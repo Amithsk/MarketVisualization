@@ -4,7 +4,7 @@ import pandas as pd
 from queries import (
     get_nifty_recent, get_predictions, get_model_daily_summary,
     get_comparisons, get_intraday_for_symbol, get_gainers_losers,
-    get_etf_list, get_etf_price_history
+    get_etf_list, get_etf_price_history,get_intraday_by_date
 )
 from components import plot_candles, line_series, simple_bar
 
@@ -35,18 +35,46 @@ with tabs[0]:
     st.dataframe(gl)
 
 # INTRADAY PANEL
+# app.py  – inside Intraday tab
 with tabs[1]:
     st.header("Intraday Performance Panel")
-    symbol = st.text_input("Symbol (exact)", value="RELIANCE.NS")
-    days_intraday = st.slider("Days", 1, 365, 30)
-    if symbol:
-        intr = get_intraday_for_symbol(symbol, days=days_intraday)
-        if intr.empty:
-            st.warning("No data for that symbol in intraday_bhavcopy. Confirm symbol.")
+
+    mode = st.radio("View Mode", ["By Symbol", "By Date"], horizontal=True)
+
+    if mode == "By Symbol":
+        symbol = st.text_input("Symbol (exact)", value="RELIANCE.NS")
+        days_intraday = st.slider("Days", 1, 365, 30)
+        if symbol:
+            intr = get_intraday_for_symbol(symbol, days=days_intraday)
+            if intr.empty:
+                st.warning("No data for that symbol in intraday_bhavcopy. Confirm symbol.")
+            else:
+                intr = intr.rename(columns={"trade_date": "Date", "open": "Open", "high": "High",
+                                            "low": "Low", "close": "Close"})
+                st.plotly_chart(plot_candles(intr), use_container_width=True)
+                st.dataframe(intr.tail(50))
+
+    else:  # By Date
+        from datetime import date, timedelta
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1))
+        df = get_intraday_by_date(sel_date.strftime("%Y-%m-%d"))
+
+        if df.empty:
+            st.info(f"No data found in intraday_bhavcopy for {sel_date}.")
         else:
-            st.plotly_chart(plot_candles(intr.rename(columns={"trade_date":"Date"})), use_container_width=True)
-            st.write("Recent table")
-            st.dataframe(intr.tail(50))
+            st.subheader(f"Market Summary — {sel_date}")
+            st.metric("Stocks traded", len(df))
+            st.dataframe(df.head(100))
+
+            st.subheader("Top 10 by Value Traded")
+            top = df.nlargest(10, "net_trdval")[["symbol", "open", "close", "net_trdval"]]
+            st.bar_chart(top.set_index("symbol")["net_trdval"])
+
+            st.subheader("Top 10 Price Movers (%)")
+            df["pct_change"] = ((df["close"] - df["open"]) / df["open"]) * 100
+            movers = df.nlargest(10, "pct_change")[["symbol", "pct_change"]]
+            st.bar_chart(movers.set_index("symbol"))
+
 
 # ETF TRACKER
 with tabs[2]:
