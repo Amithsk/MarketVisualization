@@ -140,3 +140,41 @@ def get_etf_price_history(etf_id: int, days: int = 365):
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
+def get_etf_by_date(trade_date: str, limit: int = 200):
+    """
+    Return ETF price/volume rows for a given trade date.
+    Columns returned: etf_id, etf_symbol, etf_name, etf_last_traded_price AS close,
+                      etf_day_open AS open, etf_traded_high AS high, etf_traded_low AS low,
+                      etf_daily_traded_volume AS volume, etf_daily_traded_value AS traded_value (if exists)
+    """
+    q = """
+    SELECT d.etf_id,
+           e.etf_symbol,
+           e.etf_name,
+           d.etf_last_traded_price AS close,
+           d.etf_day_open AS open,
+           d.etf_traded_high AS high,
+           d.etf_traded_low AS low,
+           d.etf_daily_traded_volume AS volume,
+           d.etf_daily_traded_value AS traded_value
+    FROM etf_daily_transaction d
+    JOIN etf e ON d.etf_id = e.etf_id
+    WHERE d.etf_trade_date = :td
+    ORDER BY d.etf_daily_traded_value DESC
+    LIMIT :limit
+    """
+    df = read_sql("etf", q, params={"td": trade_date, "limit": limit})
+    if not df.empty:
+        # canonicalize names for UI
+        df = df.rename(columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume",
+            "traded_value": "TradedValue",
+            "etf_trade_date": "Date"
+        })
+    return df
+
+
