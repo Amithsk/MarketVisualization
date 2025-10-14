@@ -89,6 +89,22 @@ def get_gainers_losers(on_date: str = None, top_n: int = 10):
         df["trade_date"] = pd.to_datetime(df["trade_date"])
     return df
 
+
+def get_intraday_by_date(trade_date: str):
+    """
+    Returns summary of all stocks traded on a given date.
+    Columns: symbol, open, high, low, close, net_trdval, net_trdqty
+    """
+    q = """
+    SELECT trade_date, symbol, open, high, low, close, net_trdval, net_trdqty
+    FROM intraday_bhavcopy
+    WHERE trade_date = :td
+    ORDER BY net_trdval DESC
+    LIMIT 200
+    """
+    return read_sql("intraday", q, params={"td": trade_date})
+
+
 # ---------- ETF (db_key = 'etf') ----------
 def get_etf_list():
     q = "SELECT etf_id, etf_symbol, etf_name, etf_fundhouse_name FROM etf ORDER BY etf_symbol"
