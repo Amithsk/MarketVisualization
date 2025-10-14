@@ -95,16 +95,32 @@ def get_etf_list():
     df = read_sql("etf", q)
     return df
 
+# queries.py (updated get_etf_price_history)
 def get_etf_price_history(etf_id: int, days: int = 365):
     q = """
-    SELECT etf_trade_date as trade_date, etf_last_traded_price as close, etf_traded_high as high, etf_traded_low as low,
-           etf_day_open as open, etf_daily_traded_volume as volume
+    SELECT etf_trade_date as trade_date,
+           etf_last_traded_price as close,
+           etf_traded_high as high,
+           etf_traded_low as low,
+           etf_day_open as open,
+           etf_daily_traded_volume as volume
     FROM etf_daily_transaction
     WHERE etf_id = :etf_id
       AND etf_trade_date >= CURDATE() - INTERVAL :days DAY
     ORDER BY etf_trade_date
     """
     df = read_sql("etf", q, params={"etf_id": etf_id, "days": days})
-    if not df.empty:
-        df["trade_date"] = pd.to_datetime(df["trade_date"])
+    if df.empty:
+        return df
+    # canonicalize column names to what UI expects
+    df = df.rename(columns={
+        "trade_date": "Date",
+        "open": "Open",
+        "high": "High",
+        "low": "Low",
+        "close": "Close",
+        "volume": "Volume"
+    })
+    df["Date"] = pd.to_datetime(df["Date"])
     return df
+
