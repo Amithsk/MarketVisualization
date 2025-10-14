@@ -3,14 +3,15 @@ import streamlit as st
 import pandas as pd
 from queries import (
     get_nifty_recent, get_predictions, get_model_daily_summary,
-    get_comparisons, get_intraday_for_symbol, get_gainers_losers,
-    get_etf_list, get_etf_price_history,get_intraday_by_date
+    get_comparisons, get_intraday_for_symbol,get_intraday_by_date, get_gainers_losers,
+    get_etf_list, get_etf_price_history,get_etf_by_date
 )
-from components import plot_candles, line_series, simple_bar
 
-st.set_page_config(layout="wide", page_title="MCP - Market Control Panel")
+from components import plot_candles, line_series, simple_bar, bar_with_labels
 
-st.title("Master Control Panel — Market Visualizations")
+st.set_page_config(layout="wide", page_title="Market Visualizations")
+
+st.title("Market Visualizations")
 
 tabs = st.tabs(["Market Overview", "Intraday Panel", "ETF Tracker", "Prediction & Model Health"])
 
@@ -79,15 +80,63 @@ with tabs[1]:
 # ETF TRACKER
 with tabs[2]:
     st.header("ETF Tracker")
-    etf_list = get_etf_list()
-    etf_choice = st.selectbox("ETF", etf_list['etf_symbol'] + " — " + etf_list['etf_name'].fillna(''))
-    etf_id = etf_list[etf_list['etf_symbol'] == etf_choice.split(" — ")[0]]['etf_id'].iloc[0]
-    etf_history = get_etf_price_history(etf_id, days=365)
-    if not etf_history.empty:
-        st.plotly_chart(plot_candles(etf_history.rename(columns={"trade_date":"Date","close":"Close"})), use_container_width=True)
-        st.dataframe(etf_history.tail(50))
+
+    view_mode = st.radio("View Mode", ["By ETF", "By Date"], horizontal=True)
+
+    if view_mode == "By ETF":
+        # existing behavior (single ETF selection)
+        etf_list = get_etf_list()
+        if etf_list.empty:
+            st.info("No ETFs available in etf table.")
+        else:
+            etf_choices = (etf_list['etf_symbol'] + " — " + etf_list['etf_name'].fillna("")).tolist()
+            etf_choice = st.selectbox("ETF", options=etf_choices)
+            sel_symbol = etf_choice.split(" — ")[0]
+            etf_id = int(etf_list[etf_list['etf_symbol'] == sel_symbol]['etf_id'].iloc[0])
+            etf_history = get_etf_price_history(etf_id, days=365)
+            if not etf_history.empty:
+                # ensure proper column names (get_etf_price_history should canonicalize)
+                st.plotly_chart(plot_candles(etf_history), use_container_width=True)
+                st.dataframe(etf_history.tail(50))
+            else:
+                st.info("No transaction history found for this ETF.")
+
     else:
-        st.info("No transaction history found for this ETF.")
+        # By Date view: show market summary for ETFs on a chosen date
+        from datetime import date, timedelta
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1))
+        date_str = sel_date.strftime("%Y-%m-%d")
+
+        df = get_etf_by_date(date_str)
+        if df is None or df.empty:
+            st.info(f"No ETF transactions found for {date_str}.")
+        else:
+            st.subheader(f"ETF Market Summary — {date_str}")
+            st.metric("ETFs traded", len(df))
+
+            # prefer TradedValue, otherwise use Volume
+            ycol = "TradedValue" if "TradedValue" in df.columns and df["TradedValue"].notna().any() else "Volume"
+
+            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), use_container_width=True)
+
+            # show table
+            st.dataframe(df.head(200))
+
+            # drill-down: choose an ETF from today's list
+            st.subheader("Drill-down ETF")
+            choices = df["etf_symbol"].dropna().unique().tolist()
+            sel = st.selectbox("Pick ETF for history", options=["-- none --"] + choices)
+            if sel and sel != "-- none --":
+                etf_id = int(df[df["etf_symbol"] == sel]["etf_id"].iloc[0])
+                etf_history = get_etf_price_history(etf_id, days=365)
+                if etf_history is None or etf_history.empty:
+                    st.warning("No historical data available for selected ETF.")
+                else:
+                    etf_history["Date"] = pd.to_datetime(etf_history["Date"])
+                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), use_container_width=True)
+                    # show recent numbers inside chart table — present tail
+                    st.dataframe(etf_history.tail(50))
+
 
 # PREDICTION & MODEL HEALTH
 with tabs[3]:
