@@ -3,6 +3,7 @@
 
 from db import read_sql
 import pandas as pd
+from datetime import datetime, timedelta, date
 
 # ---------- NIFTY (db_key = 'nifty') ----------
 def get_nifty_recent(days: int = 180):
@@ -103,6 +104,167 @@ def get_intraday_by_date(trade_date: str):
     LIMIT 200
     """
     return read_sql("intraday", q, params={"td": trade_date})
+
+# ---------- Intraday functions (drop-in replacements) ----------
+
+def get_intraday_market_rows(trade_date: str = None) -> pd.DataFrame:
+    """
+    Return intraday rows for trade_date ordered by net_trdval desc.
+    Columns returned include: trade_date, symbol, open, high, low, close, net_trdval, net_trdqty, pct_change, direction
+    """
+    if trade_date is None:
+        trade_date = datetime.now().date().isoformat()
+
+    q = """
+    SELECT
+        trade_date,
+        symbol,
+        open,
+        high,
+        low,
+        close,
+        net_trdval,
+        net_trdqty,
+        ROUND((close - open) / NULLIF(open,0) * 100, 2) AS pct_change,
+        CASE
+            WHEN close > open THEN 'gain'
+            WHEN close < open THEN 'loss'
+            ELSE 'flat'
+        END AS direction
+    FROM intraday_bhavcopy
+    WHERE trade_date = :trade_date
+    ORDER BY net_trdval DESC
+    """
+    df = read_sql("intraday", q, params={"trade_date": trade_date})
+    # ensure consistent dtypes (match other functions' style)
+    if not df.empty:
+        if "trade_date" in df.columns:
+            df["trade_date"] = pd.to_datetime(df["trade_date"])
+    return df
+
+
+def get_intraday_top_value_traded(trade_date: str = None, lookback_days: int = 30, limit: int = 10) -> pd.DataFrame:
+    """
+    Top N symbols by traded value for trade_date, plus avg_30d_net_trdval over lookback_days (inclusive).
+    Returns DataFrame with columns: symbol, open, close, net_trdval, pct_change, avg_30d_net_trdval
+    """
+    if trade_date is None:
+        td = datetime.now().date()
+    else:
+        # accept date string or date object
+        try:
+            td = datetime.fromisoformat(trade_date).date()
+        except Exception:
+            td = datetime.strptime(str(trade_date), "%Y-%m-%d").date()
+    trade_date_str = td.isoformat()
+    start_date_str = (td - timedelta(days=lookback_days - 1)).isoformat()
+
+    q = f"""
+    WITH top_symbols AS (
+        SELECT symbol
+        FROM intraday_bhavcopy
+        WHERE trade_date = :trade_date
+        ORDER BY net_trdval DESC
+        LIMIT :limit
+    )
+    SELECT
+        t.symbol,
+        i.open,
+        i.close,
+        i.net_trdval,
+        ROUND((i.close - i.open) / NULLIF(i.open,0) * 100, 2) AS pct_change,
+        ROUND((
+            SELECT AVG(net_trdval)
+            FROM intraday_bhavcopy
+            WHERE symbol = t.symbol
+              AND trade_date BETWEEN :start_date AND :trade_date
+        ), 2) AS avg_30d_net_trdval
+    FROM top_symbols t
+    JOIN intraday_bhavcopy i
+      ON i.symbol = t.symbol
+     AND i.trade_date = :trade_date
+    ORDER BY i.net_trdval DESC
+    """
+    df = read_sql("intraday", q, params={"trade_date": trade_date_str, "start_date": start_date_str, "limit": limit})
+    return df
+
+
+def get_intraday_top_price_movers(
+    trade_date: str = None, limit: int = 10
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Returns tuple (gainers_df, losers_df) for the given trade_date.
+    Each DataFrame columns: symbol, open, close, pct_change, net_trdval
+    """
+    if trade_date is None:
+        trade_date = datetime.now().date().isoformat()
+
+    q_gainers = """
+    SELECT
+        symbol,
+        open,
+        close,
+        ROUND((close - open) / NULLIF(open,0) * 100, 2) AS pct_change,
+        net_trdval
+    FROM intraday_bhavcopy
+    WHERE trade_date = :trade_date
+    ORDER BY pct_change DESC
+    LIMIT :limit
+    """
+    q_losers = """
+    SELECT
+        symbol,
+        open,
+        close,
+        ROUND((close - open) / NULLIF(open,0) * 100, 2) AS pct_change,
+        net_trdval
+    FROM intraday_bhavcopy
+    WHERE trade_date = :trade_date
+    ORDER BY pct_change ASC
+    LIMIT :limit
+    """
+
+    gainers = read_sql("intraday", q_gainers, params={"trade_date": trade_date, "limit": limit})
+    losers = read_sql("intraday", q_losers, params={"trade_date": trade_date, "limit": limit})
+
+    return gainers, losers
+
+
+def get_intraday_summary_kpis(trade_date: str = None) -> dict:
+    """
+    Return summary KPIs for intraday market snapshot for trade_date.
+    Output dict keys:
+      symbols_traded, total_traded_value, gainers, losers, flat, avg_pct_change
+    """
+    if trade_date is None:
+        trade_date = datetime.now().date().isoformat()
+
+    q = """
+    SELECT
+        COUNT(*) AS symbols_traded,
+        ROUND(SUM(net_trdval), 2) AS total_traded_value,
+        SUM(CASE WHEN close > open THEN 1 ELSE 0 END) AS gainers,
+        SUM(CASE WHEN close < open THEN 1 ELSE 0 END) AS losers,
+        SUM(CASE WHEN close = open THEN 1 ELSE 0 END) AS flat,
+        ROUND(AVG((close - open) / NULLIF(open,0) * 100), 2) AS avg_pct_change
+    FROM intraday_bhavcopy
+    WHERE trade_date = :trade_date
+    """
+    df = read_sql("intraday", q, params={"trade_date": trade_date})
+    if df.empty:
+        return {"symbols_traded": 0, "total_traded_value": 0.0, "gainers": 0, "losers": 0, "flat": 0, "avg_pct_change": 0.0}
+
+    row = df.iloc[0].to_dict()
+    # coerce types to native
+    return {
+        "symbols_traded": int(row.get("symbols_traded") or 0),
+        "total_traded_value": float(row.get("total_traded_value") or 0.0),
+        "gainers": int(row.get("gainers") or 0),
+        "losers": int(row.get("losers") or 0),
+        "flat": int(row.get("flat") or 0),
+        "avg_pct_change": float(row.get("avg_pct_change") or 0.0),
+    }
+
 
 
 # ---------- ETF (db_key = 'etf') ----------
