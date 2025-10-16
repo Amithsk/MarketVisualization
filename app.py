@@ -112,76 +112,78 @@ with tabs[1]:
             movers = df.nlargest(10, "pct_change")[["symbol", "pct_change"]]
             st.bar_chart(movers.set_index("symbol"))
 
-    # --- KPIs (now use selected trade_date if in By Date, else today) ---
-    kpi_data = get_intraday_summary_kpis(trade_date=trade_date_str)
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Symbols Traded", kpi_data["symbols_traded"])
-    col2.metric("Total Traded Value", f"{kpi_data['total_traded_value']:,.0f}")
-    col3.metric("Gainers", kpi_data["gainers"])
-    col4.metric("Losers", kpi_data["losers"])
-    col5.metric("Avg % Change", f"{kpi_data['avg_pct_change']}%")
+        # --- KPIs (now use selected trade_date if in By Date, else today) ---
+        kpi_data = get_intraday_summary_kpis(trade_date=trade_date_str)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Symbols Traded", kpi_data["symbols_traded"])
+        col2.metric("Total Traded Value", f"{kpi_data['total_traded_value']:,.0f}")
+        col3.metric("Gainers", kpi_data["gainers"])
+        col4.metric("Losers", kpi_data["losers"])
+        col5.metric("Avg % Change", f"{kpi_data['avg_pct_change']}%")
 
-    st.divider()
+        st.divider()
 
-    # --- Market snapshot ---
-    st.subheader("Market Snapshot")
-    # If the By Date branch already fetched all rows (df), reuse it; otherwise call query
-    if mode == "By Date":
-        intraday_df = df  # df was set above
-    else:
-        intraday_df = get_intraday_market_rows(trade_date=trade_date_str)
+        # --- Market snapshot ---
+        st.subheader("Market Snapshot")
+        # If the By Date branch already fetched all rows (df), reuse it; otherwise call query
+        if mode == "By Date":
+            intraday_df = df  # df was set above
+        else:
+            intraday_df = get_intraday_market_rows(trade_date=trade_date_str)
 
-    if intraday_df is not None and not intraday_df.empty:
-        st.dataframe(
-            colorize_intraday_table(intraday_df),
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.info("No intraday data available for the selected date.")
+        if intraday_df is not None and not intraday_df.empty:
+            st.dataframe(
+                colorize_intraday_table(intraday_df),
+             use_container_width=True,
+             hide_index=True,
+              )
+        else:
+            st.info("No intraday data available for the selected date.")
 
-    st.divider()
+        st.divider()
 
-    # --- Top 10 by traded value ---
-    st.subheader("Top 10 Stocks by Traded Value (with 30-Day Average)")
-    top_value_df = get_intraday_top_value_traded(trade_date=trade_date_str)
-    if top_value_df is not None and not top_value_df.empty:
-        st.dataframe(
+        # --- Top 10 by traded value ---
+        st.subheader("Top 10 Stocks by Traded Value (with 30-Day Average)")
+     
+        top_value_df = get_intraday_top_value_traded(trade_date=trade_date_str)
+        print("DEBUG trade_date type:", type(trade_date_str), "value:", trade_date_str)
+        if top_value_df is not None and not top_value_df.empty:
+            st.dataframe(
             colorize_intraday_table(top_value_df),
             use_container_width=True,
             hide_index=True,
-        )
-    else:
-        st.info("No traded value data available for the selected date.")
+            )
+        else:
+            st.info("No traded value data available for the selected date.")
 
-    st.divider()
+        st.divider()
 
-    # --- Top gainers and losers ---
-    st.subheader("Top 10 Price Movers")
-    gainers_df, losers_df = get_intraday_top_price_movers(trade_date=trade_date_str)
-    col1, col2 = st.columns(2)
+        # --- Top gainers and losers ---
+        st.subheader("Top 10 Price Movers")
+        gainers_df, losers_df = get_intraday_top_price_movers(trade_date=trade_date_str)
+        col1, col2 = st.columns(2)
 
-    with col1:
-        st.markdown("**Top Gainers**")
-        if gainers_df is not None and not gainers_df.empty:
-            st.dataframe(
+        with col1:
+            st.markdown("**Top Gainers**")
+            if gainers_df is not None and not gainers_df.empty:
+                st.dataframe(
                 colorize_intraday_table(gainers_df),
                 use_container_width=True,
                 hide_index=True,
-            )
-        else:
-            st.info("No gainers data for the selected date.")
+                )
+            else:
+                st.info("No gainers data for the selected date.")
 
-    with col2:
-        st.markdown("**Top Losers**")
-        if losers_df is not None and not losers_df.empty:
-            st.dataframe(
+        with col2:
+            st.markdown("**Top Losers**")
+            if losers_df is not None and not losers_df.empty:
+                st.dataframe(
                 colorize_intraday_table(losers_df),
                 use_container_width=True,
                 hide_index=True,
-            )
-        else:
-            st.info("No losers data for the selected date.")
+             )
+            else:
+                st.info("No losers data for the selected date.")
 # ---------------------------------------------------------------------------
 
 
