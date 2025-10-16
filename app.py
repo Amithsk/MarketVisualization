@@ -3,7 +3,9 @@ import streamlit as st
 import pandas as pd
 from queries import (
     get_nifty_recent, get_predictions, get_model_daily_summary,
-    get_comparisons, get_intraday_for_symbol,get_intraday_by_date, get_gainers_losers,
+    get_comparisons, get_intraday_for_symbol,
+    get_intraday_by_date, get_gainers_losers,get_intraday_market_rows,get_intraday_top_value_traded, 
+    get_intraday_top_price_movers,get_intraday_summary_kpis,
     get_etf_list, get_etf_price_history,get_etf_by_date
 )
 
@@ -14,6 +16,29 @@ st.set_page_config(layout="wide", page_title="Market Visualizations")
 st.title("Market Visualizations")
 
 tabs = st.tabs(["Market Overview", "Intraday Panel", "ETF Tracker", "Prediction & Model Health"])
+
+# --- Helper: colorize table rows ---
+def colorize_intraday_table(df: pd.DataFrame):
+    if df is None or df.empty:
+        return df
+    def _row_color(row):
+        if "direction" in row:
+            if row["direction"] == "gain":
+                return ["background-color: #e6ffe6"] * len(row)
+            elif row["direction"] == "loss":
+                return ["background-color: #ffe6e6"] * len(row)
+            else:
+                return ["background-color: #f2f2f2"] * len(row)
+        elif "pct_change" in row:
+            if row["pct_change"] > 2:
+                return ["background-color: #d9fcd9"] * len(row)
+            elif row["pct_change"] < -2:
+                return ["background-color: #fcd9d9"] * len(row)
+            else:
+                return ["background-color: #f2f2f2"] * len(row)
+        return [""] * len(row)
+    return df.style.apply(_row_color, axis=1)
+
 
 # MARKET OVERVIEW
 with tabs[0]:
@@ -36,13 +61,17 @@ with tabs[0]:
     st.dataframe(gl)
 
 # INTRADAY PANEL
-# app.py  – inside Intraday tab
+# ------------------- INTRADAY PANEL (replace existing block) -------------------
 with tabs[1]:
     st.header("Intraday Performance Panel")
 
     mode = st.radio("View Mode", ["By Symbol", "By Date"], horizontal=True)
 
+    # default trade_date string used for functions that accept a date
+    trade_date_str = None
+
     if mode == "By Symbol":
+        # By symbol mode remains unchanged — shows symbol history
         symbol = st.text_input("Symbol (exact)", value="RELIANCE.NS")
         days_intraday = st.slider("Days", 1, 365, 30)
         if symbol:
@@ -55,16 +84,23 @@ with tabs[1]:
                 st.plotly_chart(plot_candles(intr), use_container_width=True)
                 st.dataframe(intr.tail(50))
 
+        # keep trade_date_str as None so subsequent calls fall back to today's data
+        trade_date_str = None
+
     else:  # By Date
         from datetime import date, timedelta
         sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1))
-        df = get_intraday_by_date(sel_date.strftime("%Y-%m-%d"))
+        trade_date_str = sel_date.strftime("%Y-%m-%d")
+
+        # use existing helper that fetches all rows for that date
+        df = get_intraday_by_date(trade_date_str)
 
         if df.empty:
-            st.info(f"No data found in intraday_bhavcopy for {sel_date}.")
+            st.info(f"No data found in intraday_bhavcopy for {trade_date_str}.")
         else:
-            st.subheader(f"Market Summary — {sel_date}")
+            st.subheader(f"Market Summary — {trade_date_str}")
             st.metric("Stocks traded", len(df))
+            # Use the fetched df for the snapshot display to avoid duplicate DB calls
             st.dataframe(df.head(100))
 
             st.subheader("Top 10 by Value Traded")
@@ -75,6 +111,78 @@ with tabs[1]:
             df["pct_change"] = ((df["close"] - df["open"]) / df["open"]) * 100
             movers = df.nlargest(10, "pct_change")[["symbol", "pct_change"]]
             st.bar_chart(movers.set_index("symbol"))
+
+    # --- KPIs (now use selected trade_date if in By Date, else today) ---
+    kpi_data = get_intraday_summary_kpis(trade_date=trade_date_str)
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Symbols Traded", kpi_data["symbols_traded"])
+    col2.metric("Total Traded Value", f"{kpi_data['total_traded_value']:,.0f}")
+    col3.metric("Gainers", kpi_data["gainers"])
+    col4.metric("Losers", kpi_data["losers"])
+    col5.metric("Avg % Change", f"{kpi_data['avg_pct_change']}%")
+
+    st.divider()
+
+    # --- Market snapshot ---
+    st.subheader("Market Snapshot")
+    # If the By Date branch already fetched all rows (df), reuse it; otherwise call query
+    if mode == "By Date":
+        intraday_df = df  # df was set above
+    else:
+        intraday_df = get_intraday_market_rows(trade_date=trade_date_str)
+
+    if intraday_df is not None and not intraday_df.empty:
+        st.dataframe(
+            colorize_intraday_table(intraday_df),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No intraday data available for the selected date.")
+
+    st.divider()
+
+    # --- Top 10 by traded value ---
+    st.subheader("Top 10 Stocks by Traded Value (with 30-Day Average)")
+    top_value_df = get_intraday_top_value_traded(trade_date=trade_date_str)
+    if top_value_df is not None and not top_value_df.empty:
+        st.dataframe(
+            colorize_intraday_table(top_value_df),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No traded value data available for the selected date.")
+
+    st.divider()
+
+    # --- Top gainers and losers ---
+    st.subheader("Top 10 Price Movers")
+    gainers_df, losers_df = get_intraday_top_price_movers(trade_date=trade_date_str)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Top Gainers**")
+        if gainers_df is not None and not gainers_df.empty:
+            st.dataframe(
+                colorize_intraday_table(gainers_df),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No gainers data for the selected date.")
+
+    with col2:
+        st.markdown("**Top Losers**")
+        if losers_df is not None and not losers_df.empty:
+            st.dataframe(
+                colorize_intraday_table(losers_df),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No losers data for the selected date.")
+# ---------------------------------------------------------------------------
 
 
 # ETF TRACKER
@@ -159,3 +267,5 @@ with tabs[3]:
     st.subheader("Backtest Comparison (recent)")
     comp = get_comparisons(model_name=None if chosen=="ALL" else chosen, limit=200)
     st.dataframe(comp)
+
+
