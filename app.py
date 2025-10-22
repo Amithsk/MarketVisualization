@@ -89,7 +89,7 @@ with tabs[1]:
 
     else:  # By Date
         from datetime import date, timedelta
-        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1))
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1),key="intraday_date_input")
         trade_date_str = sel_date.strftime("%Y-%m-%d")
 
         # use existing helper that fetches all rows for that date
@@ -214,7 +214,7 @@ with tabs[2]:
     else:
         # By Date view: show market summary for ETFs on a chosen date
         from datetime import date, timedelta
-        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1))
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1),key="etf_date_input")
         date_str = sel_date.strftime("%Y-%m-%d")
 
         df = get_etf_by_date(date_str)
