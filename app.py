@@ -47,7 +47,7 @@ with tabs[0]:
     nifty_df = get_nifty_recent(days=ndays)
     st.subheader("NIFTY Price Chart (OHLC)")
     fig = plot_candles(nifty_df, date_col='Date', title=f"NIFTY Last {ndays} days")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader("NIFTY Indicators")
     col1, col2, col3 = st.columns(3)
