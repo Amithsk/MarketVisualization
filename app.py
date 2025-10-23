@@ -11,6 +11,7 @@ from queries import (
 
 from components import plot_candles, line_series, simple_bar, bar_with_labels
 
+pd.options.display.float_format = "{:.2f}".format
 st.set_page_config(layout="wide", page_title="Market Visualizations")
 
 st.title("Market Visualizations")
@@ -18,26 +19,51 @@ st.title("Market Visualizations")
 tabs = st.tabs(["Market Overview", "Intraday Panel", "ETF Tracker", "Prediction & Model Health"])
 
 # --- Helper: colorize table rows ---
-def colorize_intraday_table(df: pd.DataFrame):
+def colorize_intraday_table(df: pd.DataFrame, decimals: int = 2):
+    """
+    Return a pandas Styler that colors rows and formats numeric columns to `decimals` places.
+    Safe: handles non-numeric columns.
+    """
     if df is None or df.empty:
         return df
+
+    # work on a copy and round numeric columns
+    dfr = df.copy()
+    num_cols = dfr.select_dtypes(include="number").columns.tolist()
+    if num_cols:
+        dfr[num_cols] = dfr[num_cols].round(decimals)
+
     def _row_color(row):
-        if "direction" in row:
+        # row is a Series of values (already rounded for numeric)
+        if "direction" in row.index:
             if row["direction"] == "gain":
                 return ["background-color: #e6ffe6"] * len(row)
             elif row["direction"] == "loss":
                 return ["background-color: #ffe6e6"] * len(row)
             else:
                 return ["background-color: #f2f2f2"] * len(row)
-        elif "pct_change" in row:
-            if row["pct_change"] > 2:
+        elif "pct_change" in row.index:
+            # use rounded value for thresholds
+            try:
+                val = float(row["pct_change"])
+            except Exception:
+                val = 0.0
+            if val > 2:
                 return ["background-color: #d9fcd9"] * len(row)
-            elif row["pct_change"] < -2:
+            elif val < -2:
                 return ["background-color: #fcd9d9"] * len(row)
             else:
                 return ["background-color: #f2f2f2"] * len(row)
         return [""] * len(row)
-    return df.style.apply(_row_color, axis=1)
+
+    styler = dfr.style.apply(_row_color, axis=1)
+
+    # Format numeric cols explicitly to ensure .2f-like display in the styler
+    if num_cols:
+        fmt = {c: f"{{:.{decimals}f}}" for c in num_cols}
+        styler = styler.format(fmt)
+
+    return styler
 
 
 # MARKET OVERVIEW
@@ -58,7 +84,7 @@ with tabs[0]:
 
     st.markdown("**Gainers / Losers (recent)**")
     gl = get_gainers_losers(top_n=10)
-    st.dataframe(gl)
+    st.dataframe(gl.round(2))
 
 # INTRADAY PANEL
 # ------------------- INTRADAY PANEL (replace existing block) -------------------
@@ -81,8 +107,8 @@ with tabs[1]:
             else:
                 intr = intr.rename(columns={"trade_date": "Date", "open": "Open", "high": "High",
                                             "low": "Low", "close": "Close"})
-                st.plotly_chart(plot_candles(intr), use_container_width=True)
-                st.dataframe(intr.tail(50))
+                st.plotly_chart(plot_candles(intr), width='stretch')
+                st.dataframe(intr.tail(50).round(2))
 
         # keep trade_date_str as None so subsequent calls fall back to today's data
         trade_date_str = None
@@ -101,7 +127,7 @@ with tabs[1]:
             st.subheader(f"Market Summary — {trade_date_str}")
             st.metric("Stocks traded", len(df))
             # Use the fetched df for the snapshot display to avoid duplicate DB calls
-            st.dataframe(df.head(100))
+            st.dataframe(df.head(100).round(2))
 
             st.subheader("Top 10 by Value Traded")
             top = df.nlargest(10, "net_trdval")[["symbol", "open", "close", "net_trdval"]]
@@ -206,8 +232,8 @@ with tabs[2]:
             etf_history = get_etf_price_history(etf_id, days=365)
             if not etf_history.empty:
                 # ensure proper column names (get_etf_price_history should canonicalize)
-                st.plotly_chart(plot_candles(etf_history), use_container_width=True)
-                st.dataframe(etf_history.tail(50))
+                st.plotly_chart(plot_candles(etf_history), width='stretch')
+                st.dataframe(etf_history.tail(50).round(2))
             else:
                 st.info("No transaction history found for this ETF.")
 
@@ -227,10 +253,10 @@ with tabs[2]:
             # prefer TradedValue, otherwise use Volume
             ycol = "TradedValue" if "TradedValue" in df.columns and df["TradedValue"].notna().any() else "Volume"
 
-            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), use_container_width=True)
+            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), width='stretch')
 
             # show table
-            st.dataframe(df.head(200))
+            st.dataframe(df.head(200).round(2))
 
             # drill-down: choose an ETF from today's list
             st.subheader("Drill-down ETF")
@@ -243,9 +269,9 @@ with tabs[2]:
                     st.warning("No historical data available for selected ETF.")
                 else:
                     etf_history["Date"] = pd.to_datetime(etf_history["Date"])
-                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), use_container_width=True)
+                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), width='stretch')
                     # show recent numbers inside chart table — present tail
-                    st.dataframe(etf_history.tail(50))
+                    st.dataframe(etf_history.tail(50).round(2))
 
 
 # PREDICTION & MODEL HEALTH
