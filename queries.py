@@ -105,7 +105,7 @@ def get_intraday_by_date(trade_date: str):
     """
     return read_sql("intraday", q, params={"td": trade_date})
 
-# ---------- Intraday functions (drop-in replacements) ----------
+
 
 def get_intraday_market_rows(trade_date: str = None) -> pd.DataFrame:
     """
@@ -265,6 +265,126 @@ def get_intraday_summary_kpis(trade_date: str = None) -> dict:
         "avg_pct_change": float(row.get("avg_pct_change") or 0.0),
     }
 
+# --- New: Strategy / Signals / Features / Runs (db_key = 'intraday') ---
+
+def get_signal_summary_by_day_strategy(last_days: int = 30):
+    """
+    Returns daily counts by strategy and LONG/SHORT breakdown for the past `last_days`.
+    Columns: d (date), strategy, c (count), longs, shorts
+    """
+    q = """
+    SELECT DATE(trade_date) AS d,
+           strategy,
+           COUNT(*) AS c,
+           SUM(signal_type = 'LONG') AS longs,
+           SUM(signal_type = 'SHORT') AS shorts
+    FROM strategy_signals
+    WHERE trade_date >= CURDATE() - INTERVAL :days DAY
+    GROUP BY DATE(trade_date), strategy
+    ORDER BY DATE(trade_date) DESC, strategy
+    """
+    df = read_sql("intraday", q, params={"days": last_days})
+    if not df.empty:
+        df["d"] = pd.to_datetime(df["d"])
+    return df
+
+
+def get_signals_by_date_strategy(trade_date: str, strategy: str = None, limit: int = 1000):
+    """
+    Return detailed signals for a date (optionally filter by strategy).
+    """
+    if strategy:
+        q = """
+        SELECT trade_date, strategy, symbol, signal_type, signal_score,
+               entry_price, stop_price, target_price, expected_hold_days,
+               params, notes, created_at
+        FROM strategy_signals
+        WHERE trade_date = :td AND strategy = :strategy
+        ORDER BY signal_score DESC
+        LIMIT :limit
+        """
+        params = {"td": trade_date, "strategy": strategy, "limit": limit}
+    else:
+        q = """
+        SELECT trade_date, strategy, symbol, signal_type, signal_score,
+               entry_price, stop_price, target_price, expected_hold_days,
+               params, notes, created_at
+        FROM strategy_signals
+        WHERE trade_date = :td
+        ORDER BY signal_score DESC
+        LIMIT :limit
+        """
+        params = {"td": trade_date, "limit": limit}
+
+    df = read_sql("intraday", q, params=params)
+    if not df.empty:
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+    return df
+
+
+def get_feature_trends(symbol: str, feature_names: list, start_date: str = None, end_date: str = None):
+    """
+    Pull feature time series for a symbol. Returns pivoted DataFrame:
+    Index: trade_date, Columns: feature names
+    - feature_names: list of strings (e.g., ['rsi_14','atr_14'])
+    - start_date / end_date: 'YYYY-MM-DD' strings or None
+    """
+    if not feature_names:
+        return pd.DataFrame()
+
+    # build IN clause safely by generating params
+    placeholders = ", ".join([f":f{i}" for i in range(len(feature_names))])
+    params = {"symbol": symbol}
+    for i, fn in enumerate(feature_names):
+        params[f"f{i}"] = fn
+
+    date_clause = ""
+    if start_date and end_date:
+        date_clause = "AND trade_date BETWEEN :start_date AND :end_date"
+        params["start_date"] = start_date
+        params["end_date"] = end_date
+    elif start_date:
+        date_clause = "AND trade_date >= :start_date"
+        params["start_date"] = start_date
+    elif end_date:
+        date_clause = "AND trade_date <= :end_date"
+        params["end_date"] = end_date
+
+    q = f"""
+    SELECT trade_date, feature_name, value
+    FROM strategy_features
+    WHERE symbol = :symbol
+      AND feature_name IN ({placeholders})
+      {date_clause}
+    ORDER BY trade_date
+    """
+    df = read_sql("intraday", q, params=params)
+    if df.empty:
+        return df
+
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    # pivot to time-series: rows=trade_date, cols=feature_name
+    pivot = df.pivot_table(index="trade_date", columns="feature_name", values="value", aggfunc="first")
+    pivot = pivot.sort_index()
+    return pivot
+
+
+def get_strategy_runs(limit: int = 50):
+    """
+    Return recent rows from strategy_runs table.
+    Columns: run_name, started_at, finished_at, summary (JSON)
+    """
+    q = """
+    SELECT run_name, started_at, finished_at, summary
+    FROM strategy_runs
+    ORDER BY started_at DESC
+    LIMIT :limit
+    """
+    df = read_sql("intraday", q, params={"limit": limit})
+    if not df.empty:
+        df["started_at"] = pd.to_datetime(df["started_at"])
+        df["finished_at"] = pd.to_datetime(df["finished_at"])
+    return df
 
 
 # ---------- ETF (db_key = 'etf') ----------
