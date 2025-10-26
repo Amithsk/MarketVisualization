@@ -67,3 +67,12 @@ def bar_with_labels(df, x_col: str, y_col: str, title: str = None, text_format: 
         height=600
     )
     return fig
+def pie_split(labels, values, title=None):
+    """
+    Simple Plotly pie/donut chart. labels: list, values: list.
+    """
+    import plotly.graph_objs as go
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.4, textinfo='label+percent')])
+    if title:
+        fig.update_layout(title=title, height=420)
+    return fig
