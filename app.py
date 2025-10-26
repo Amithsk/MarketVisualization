@@ -5,12 +5,11 @@ from queries import (
     get_nifty_recent, get_predictions, get_model_daily_summary,
     get_comparisons, get_intraday_for_symbol,
     get_intraday_by_date, get_gainers_losers,get_intraday_market_rows,get_intraday_top_value_traded, 
-    get_intraday_top_price_movers,get_intraday_summary_kpis,
+    get_intraday_top_price_movers,get_intraday_summary_kpis,get_signal_summary_by_day_strategy,get_signals_by_date_strategy,get_feature_trends,get_strategy_runs,get_strategy_runs,
     get_etf_list, get_etf_price_history,get_etf_by_date
 )
 
-from components import plot_candles, line_series, simple_bar, bar_with_labels
-
+from components import plot_candles, line_series, simple_bar, bar_with_labels,pie_split
 pd.options.display.float_format = "{:.2f}".format
 st.set_page_config(layout="wide", page_title="Market Visualizations")
 
@@ -131,12 +130,32 @@ with tabs[1]:
 
             st.subheader("Top 10 by Value Traded")
             top = df.nlargest(10, "net_trdval")[["symbol", "open", "close", "net_trdval"]]
-            st.bar_chart(top.set_index("symbol")["net_trdval"])
+            st.plotly_chart(
+                bar_with_labels(
+                top,
+                x_col="symbol",
+                y_col="net_trdval",
+                title="Top 10 Stocks by Value Traded",
+                text_format=".0f",
+                max_items=10,
+                ),
+                width='stretch',
+                        )
 
             st.subheader("Top 10 Price Movers (%)")
             df["pct_change"] = ((df["close"] - df["open"]) / df["open"]) * 100
             movers = df.nlargest(10, "pct_change")[["symbol", "pct_change"]]
-            st.bar_chart(movers.set_index("symbol"))
+            st.plotly_chart(
+                 bar_with_labels(
+                    movers,
+                    x_col="symbol",
+                    y_col="pct_change",
+                    title="Top 10 Price Movers (%)",
+                    text_format=".2f",
+                    max_items=10,
+                    ),
+                     width='stretch',   
+                )
 
         # --- KPIs (now use selected trade_date if in By Date, else today) ---
         kpi_data = get_intraday_summary_kpis(trade_date=trade_date_str)
@@ -210,6 +229,99 @@ with tabs[1]:
              )
             else:
                 st.info("No losers data for the selected date.")
+    # -- Insert inside the Intraday tab (tabs[1]) after existing Intraday UI --
+
+
+    st.markdown("## Signals & Strategy Analysis")
+
+    with st.expander("Signals & Strategy — Summary and Explorer", expanded=True):
+        col_a, col_b = st.columns([2, 1])
+
+        # Filters
+        days = col_b.number_input("Summary lookback (days)", min_value=1, max_value=365, value=30)
+        selected_date = col_b.date_input("Signal date", value=date.today() - timedelta(days=1))
+        chosen_strategy = col_b.selectbox("Strategy (optional)", options=["-- ALL --"], index=0)
+
+        # Load summary
+        summary_df = get_signal_summary_by_day_strategy(last_days=days)
+        if summary_df.empty:
+            st.info("No strategy signals found for the chosen period.")
+        else:
+            # Update strategy choices if default
+            strategies = ["-- ALL --"] + sorted(summary_df["strategy"].dropna().unique().tolist())
+            # replace the selectbox with actual choices if it was placeholder
+        if chosen_strategy == "-- ALL --":
+            # cheap trick to let user pick from actual strategies (UI state)
+            chosen_strategy = col_b.selectbox("Strategy (optional)", options=strategies, index=0)
+
+            # Aggregate counts by strategy for the period (for bar)
+            agg = summary_df.groupby("strategy").agg({"c": "sum", "longs": "sum", "shorts": "sum"}).reset_index().sort_values("c", ascending=False)
+            st.subheader("Signals by Strategy (last {} days)".format(days))
+            st.plotly_chart(bar_with_labels(agg, x_col="strategy", y_col="c", title=f"Signals by strategy — last {days}d"), use_container_width=True)
+
+            # Pie LONG vs SHORT overall
+            total_longs = int(agg["longs"].sum())
+            total_shorts = int(agg["shorts"].sum())
+            st.subheader("LONG vs SHORT (period total)")
+            st.plotly_chart(pie_split(["LONG", "SHORT"], [total_longs, total_shorts], title="LONG vs SHORT"), use_container_width=True)
+
+        # Signal Explorer: list of signals for the selected date / strategy
+        st.markdown("---")
+        st.subheader(f"Signal Explorer — {selected_date.isoformat()}")
+        strat_param = None if (chosen_strategy is None or chosen_strategy == "-- ALL --") else chosen_strategy
+        signals_df = get_signals_by_date_strategy(selected_date.isoformat(), strategy=strat_param, limit=2000)
+        if signals_df.empty:
+            st.info(f"No signals for {selected_date}.")
+        else:
+            # show the important columns; show params/notes truncated
+            show_cols = ["trade_date", "strategy", "symbol", "signal_type", "signal_score", "entry_price", "stop_price", "target_price", "expected_hold_days", "params", "notes"]
+            df_show = signals_df[show_cols].copy()
+            st.dataframe(df_show, use_container_width=True)
+
+        # Feature Trends: choose symbol and features
+    st.markdown("---")
+    st.subheader("Feature Trends (per-symbol)")
+
+    # get list of top symbols from today's intraday rows (or from signals)
+    today_sym_list = []
+    if not signals_df.empty:
+        today_sym_list = signals_df["symbol"].dropna().unique().tolist()
+
+    # fallback: use intraday rows for chosen date if no signals
+    if not today_sym_list:
+        intraday_today = get_intraday_by_date(selected_date.isoformat())
+        if intraday_today is not None and not intraday_today.empty:
+            today_sym_list = intraday_today["symbol"].dropna().unique().tolist()
+
+    if not today_sym_list:
+        st.info("No symbols available for feature trend lookup")
+    else:
+        sel_symbol = st.selectbox("Symbol (for feature trends)", options=today_sym_list)
+        # free-form list of features (comma-separated) with defaults
+        feat_entry = st.text_input("Features (comma-separated)", value="rsi_14,atr_14,mom_20")
+        features = [f.strip() for f in feat_entry.split(",") if f.strip()]
+        if sel_symbol and features:
+            feat_ts = get_feature_trends(sel_symbol, features, start_date=(date.today() - timedelta(days=180)).isoformat(), end_date=selected_date.isoformat())
+            if feat_ts.empty:
+                st.warning("No feature data found for symbol / features.")
+            else:
+                # plot each feature line
+                for col in feat_ts.columns:
+                    fig = line_series(feat_ts.reset_index(), x_col="trade_date", y_col=col, title=f"{sel_symbol} — {col}")
+                    st.plotly_chart(fig, use_container_width=True)
+
+    # Recent Run Logs
+    st.markdown("---")
+    st.subheader("Recent Strategy Runs")
+    runs = get_strategy_runs(limit=50)
+    if runs.empty:
+        st.info("No strategy_runs entries found.")
+    else:
+        # show run_name, started_at, finished_at and parsed summary
+        runs_display = runs[["run_name", "started_at", "finished_at", "summary"]].copy()
+        runs_display["summary_short"] = runs_display["summary"].apply(lambda s: (s if s is None else (s if len(str(s)) < 200 else str(s)[:200] + "...")))
+        st.dataframe(runs_display.drop(columns=["summary"]).rename(columns={"summary_short": "summary"}), use_container_width=True)
+
 # ---------------------------------------------------------------------------
 
 
