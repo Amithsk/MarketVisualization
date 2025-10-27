@@ -3,7 +3,12 @@ import plotly.graph_objs as go
 import pandas as pd
 
 
-def plot_candles(df, date_col='Date', open_col='Open', high_col='High', low_col='Low', close_col='Close', title="OHLC"):
+def plot_candles(df, date_col='Date', open_col='Open', high_col='High', low_col='Low', close_col='Close',
+                 title="OHLC", overlays: list = None, height: int = 550):
+    """
+    overlays: list of dicts: {"label": "entry", "price": 123.45, "color": "green", "dash": "dash", "width":2}
+    The function draws horizontal lines for each overlay at the given price.
+    """
     fig = go.Figure(data=[go.Candlestick(
         x=df[date_col],
         open=df[open_col],
@@ -12,7 +17,35 @@ def plot_candles(df, date_col='Date', open_col='Open', high_col='High', low_col=
         close=df[close_col],
         name='OHLC'
     )])
-    fig.update_layout(title=title, xaxis_rangeslider_visible=False, height=550)
+    shapes = []
+    annotations = []
+    if overlays:
+        for o in overlays:
+            price = o.get("price")
+            if price is None:
+                continue
+            label = o.get("label", "")
+            dash = o.get("dash", "dash")
+            width = o.get("width", 2)
+            color = o.get("color", None)  # if None, rely on plotly default
+            shapes.append({
+                "type": "line",
+                "xref": "paper",
+                "x0": 0, "x1": 1,
+                "y0": price, "y1": price,
+                "line": {"color": color, "width": width, "dash": dash}
+            })
+            annotations.append({
+                "x": 1.01, "xref": "paper",
+                "y": price, "yref": "y",
+                "text": f"{label}: {price}",
+                "showarrow": False,
+                "align": "left",
+                "font": {"size": 11}
+            })
+
+    fig.update_layout(title=title, xaxis_rangeslider_visible=False, height=height,
+                      shapes=shapes, annotations=annotations)
     return fig
 
 def line_series(df, x_col, y_col, title=None):
