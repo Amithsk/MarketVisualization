@@ -387,6 +387,146 @@ def get_strategy_runs(limit: int = 50):
     return df
 
 
+# --- new helpers for Signals / Features / Runs (append into queries.py) ---
+from db import read_sql
+import pandas as pd
+from datetime import datetime, timedelta
+
+def get_latest_prior_trading_date(selected_date: str):
+    """
+    Return the MAX(trade_date) <= selected_date from intraday_bhavcopy.
+    selected_date: 'YYYY-MM-DD' or date-like string
+    """
+    q = """
+    SELECT MAX(trade_date) AS latest
+    FROM intraday_bhavcopy
+    WHERE trade_date <= :d
+    """
+    df = read_sql("intraday", q, params={"d": selected_date})
+    if df is None or df.empty or df.loc[0, "latest"] is None:
+        return None
+    return pd.to_datetime(df.loc[0, "latest"]).date().isoformat()
+
+
+def get_smart_symbols(selected_date: str, lookback_days: int = 5, top_k: int = 10):
+    """
+    Return top-K candidate symbols based on:
+      - completeness of features on selected_date (count of non-null feature_name)
+      - recent presence in strategy_signals in last `lookback_days`
+    Returns DataFrame: symbol, feature_count, recent_signals_count, score
+    """
+    # 1) count features on selected_date
+    q_features = """
+    SELECT symbol, COUNT(*) AS feature_count
+    FROM strategy_features
+    WHERE feature_date = :d
+      AND feature_value IS NOT NULL
+    GROUP BY symbol
+    """
+    df_feat = read_sql("intraday", q_features, params={"d": selected_date})
+    if df_feat is None:
+        df_feat = pd.DataFrame(columns=["symbol", "feature_count"])
+
+    # 2) recent signals
+    since = (pd.to_datetime(selected_date) - timedelta(days=lookback_days)).date().isoformat()
+    q_signals = """
+    SELECT symbol, COUNT(*) AS recent_signals
+    FROM strategy_signals
+    WHERE signal_date BETWEEN :since AND :d
+    GROUP BY symbol
+    """
+    df_sig = read_sql("intraday", q_signals, params={"since": since, "d": selected_date})
+    if df_sig is None:
+        df_sig = pd.DataFrame(columns=["symbol", "recent_signals"])
+
+    # merge and compute score
+    df = pd.merge(df_feat, df_sig, on="symbol", how="outer").fillna(0)
+    df["feature_count"] = df["feature_count"].astype(int)
+    df["recent_signals"] = df["recent_signals"].astype(int)
+    # score: weight features higher
+    df["score"] = df["feature_count"] * 3 + df["recent_signals"]
+    df = df.sort_values("score", ascending=False).head(top_k)
+    return df.reset_index(drop=True)
+
+
+def get_signals_for_date(trade_date: str, strategies=None, signal_types=None, min_score: float=None, symbol_like=None, limit: int = 1000):
+    """
+    Fetch signals filtered by the UI inputs.
+    Returns signals with JSON notes column if present.
+    """
+    where = ["signal_date = :td"]
+    params = {"td": trade_date, "limit": limit}
+    if strategies:
+        where.append("strategy IN (:strategies)")
+        params["strategies"] = strategies
+    if signal_types:
+        where.append("signal_type IN (:signal_types)")
+        params["signal_types"] = signal_types
+    if min_score is not None:
+        where.append("signal_score >= :min_score")
+        params["min_score"] = min_score
+    if symbol_like:
+        where.append("symbol LIKE :sym")
+        params["sym"] = f"%{symbol_like}%"
+
+    where_clause = " AND ".join(where)
+    q = f"""
+    SELECT signal_date, strategy, symbol, signal_type, signal_score,
+           entry_price, stop_price, target_price, expected_hold_days, notes
+    FROM strategy_signals
+    WHERE {where_clause}
+    ORDER BY signal_score DESC
+    LIMIT :limit
+    """
+    df = read_sql("intraday", q, params=params)
+    if not df.empty and "signal_date" in df.columns:
+        df["signal_date"] = pd.to_datetime(df["signal_date"])
+    return df
+
+
+def get_strategy_features(symbol: str, start_date: str, end_date: str, features: list = None):
+    """
+    Fetch time-series of selected features for a symbol between start_date and end_date.
+    Assumes columns: feature_date, symbol, feature_name, feature_value
+    Returns pivoted DataFrame with index=feature_date and columns=feature names.
+    """
+    q = """
+    SELECT feature_date, symbol, feature_name, feature_value
+    FROM strategy_features
+    WHERE symbol = :symbol
+      AND feature_date BETWEEN :start_date AND :end_date
+    ORDER BY feature_date
+    """
+    df = read_sql("intraday", q, params={"symbol": symbol, "start_date": start_date, "end_date": end_date})
+    if df is None or df.empty:
+        return pd.DataFrame()
+    # pivot into wide form
+    df["feature_date"] = pd.to_datetime(df["feature_date"])
+    df_p = df.pivot_table(index="feature_date", columns="feature_name", values="feature_value", aggfunc="first")
+    if features:
+        sel = [f for f in features if f in df_p.columns]
+        df_p = df_p[sel]
+    df_p = df_p.sort_index()
+    return df_p
+
+
+def get_strategy_runs(limit: int = 50):
+    """
+    Fetch latest runs from strategy_runs for display in the UI.
+    Columns: run_id, run_name, started_at, finished_at, summary (JSON/text)
+    """
+    q = """
+    SELECT run_id, run_name, started_at, finished_at, summary
+    FROM strategy_runs
+    ORDER BY started_at DESC
+    LIMIT :limit
+    """
+    df = read_sql("intraday", q, params={"limit": limit})
+    if not df.empty and "started_at" in df.columns:
+        df["started_at"] = pd.to_datetime(df["started_at"])
+    return df
+
+
 # ---------- ETF (db_key = 'etf') ----------
 def get_etf_list():
     q = "SELECT etf_id, etf_symbol, etf_name, etf_fundhouse_name FROM etf ORDER BY etf_symbol"
