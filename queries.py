@@ -513,10 +513,10 @@ def get_strategy_features(symbol: str, start_date: str, end_date: str, features:
 def get_strategy_runs(limit: int = 50):
     """
     Fetch latest runs from strategy_runs for display in the UI.
-    Columns: run_id, run_name, started_at, finished_at, summary (JSON/text)
+    Columns: id, run_name, started_at, finished_at, summary (JSON/text)
     """
     q = """
-    SELECT run_id, run_name, started_at, finished_at, summary
+    SELECT id, run_name, started_at, finished_at, summary
     FROM strategy_runs
     ORDER BY started_at DESC
     LIMIT :limit
