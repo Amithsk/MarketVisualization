@@ -419,7 +419,7 @@ def get_smart_symbols(selected_date: str, lookback_days: int = 5, top_k: int = 1
     q_features = """
     SELECT symbol, COUNT(*) AS feature_count
     FROM strategy_features
-    WHERE feature_date = :d
+    WHERE trade_date = :d
       AND feature_value IS NOT NULL
     GROUP BY symbol
     """
@@ -487,22 +487,22 @@ def get_signals_for_date(trade_date: str, strategies=None, signal_types=None, mi
 def get_strategy_features(symbol: str, start_date: str, end_date: str, features: list = None):
     """
     Fetch time-series of selected features for a symbol between start_date and end_date.
-    Assumes columns: feature_date, symbol, feature_name, feature_value
-    Returns pivoted DataFrame with index=feature_date and columns=feature names.
+    Assumes columns: trade_date, symbol, feature_name, feature_value
+    Returns pivoted DataFrame with index=trade_date and columns=feature names.
     """
     q = """
-    SELECT feature_date, symbol, feature_name, feature_value
+    SELECT trade_date, symbol, feature_name, feature_value
     FROM strategy_features
     WHERE symbol = :symbol
-      AND feature_date BETWEEN :start_date AND :end_date
-    ORDER BY feature_date
+      AND trade_date BETWEEN :start_date AND :end_date
+    ORDER BY trade_date
     """
     df = read_sql("intraday", q, params={"symbol": symbol, "start_date": start_date, "end_date": end_date})
     if df is None or df.empty:
         return pd.DataFrame()
     # pivot into wide form
-    df["feature_date"] = pd.to_datetime(df["feature_date"])
-    df_p = df.pivot_table(index="feature_date", columns="feature_name", values="feature_value", aggfunc="first")
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    df_p = df.pivot_table(index="trade_date", columns="feature_name", values="feature_value", aggfunc="first")
     if features:
         sel = [f for f in features if f in df_p.columns]
         df_p = df_p[sel]
