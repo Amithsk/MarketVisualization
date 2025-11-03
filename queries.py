@@ -80,11 +80,11 @@ def get_intraday_for_symbol(symbol: str, days: int = 30):
 
 def get_gainers_losers(on_date: str = None, top_n: int = 10):
     if on_date:
-        q = "SELECT symbol, pct_change FROM gainers_losers WHERE trade_date = :td ORDER BY pct_change DESC LIMIT :n"
+        q = "SELECT symbol, pct_change FROM gainer_loser WHERE trade_date = :td ORDER BY pct_change DESC LIMIT :n"
         params = {"td": on_date, "n": top_n}
         df = read_sql("intraday", q, params=params)
     else:
-        q = "SELECT trade_date, symbol, pct_change FROM gainers_losers ORDER BY trade_date DESC LIMIT :n"
+        q = "SELECT trade_date, symbol, pct_change FROM gainer_loser ORDER BY trade_date DESC LIMIT :n"
         df = read_sql("intraday", q, params={"n": top_n})
     if not df.empty and "trade_date" in df.columns:
         df["trade_date"] = pd.to_datetime(df["trade_date"])
