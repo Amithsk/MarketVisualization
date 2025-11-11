@@ -1,10 +1,14 @@
 # app.py
 import os
 import sys
-# Add project root to Python path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
+from pathlib import Path
+
+# Ensure project root (parent of the "Code" folder) is on sys.path so "Code.*" imports work
+PROJECT_ROOT = Path(__file__).resolve().parent
+# if this file is inside Code/, PROJECT_ROOT is .../Code; parent() gives project root
+if PROJECT_ROOT.name == "Code":
+    PROJECT_ROOT = PROJECT_ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 import datetime
@@ -96,32 +100,342 @@ with tabs[0]:
 
     st.subheader("NIFTY Indicators")
     col1, col2, col3 = st.columns(3)
-    last = nifty_df.iloc[-1]
-    col1.metric("Close", f"{last['Close']:.2f}", delta=f"{last['Close']-nifty_df['Close'].iloc[-2]:.2f}")
-    col2.metric("SMA20", f"{last['SMA_20']:.2f}" if pd.notna(last['SMA_20']) else "n/a")
-    col3.metric("RSI", f"{last['RSI']:.2f}" if pd.notna(last['RSI']) else "n/a")
+    if not nifty_df.empty:
+        last = nifty_df.iloc[-1]
+        col1.metric("Close", f"{last['Close']:.2f}", delta=f"{last['Close']-nifty_df['Close'].iloc[-2]:.2f}")
+        col2.metric("SMA20", f"{last['SMA_20']:.2f}" if pd.notna(last['SMA_20']) else "n/a")
+        col3.metric("RSI", f"{last['RSI']:.2f}" if pd.notna(last['RSI']) else "n/a")
 
     st.markdown("**Gainers / Losers (recent)**")
     gl = get_gainers_losers(top_n=10)
     st.dataframe(gl.round(2))
 
 
-# INTRADAY PANEL
-# ------------------- INTRADAY PANEL (replace existing block) -------------------
+# ------------------- INTRADAY PANEL (restore original intraday code) -------------------
 with tabs[1]:
     st.header("Intraday Panel")
-    # (existing intraday code unchanged)
-    # ... (kept intact from original)
-    # The intraday tab contains many controls including a Trade-of-the-day mini control
-    # which we leave as-is for intraday-specific views.
-    # (Full intraday block retained below in file; unchanged.)
 
-    st.subheader("Intraday Summary")
-    # ... (omitted here for brevity in this header section)
-    # actual intraday code continues (unchanged)
+    radio_mode = st.radio("Mode", ["By Symbol", "By Date"], horizontal=True)
+
+    # default trade_date string used for functions that accept a date
+    trade_date_str = None
+
+    if radio_mode == "By Symbol":
+        # By symbol mode — shows symbol history
+        symbol = st.text_input("Symbol (exact)", value="RELIANCE.NS")
+        days_intraday = st.slider("Days", 1, 365, 30)
+        if symbol:
+            intr = get_intraday_for_symbol(symbol, days=days_intraday)
+            if intr is None or intr.empty:
+                st.warning("No data for that symbol in intraday_bhavcopy. Confirm symbol.")
+            else:
+                intr = intr.rename(columns={"trade_date": "Date", "open": "Open", "high": "High",
+                                            "low": "Low", "close": "Close"})
+                st.plotly_chart(plot_candles(intr), width='stretch')
+                st.dataframe(intr.tail(50).round(2))
+
+        # keep trade_date_str as None so subsequent calls fall back to today's data
+        trade_date_str = None
+
+    else:  # By Date
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1), key="intraday_date_input")
+        trade_date_str = sel_date.strftime("%Y-%m-%d")
+
+        # use existing helper that fetches all rows for that date
+        df = get_intraday_by_date(trade_date_str)
+
+        if df is None or df.empty:
+            st.info(f"No data found in intraday_bhavcopy for {trade_date_str}.")
+        else:
+            st.subheader(f"Market Summary — {trade_date_str}")
+            st.metric("Stocks traded", len(df))
+            # Use the fetched df for the snapshot display to avoid duplicate DB calls
+            st.dataframe(df.head(100).round(2))
+
+            st.subheader("Top 10 by Value Traded")
+            if "net_trdval" in df.columns:
+                top = df.nlargest(10, "net_trdval")[["symbol", "open", "close", "net_trdval"]]
+                st.plotly_chart(
+                    bar_with_labels(
+                        top,
+                        x_col="symbol",
+                        y_col="net_trdval",
+                        title="Top 10 Stocks by Value Traded",
+                        text_format=".0f",
+                        max_items=10,
+                    ),
+                    width='stretch',
+                )
+
+            st.subheader("Top 10 Price Movers (%)")
+            if "open" in df.columns and "close" in df.columns:
+                df = df.copy()
+                df["pct_change"] = ((df["close"] - df["open"]) / df["open"]) * 100
+                movers = df.nlargest(10, "pct_change")[["symbol", "pct_change"]]
+                st.plotly_chart(
+                    bar_with_labels(
+                        movers,
+                        x_col="symbol",
+                        y_col="pct_change",
+                        title="Top 10 Price Movers (%)",
+                        text_format=".2f",
+                        max_items=10,
+                    ),
+                    width='stretch',
+                )
+
+        # --- KPIs (use selected trade_date if in By Date) ---
+        kpi_data = get_intraday_summary_kpis(trade_date=trade_date_str)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        try:
+            col1.metric("Symbols Traded", kpi_data["symbols_traded"])
+            col2.metric("Total Traded Value", f"{kpi_data['total_traded_value']:,0f}")
+            col3.metric("Gainers", kpi_data["gainers"])
+            col4.metric("Losers", kpi_data["losers"])
+            col5.metric("Avg % Change", f"{kpi_data['avg_pct_change']}%")
+        except Exception:
+            # If kpi_data is missing keys, just skip showing them
+            pass
+
+        st.divider()
+
+        # --- Market snapshot ---
+        st.subheader("Market Snapshot")
+        # If the By Date branch already fetched all rows (df), reuse it; otherwise call query
+        if radio_mode == "By Date":
+            intraday_df = df  # df was set above
+        else:
+            intraday_df = get_intraday_market_rows(trade_date=trade_date_str)
+
+        if intraday_df is not None and not intraday_df.empty:
+            st.dataframe(
+                colorize_intraday_table(intraday_df),
+                width='stretch',
+                hide_index=True,
+            )
+        else:
+            st.info("No intraday data available for the selected date.")
+
+        st.divider()
+
+        # --- Top 10 by traded value ---
+        st.subheader("Top 10 Stocks by Traded Value (with 30-Day Average)")
+        top_value_df = get_intraday_top_value_traded(trade_date=trade_date_str)
+        if top_value_df is not None and not top_value_df.empty:
+            st.dataframe(
+                colorize_intraday_table(top_value_df),
+                width='stretch',
+                hide_index=True,
+            )
+        else:
+            st.info("No traded value data available for the selected date.")
+
+        st.divider()
+
+        # --- Top gainers and losers ---
+        st.subheader("Top 10 Price Movers")
+        gainers_df, losers_df = get_intraday_top_price_movers(trade_date=trade_date_str)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Top Gainers**")
+            if gainers_df is not None and not gainers_df.empty:
+                st.dataframe(
+                    colorize_intraday_table(gainers_df),
+                    width='stretch',
+                    hide_index=True,
+                )
+            else:
+                st.info("No gainers data for the selected date.")
+
+        with col2:
+            st.markdown("**Top Losers**")
+            if losers_df is not None and not losers_df.empty:
+                st.dataframe(
+                    colorize_intraday_table(losers_df),
+                    width='stretch',
+                    hide_index=True,
+                )
+            else:
+                st.info("No losers data for the selected date.")
+
+        # trade-of-the-day controls (intraday page shows a compact TOD mini control for intraday-specific views)
+        st.subheader("Trade-of-the-day (Signals + Evaluation) — Intraday mini")
+        intr_tod_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1), key="tod_date")
+        # get eval tags for dropdown
+        eval_tags = get_eval_tags_list() or []
+        default_tag = "intraday_v1_default" if "intraday_v1_default" in eval_tags else (eval_tags[0] if eval_tags else None)
+        # build options with "(none)" safe
+        eval_options = ["(none)"] + eval_tags if eval_tags else ["(none)"]
+        idx = 0
+        if default_tag and default_tag in eval_tags:
+            idx = eval_tags.index(default_tag) + 1
+        eval_tag = st.selectbox("Eval Tag", options=eval_options, index=idx, help="Select evaluation run tag for labels", key="intr_eval_tag")
+
+        # filters area
+        col1, col2, col3 = st.columns([2, 2, 1])
+        strategy_filter = col1.text_input("Strategy (exact)", value="", key="intr_strategy_filter")
+        symbol_search = col2.text_input("Symbol contains", value="", key="intr_symbol_search")
+        label_filter = col3.selectbox("Label filter", options=["All","win","loss","neutral","Not evaluated"], key="intr_label_filter")
+
+        # pagination
+        page_size = 100
+        page = st.number_input("Page", min_value=1, value=1, step=1, key="intr_page")
+        offset = (page - 1) * page_size
+
+        # build filters dict for server-side filters
+        filters = {}
+        if strategy_filter:
+            filters["strategy"] = strategy_filter
+        if symbol_search:
+            filters["symbol_search"] = symbol_search
+        if label_filter and label_filter != "All":
+            filters["label_outcome"] = "NOT_EVALUATED" if label_filter == "Not evaluated" else label_filter
+
+        # If user selected "(none)" tag, treat as no eval (pass eval_tag empty string)
+        use_tag = eval_tag if eval_tag and eval_tag != "(none)" else ""
+
+        data = get_signals_with_eval_json(intr_tod_date.strftime("%Y-%m-%d"), use_tag, limit=page_size, offset=offset, filters=filters)
+
+        meta = data.get("meta", {})
+        rows = data.get("rows", [])
+
+        # KPIs
+        kcol1, kcol2, kcol3, kcol4, kcol5 = st.columns(5)
+        kcol1.metric("Rows", meta.get("total_rows", 0))
+        kcol2.metric("Wins", meta.get("wins", 0))
+        kcol3.metric("Losses", meta.get("losses", 0))
+        kcol4.metric("Neutral", meta.get("neutral", 0))
+        win_pct = (meta["wins"] / meta["total_rows"] * 100) if meta.get("total_rows",0) else None
+        kcol5.metric("Win %", f"{win_pct:.1f}%" if win_pct is not None else "-")
+
+        df_rows = pd.DataFrame(rows)
+        # Add Label display column (human friendly)
+        def label_display(row):
+            if row.get("label_outcome") is None:
+                return "Not evaluated"
+            else:
+                return row.get("label_outcome")
+        if not df_rows.empty:
+            df_rows["Label"] = df_rows.apply(label_display, axis=1)
+            # Ambiguous indicator: 1/0 -> show symbol
+            if "ambiguous_flag" in df_rows.columns:
+                df_rows["Ambiguous"] = df_rows["ambiguous_flag"].apply(lambda x: "⚠" if x == 1 else "")
+            # Reorder columns: put Label right after signal_score
+            cols = list(df_rows.columns)
+            if "signal_score" in cols:
+                cols = [c for c in cols if c not in ("Label","Ambiguous")]
+                idx = cols.index("signal_score") + 1
+                cols.insert(idx, "Label")
+                cols.insert(idx+1, "Ambiguous")
+            st.dataframe(df_rows[cols].head(page_size), use_container_width=True)
+
+        # Row detail panel when a signal is selected (choose by signal_id)
+        sel_signal = st.text_input("Open details for signal_id (enter id)", "", key="intr_sel_signal")
+        if sel_signal and not df_rows.empty:
+            try:
+                sid = int(sel_signal)
+                match = df_rows[df_rows["signal_id"] == sid]
+                if not match.empty:
+                    r = match.iloc[0].to_dict()
+                    st.write("**Evaluation details**")
+                    st.write({
+                      "eval_entry_price": r.get("eval_entry_price"),
+                      "eval_exit_price": r.get("eval_exit_price"),
+                      "label_outcome": r.get("label_outcome"),
+                      "notes": r.get("notes"),
+                    })
+            except Exception:
+                st.warning("Enter a numeric signal_id that exists in the table.")
+
+# ---------------------------------------------------------------------------
 
 
-# TRADE-OF-THE-DAY TAB 
+# ETF TRACKER
+with tabs[2]:
+    st.header("ETF Tracker")
+
+    view_mode = st.radio("View Mode", ["By ETF", "By Date"], horizontal=True)
+
+    if view_mode == "By ETF":
+        # existing behavior (single ETF selection)
+        etf_list = get_etf_list()
+        if etf_list is None or etf_list.empty:
+            st.info("No ETFs available in etf table.")
+        else:
+            etf_choices = (etf_list['etf_symbol'] + " — " + etf_list['etf_name'].fillna("")).tolist()
+            etf_choice = st.selectbox("ETF", options=etf_choices)
+            sel_symbol = etf_choice.split(" — ")[0]
+            etf_id = int(etf_list[etf_list['etf_symbol'] == sel_symbol]['etf_id'].iloc[0])
+            etf_history = get_etf_price_history(etf_id, days=365)
+            if etf_history is not None and not etf_history.empty:
+                # ensure proper column names (get_etf_price_history should canonicalize)
+                st.plotly_chart(plot_candles(etf_history), width='stretch')
+                st.dataframe(etf_history.tail(50).round(2))
+            else:
+                st.info("No transaction history found for this ETF.")
+
+    else:
+        # By Date view: show market summary for ETFs on a chosen date
+        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1), key="etf_date_input")
+        date_str = sel_date.strftime("%Y-%m-%d")
+
+        df = get_etf_by_date(date_str)
+        if df is None or df.empty:
+            st.info(f"No ETF transactions found for {date_str}.")
+        else:
+            st.subheader(f"ETF Market Summary — {date_str}")
+            st.metric("ETFs traded", len(df))
+
+            # prefer TradedValue, otherwise use Volume
+            ycol = "TradedValue" if "TradedValue" in df.columns and df["TradedValue"].notna().any() else "Volume"
+
+            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), width='stretch')
+
+            # show table
+            st.dataframe(df.head(200).round(2))
+
+            # drill-down: choose an ETF from today's list
+            st.subheader("Drill-down ETF")
+            choices = df["etf_symbol"].dropna().unique().tolist()
+            sel = st.selectbox("Pick ETF for history", options=["-- none --"] + choices)
+            if sel and sel != "-- none --":
+                etf_id = int(df[df["etf_symbol"] == sel]["etf_id"].iloc[0])
+                etf_history = get_etf_price_history(etf_id, days=365)
+                if etf_history is None or etf_history.empty:
+                    st.warning("No historical data available for selected ETF.")
+                else:
+                    etf_history["Date"] = pd.to_datetime(etf_history["Date"])
+                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), width='stretch')
+                    # show recent numbers inside chart table — present tail
+                    st.dataframe(etf_history.tail(50).round(2))
+
+
+# PREDICTION & MODEL HEALTH
+with tabs[3]:
+    st.header("Predictions & Model Health")
+    models = get_model_daily_summary()
+    model_names = models['model_name'].unique().tolist() if not models.empty else []
+    chosen = st.selectbox("Model", options=["ALL"] + model_names)
+    days = st.slider("Model history days", 7, 365, 90)
+    if chosen == "ALL":
+        summary = get_model_daily_summary(last_days=days)
+    else:
+        summary = get_model_daily_summary(model_name=chosen, last_days=days)
+    st.subheader("Daily Summary")
+    st.dataframe(summary)
+
+    st.subheader("Forward Predictions (recent)")
+    preds = get_predictions(model_name=None if chosen=="ALL" else chosen, only_forward=True, limit=200)
+    st.dataframe(preds)
+
+    st.subheader("Backtest Comparison (recent)")
+    comp = get_comparisons(model_name=None if chosen=="ALL" else chosen, limit=200)
+    st.dataframe(comp)
+
+
+# ---------------------------------------------------------------------------
+# TRADE-OF-THE-DAY TAB (moved date + refresh inside tab; fixed df_signals name usage)
 with tabs[4]:  
     st.header("Trade-of-the-day — Signals & Details")
 
@@ -131,7 +445,6 @@ with tabs[4]:
         st.error("Could not determine latest trading date from intraday_bhavcopy. Check DB and config.")
     else:
         # top controls (moved inside this tab only)
-        # use a stable key so the widget persists correctly across reruns
         left_col, right_col = st.columns([3,1])
         with left_col:
             ui_date = st.date_input(
@@ -148,7 +461,7 @@ with tabs[4]:
         df_signals = get_signals_with_price_context(chosen_date_iso)
 
         st.subheader(f"Signals for {chosen_date_iso}")
-        if df_signals.empty:
+        if df_signals is None or df_signals.empty:
             st.info(f"No signals available for {chosen_date_iso}. Showing latest available data.")
             # allow user to pick earlier date manually via date picker
         else:
@@ -225,17 +538,12 @@ with tabs[4]:
                 st.write("Top smart suggestions (pick one):")
                 chosen_symbol = st.selectbox("Pick from suggestions", options=candidates["symbol"].tolist(), key="smart_sym_sel")
         else:
-            # Manual mode: source symbols from signals first, then intraday table as fallback
+            # Manual mode: source symbols from df_signals first, then intraday table as fallback
             manual_search = st.text_input("Type to filter symbols (contains)", value="", key="manual_sym_search")
             symbol_source = []
-            # prefer signals_df if available
-            symbol_source = []
+            # prefer df_signals if available
             if 'df_signals' in locals() and isinstance(df_signals, pd.DataFrame) and not df_signals.empty:
                 symbol_source = sorted(df_signals["symbol"].dropna().unique().tolist())
-            else:
-                intr_today = get_intraday_by_date(end_str)
-            if intr_today is not None and not intr_today.empty:
-                symbol_source = sorted(intr_today["symbol"].dropna().unique().tolist())
             if not symbol_source:
                 intr_today = get_intraday_by_date(end_str)
                 if intr_today is not None and not intr_today.empty:
@@ -247,7 +555,7 @@ with tabs[4]:
             else:
                 chosen_symbol = None
 
-        if chosen_symbol:
+        if chosen_symbol and chosen_symbol != "-- none --":
             # fetch features via get_strategy_features if available; otherwise fallback to get_feature_trends
             try:
                 feat_ts = get_strategy_features(chosen_symbol, start_date=start_str, end_date=end_str, features=None)
@@ -303,93 +611,6 @@ with tabs[4]:
                         summary = row["summary"]
                     st.json(summary)
                     st.button("Re-run preview (dry-run)", key=f"preview_{row.get('run_name')}_{row.get('started_at')}")
-
-
-# ---------------------------------------------------------------------------
-
-
-# ETF TRACKER
-with tabs[2]:
-    st.header("ETF Tracker")
-
-    view_mode = st.radio("View Mode", ["By ETF", "By Date"], horizontal=True)
-
-    if view_mode == "By ETF":
-        # existing behavior (single ETF selection)
-        etf_list = get_etf_list()
-        if etf_list is None or etf_list.empty:
-            st.info("No ETFs available in etf table.")
-        else:
-            etf_choices = (etf_list['etf_symbol'] + " — " + etf_list['etf_name'].fillna("")).tolist()
-            etf_choice = st.selectbox("ETF", options=etf_choices)
-            sel_symbol = etf_choice.split(" — ")[0]
-            etf_id = int(etf_list[etf_list['etf_symbol'] == sel_symbol]['etf_id'].iloc[0])
-            etf_history = get_etf_price_history(etf_id, days=365)
-            if etf_history is not None and not etf_history.empty:
-                # ensure proper column names (get_etf_price_history should canonicalize)
-                st.plotly_chart(plot_candles(etf_history), width='stretch')
-                st.dataframe(etf_history.tail(50).round(2))
-            else:
-                st.info("No transaction history found for this ETF.")
-
-    else:
-        # By Date view: show market summary for ETFs on a chosen date
-        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1), key="etf_date_input")
-        date_str = sel_date.strftime("%Y-%m-%d")
-
-        df = get_etf_by_date(date_str)
-        if df is None or df.empty:
-            st.info(f"No ETF transactions found for {date_str}.")
-        else:
-            st.subheader(f"ETF Market Summary — {date_str}")
-            st.metric("ETFs traded", len(df))
-
-            # prefer TradedValue, otherwise use Volume
-            ycol = "TradedValue" if "TradedValue" in df.columns and df["TradedValue"].notna().any() else "Volume"
-
-            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), width='stretch')
-
-            # show table
-            st.dataframe(df.head(200).round(2))
-
-            # drill-down: choose an ETF from today's list
-            st.subheader("Drill-down ETF")
-            choices = df["etf_symbol"].dropna().unique().tolist()
-            sel = st.selectbox("Pick ETF for history", options=["-- none --"] + choices)
-            if sel and sel != "-- none --":
-                etf_id = int(df[df["etf_symbol"] == sel]["etf_id"].iloc[0])
-                etf_history = get_etf_price_history(etf_id, days=365)
-                if etf_history is None or etf_history.empty:
-                    st.warning("No historical data available for selected ETF.")
-                else:
-                    etf_history["Date"] = pd.to_datetime(etf_history["Date"])
-                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), width='stretch')
-                    # show recent numbers inside chart table — present tail
-                    st.dataframe(etf_history.tail(50).round(2))
-
-
-# PREDICTION & MODEL HEALTH
-with tabs[3]:
-    st.header("Predictions & Model Health")
-    models = get_model_daily_summary()
-    model_names = models['model_name'].unique().tolist()
-    chosen = st.selectbox("Model", options=["ALL"] + model_names)
-    days = st.slider("Model history days", 7, 365, 90)
-    if chosen == "ALL":
-        summary = get_model_daily_summary(last_days=days)
-    else:
-        summary = get_model_daily_summary(model_name=chosen, last_days=days)
-    st.subheader("Daily Summary")
-    st.dataframe(summary)
-
-    st.subheader("Forward Predictions (recent)")
-    preds = get_predictions(model_name=None if chosen=="ALL" else chosen, only_forward=True, limit=200)
-    st.dataframe(preds)
-
-    st.subheader("Backtest Comparison (recent)")
-    comp = get_comparisons(model_name=None if chosen=="ALL" else chosen, limit=200)
-    st.dataframe(comp)
-
 
 # ---------------------------------------------------------------------------
 # End of app.py
