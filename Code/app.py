@@ -1,7 +1,6 @@
 # ================================================================
 # app.py — Streamlit Market Visualization Dashboard
 # Updated: Intraday mini “Trade-of-the-day (Signals + Evaluation)” simplified
-# NOTE: This file is based on your project app.py (preserved functions).
 # ================================================================
 
 import os
@@ -16,9 +15,14 @@ import json
 
 # --- Ensure correct project import paths (parent of Code/)
 # Add project root (D:\MarketVisualization) to Python path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
+from pathlib import Path
+
+# Ensure project root (parent of the "Code" folder) is on sys.path so "Code.*" imports work
+PROJECT_ROOT = Path(__file__).resolve().parent
+# if this file is inside Code/, PROJECT_ROOT is .../Code; parent() gives project root
+if PROJECT_ROOT.name == "Code":
+    PROJECT_ROOT = PROJECT_ROOT.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # --- Import project modules (unchanged)
 from Code.queries import (
