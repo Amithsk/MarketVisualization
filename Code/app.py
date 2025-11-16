@@ -671,25 +671,25 @@ with tabs[4]:
             st.info("No symbol selected for Feature Trends. Use Smart or Manual mode to select one.")
 
         # Recent Run Logs
-        st.markdown("---")
-        st.subheader("Recent Strategy Runs")
-        runs = get_strategy_runs(limit=50)
-        if runs is None or runs.empty:
-            st.info("No strategy_runs entries found.")
-        else:
-            runs_display = runs[["run_name", "started_at", "finished_at", "summary"]].copy()
-            runs_display["summary_short"] = runs_display["summary"].apply(lambda s: (s if s is None else (s if len(str(s)) < 200 else str(s)[:200] + ".")))
-            st.dataframe(runs_display.drop(columns=["summary"]).rename(columns={"summary_short": "summary"}), width='stretch')
+        #st.markdown("---")
+        #st.subheader("Recent Strategy Runs")
+        #runs = get_strategy_runs(limit=50)
+        #if runs is None or runs.empty:
+            #st.info("No strategy_runs entries found.")
+        #else:
+            #runs_display = runs[["run_name", "started_at", "finished_at", "summary"]].copy()
+            #runs_display["summary_short"] = runs_display["summary"].apply(lambda s: (s if s is None else (s if len(str(s)) < 200 else str(s)[:200] + ".")))
+            #st.dataframe(runs_display.drop(columns=["summary"]).rename(columns={"summary_short": "summary"}), width='stretch')
 
-            for _, row in runs.iterrows():
-                with st.expander(f"{row['run_name']} — {row.get('started_at')}"):
-                    st.write("Started:", row.get("started_at"))
-                    st.write("Finished:", row.get("finished_at"))
-                    try:
-                        summary = json.loads(row["summary"]) if row["summary"] else row["summary"]
-                    except Exception:
-                        summary = row["summary"]
-                    st.json(summary)
-                    st.button("Re-run preview (dry-run)", key=f"preview_{row.get('run_name')}_{row.get('started_at')}")
+            #for _, row in runs.iterrows():
+                #with st.expander(f"{row['run_name']} — {row.get('started_at')}"):
+                    #st.write("Started:", row.get("started_at"))
+                    #st.write("Finished:", row.get("finished_at"))
+                    #try:
+                        #summary = json.loads(row["summary"]) if row["summary"] else row["summary"]
+                    #except Exception:
+                        #summary = row["summary"]
+                    #st.json(summary)
+                    #st.button("Re-run preview (dry-run)", key=f"preview_{row.get('run_name')}_{row.get('started_at')}")
 
 # End of file
