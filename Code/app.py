@@ -307,6 +307,28 @@ with tabs[1]:
         meta = data.get("meta", {})
         rows = data.get("rows", []) or []
         df_rows = pd.DataFrame(rows)
+        # --- Minimal column-name compatibility shim (no SQL changes) ---
+        # Map DB aliases to the canonical UI names the rest of the code expects.
+        # Keep this tiny and local so no other code needs to change.
+        compat_map = {
+        "entry_price": ["signal_entry_price", "eval_entry_price"],
+        "stop_price": ["signal_stop_price", "eval_stop_price"],
+        "target_price": ["signal_target_price", "eval_target_price"],
+        "entry_model": ["signal_entry_model"],
+        }
+
+        for canon, candidates in compat_map.items():
+            if canon not in df_rows.columns:
+                for c in candidates:
+                    if c in df_rows.columns:
+                        df_rows[canon] = df_rows[c]
+                        break
+        # Ensure canonical numeric columns are numeric (safe for downstream formatting)
+        for col in ("entry_price", "stop_price", "target_price", "signal_score"):
+            if col in df_rows.columns:
+                df_rows[col] = pd.to_numeric(df_rows[col], errors="coerce").round(2)
+        # --- end compatibility shim ---
+
 
         if df_rows.empty:
             st.info("No signal+evaluation data for this date/tag.")
