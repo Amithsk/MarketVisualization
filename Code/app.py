@@ -112,6 +112,7 @@ with tabs[0]:
     st.dataframe(gl.round(2))
 
 
+
 # ================================================================
 # TAB 1 — INTRADAY PANEL (preserved original logic)
 # ================================================================
@@ -293,7 +294,8 @@ with tabs[1]:
         if label_filter and label_filter != "All":
             filters["label_outcome"] = "NOT_EVALUATED" if label_filter == "Not evaluated" else label_filter
 
-        use_tag = eval_tag if eval_tag and eval_tag != "(none)" else ""
+        # Pass None when (none) selected so backend can omit tag filter instead of matching empty string
+        use_tag = None if (not eval_tag or eval_tag == "(none)") else eval_tag
 
         # Fetch compact dataset (server returns {"meta":..., "rows":[...]} )
         data = {}
@@ -307,28 +309,46 @@ with tabs[1]:
         meta = data.get("meta", {})
         rows = data.get("rows", []) or []
         df_rows = pd.DataFrame(rows)
+        st.write("Columns:", df_rows.columns.tolist())
+
         # --- Minimal column-name compatibility shim (no SQL changes) ---
         # Map DB aliases to the canonical UI names the rest of the code expects.
-        # Keep this tiny and local so no other code needs to change.
         compat_map = {
-        "entry_price": ["signal_entry_price", "eval_entry_price"],
-        "stop_price": ["signal_stop_price", "eval_stop_price"],
-        "target_price": ["signal_target_price", "eval_target_price"],
-        "entry_model": ["signal_entry_model"],
+            # signal-side canonical names (what UI uses below)
+            "entry_price": ["signal_entry_price", "eval_entry_price", "entry_price", "signal_entry_price"],  # prefer signal entry if present, else eval entry
+            "stop_price": ["signal_stop_price", "eval_stop_price", "signal_stop_price"],
+            "target_price": ["signal_target_price", "eval_target_price", "signal_target_price"],
+            "entry_model": ["signal_entry_model", "signal_entry_model"],
+            # evaluation-specific canonical names
+            "eval_entry_price": ["eval_entry_price", "entry_price", "signal_entry_price"],
+            "eval_exit_price": ["exit_price", "eval_exit_price", "realized_high", "realized_low", "close_price"],
+            "eval_exit_date": ["eval_exit_date", "eval_created_at", "eval_entry_time"],
+            "notes": ["eval_notes", "notes"],
+            "eval_tag": ["eval_run_tag"],
         }
 
+        # create canonical columns if not present
         for canon, candidates in compat_map.items():
             if canon not in df_rows.columns:
                 for c in candidates:
                     if c in df_rows.columns:
                         df_rows[canon] = df_rows[c]
                         break
+
         # Ensure canonical numeric columns are numeric (safe for downstream formatting)
-        for col in ("entry_price", "stop_price", "target_price", "signal_score"):
+        for col in ("entry_price", "stop_price", "target_price", "signal_score", "eval_entry_price", "eval_exit_price"):
             if col in df_rows.columns:
                 df_rows[col] = pd.to_numeric(df_rows[col], errors="coerce").round(2)
-        # --- end compatibility shim ---
 
+        # Normalize eval_exit_date to readable string if present
+        if "eval_exit_date" in df_rows.columns:
+            try:
+                df_rows["eval_exit_date"] = pd.to_datetime(df_rows["eval_exit_date"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                # fallback: coerce to str
+                df_rows["eval_exit_date"] = df_rows["eval_exit_date"].astype(str)
+
+        # --- end compatibility shim ---
 
         if df_rows.empty:
             st.info("No signal+evaluation data for this date/tag.")
@@ -396,12 +416,13 @@ with tabs[1]:
                     st.table(pd.DataFrame(list(sig_fields.items()), columns=["Field", "Value"]))
 
                     st.write("**Evaluation details**")
+                    # Prefer canonical eval fields created by the shim above
                     eval_fields = {
                         "Eval Entry Price": row.get("eval_entry_price"),
-                        "Eval Exit Price": row.get("eval_exit_price"),
+                        "Eval Exit Price": row.get("eval_exit_price") or row.get("exit_price"),
                         "Eval Exit Date": row.get("eval_exit_date"),
                         "Label Outcome": row.get("label_outcome"),
-                        "Notes": row.get("notes"),
+                        "Notes": row.get("notes") or row.get("eval_notes"),
                         "Eval Tag": row.get("eval_tag") or use_tag,
                     }
                     st.table(pd.DataFrame(list(eval_fields.items()), columns=["Field", "Value"]))
@@ -440,61 +461,6 @@ with tabs[1]:
                             st.exception(e)
         # --- END: Intraday mini "Trade-of-the-day (Signals + Evaluation)" compact + expandable view ---
         # --------------------------- end intraday Trade-of-the-day mini ---------------------------
-
-
-# ================================================================
-# TAB 2 — ETF TRACKER
-# ================================================================
-with tabs[2]:
-    st.header("ETF Tracker")
-
-    view_mode = st.radio("View Mode", ["By ETF", "By Date"], horizontal=True)
-
-    if view_mode == "By ETF":
-        etf_list = get_etf_list()
-        if etf_list is None or etf_list.empty:
-            st.info("No ETFs available in etf table.")
-        else:
-            etf_choices = (etf_list['etf_symbol'] + " — " + etf_list['etf_name'].fillna("")).tolist()
-            etf_choice = st.selectbox("ETF", options=etf_choices)
-            sel_symbol = etf_choice.split(" — ")[0]
-            etf_id = int(etf_list[etf_list['etf_symbol'] == sel_symbol]['etf_id'].iloc[0])
-            etf_history = get_etf_price_history(etf_id, days=365)
-            if etf_history is not None and not etf_history.empty:
-                st.plotly_chart(plot_candles(etf_history), width='stretch')
-                st.dataframe(etf_history.tail(50).round(2))
-            else:
-                st.info("No transaction history found for this ETF.")
-
-    else:
-        sel_date = st.date_input("Trade Date", value=date.today() - timedelta(days=1), key="etf_date_input")
-        date_str = sel_date.strftime("%Y-%m-%d")
-
-        df = get_etf_by_date(date_str)
-        if df is None or df.empty:
-            st.info(f"No ETF transactions found for {date_str}.")
-        else:
-            st.subheader(f"ETF Market Summary — {date_str}")
-            st.metric("ETFs traded", len(df))
-
-            ycol = "TradedValue" if "TradedValue" in df.columns and df["TradedValue"].notna().any() else "Volume"
-
-            st.plotly_chart(bar_with_labels(df, x_col="etf_symbol", y_col=ycol, title=f"Top ETFs by {ycol} on {date_str}", text_format=".0f", max_items=40), width='stretch')
-
-            st.dataframe(df.head(200).round(2))
-
-            st.subheader("Drill-down ETF")
-            choices = df["etf_symbol"].dropna().unique().tolist()
-            sel = st.selectbox("Pick ETF for history", options=["-- none --"] + choices)
-            if sel and sel != "-- none --":
-                etf_id = int(df[df["etf_symbol"] == sel]["etf_id"].iloc[0])
-                etf_history = get_etf_price_history(etf_id, days=365)
-                if etf_history is None or etf_history.empty:
-                    st.warning("No historical data available for selected ETF.")
-                else:
-                    etf_history["Date"] = pd.to_datetime(etf_history["Date"])
-                    st.plotly_chart(plot_candles(etf_history, title=f"{sel} — 1y history"), width='stretch')
-                    st.dataframe(etf_history.tail(50).round(2))
 
 
 # ================================================================
