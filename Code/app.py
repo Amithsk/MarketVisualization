@@ -278,17 +278,37 @@ with tabs[1]:
             idx = eval_tags.index(default_tag) + 1
         eval_tag = st.selectbox("Eval Tag", options=eval_options, index=idx, help="Select evaluation run tag for labels", key="intr_eval_tag")
 
-        # Filters row (compact)
-        f_col1, f_col2, f_col3 = st.columns([2, 2, 1])
-        strategy_filter = f_col1.text_input("Strategy (exact)", value="", key="intr_strategy_filter")
-        symbol_search = f_col2.text_input("Symbol contains", value="", key="intr_symbol_search")
-        label_filter = f_col3.selectbox("Label filter", options=["All", "win", "loss", "neutral", "Not evaluated"], key="intr_label_filter")
-
         # Build filters for backend call
         page_size = 50
         filters = {}
-        if strategy_filter:
-            filters["strategy"] = strategy_filter
+        # Filters row (compact)
+        f_col1, f_col2, f_col3 = st.columns([2, 2, 1])
+        symbol_search = f_col2.text_input("Symbol contains", value="", key="intr_symbol_search")
+        label_filter = f_col3.selectbox("Label filter", options=["All", "win", "loss", "neutral", "Not evaluated"], key="intr_label_filter")
+        
+       # --- Strategy filter: dropdown (defaults to gap_follow) ---
+        strategy_options = [
+            "(any)",
+            "gap_follow",
+            "momentum_topn",
+            "volatility_breakout",
+            "volatility_breakout_v2",
+            ]
+
+        # Default selection = gap_follow
+        default_idx = strategy_options.index("gap_follow")
+
+        strategy_selected = f_col1.selectbox(
+            "Strategy ",
+        options=strategy_options,
+        index=default_idx,
+        key="intr_strategy_filter_select"   # unique key
+            )
+
+        # Apply to filters (same logic as before)
+        if strategy_selected and strategy_selected != "(any)":
+            filters["strategy"] = strategy_selected
+
         if symbol_search:
             filters["symbol_search"] = symbol_search
         if label_filter and label_filter != "All":
@@ -309,7 +329,7 @@ with tabs[1]:
         meta = data.get("meta", {})
         rows = data.get("rows", []) or []
         df_rows = pd.DataFrame(rows)
-        st.write("Columns:", df_rows.columns.tolist())
+
 
         # --- Minimal column-name compatibility shim (no SQL changes) ---
         # Map DB aliases to the canonical UI names the rest of the code expects.
