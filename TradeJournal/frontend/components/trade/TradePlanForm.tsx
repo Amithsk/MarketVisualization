@@ -1,12 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 
-type Props = {
-  onSubmit: (payload: any) => Promise<void>
-}
-
-export default function TradePlanForm({ onSubmit }: Props) {
+export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const [form, setForm] = useState({
     plan_date: "",
     trade_mode: "PAPER",
@@ -18,63 +14,73 @@ export default function TradePlanForm({ onSubmit }: Props) {
     planned_target_price: "",
     planned_risk_amount: "",
     planned_position_size: "",
-  })
-
-  const update = (k: string, v: any) =>
-    setForm((p) => ({ ...p, [k]: v }))
-
-  const submit = async () => {
-    await onSubmit({
-      ...form,
-      planned_entry_price: Number(form.planned_entry_price),
-      planned_stop_price: Number(form.planned_stop_price),
-      planned_target_price: Number(form.planned_target_price || 0),
-      planned_risk_amount: Number(form.planned_risk_amount),
-      planned_position_size: Number(form.planned_position_size),
-    })
-  }
+  });
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm">
-      <div className="px-6 py-4 border-b text-lg font-semibold">
+    <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border p-6 space-y-6">
+      <h2 className="text-xl font-semibold text-gray-800">
         Create Trade Plan
-      </div>
+      </h2>
 
-      <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input className="input" type="date" onChange={(e) => update("plan_date", e.target.value)} />
-        <select className="input" onChange={(e) => update("trade_mode", e.target.value)}>
+      <div className="grid grid-cols-2 gap-4">
+        <input
+          type="date"
+          className="border rounded-md px-3 py-2"
+          value={form.plan_date}
+          onChange={(e) => setForm({ ...form, plan_date: e.target.value })}
+        />
+
+        <select
+          className="border rounded-md px-3 py-2"
+          value={form.trade_mode}
+          onChange={(e) => setForm({ ...form, trade_mode: e.target.value })}
+        >
           <option value="PAPER">Paper</option>
           <option value="REAL">Real</option>
         </select>
 
-        <input className="input" placeholder="Strategy (e.g. ORB)" onChange={(e) => update("strategy", e.target.value)} />
-        <select className="input" onChange={(e) => update("position_type", e.target.value)}>
+        <input
+          placeholder="Strategy (e.g. ORB)"
+          className="border rounded-md px-3 py-2 col-span-2"
+          onChange={(e) => setForm({ ...form, strategy: e.target.value })}
+        />
+
+        <select
+          className="border rounded-md px-3 py-2"
+          value={form.position_type}
+          onChange={(e) => setForm({ ...form, position_type: e.target.value })}
+        >
           <option value="LONG">Long</option>
           <option value="SHORT">Short</option>
         </select>
-
-        <input className="input" placeholder="Entry Price" />
-        <input className="input" placeholder="Stop Price" />
-        <input className="input" placeholder="Target Price" />
-        <input className="input" placeholder="Risk Amount" />
-        <input className="input" placeholder="Position Size" />
-
-        <textarea
-          className="input md:col-span-2"
-          placeholder="Setup Description"
-          rows={3}
-          onChange={(e) => update("setup_description", e.target.value)}
-        />
       </div>
 
-      <div className="px-6 py-4 border-t flex justify-end">
-        <button
-          onClick={submit}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Save Plan
-        </button>
+      <textarea
+        placeholder="Setup description"
+        className="border rounded-md px-3 py-2 w-full"
+        rows={3}
+        onChange={(e) =>
+          setForm({ ...form, setup_description: e.target.value })
+        }
+      />
+
+      <div className="grid grid-cols-3 gap-4">
+        <input placeholder="Entry Price" className="border rounded-md px-3 py-2" />
+        <input placeholder="Stop Loss" className="border rounded-md px-3 py-2" />
+        <input placeholder="Target" className="border rounded-md px-3 py-2" />
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <input placeholder="Risk Amount" className="border rounded-md px-3 py-2" />
+        <input placeholder="Position Size" className="border rounded-md px-3 py-2" />
+      </div>
+
+      <button
+        onClick={() => onSubmit(form)}
+        className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+      >
+        Save Plan
+      </button>
     </div>
-  )
+  );
 }

@@ -1,13 +1,9 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 
-type Props = {
-  onSubmit: (payload: any) => Promise<void>
-}
-
-export default function TradeReviewForm({ onSubmit }: Props) {
-  const [form, setForm] = useState({
+export default function TradeReviewForm({ onSubmit }: { onSubmit: (data: any) => void }) {
+  const [review, setReview] = useState({
     exit_reason: "",
     followed_entry_rules: true,
     followed_stop_rules: true,
@@ -16,53 +12,36 @@ export default function TradeReviewForm({ onSubmit }: Props) {
     market_context: "TRENDING",
     learning_insight: "",
     trade_grade: "A",
-  })
-
-  const update = (k: string, v: any) =>
-    setForm((p) => ({ ...p, [k]: v }))
+  });
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm">
-      <div className="px-6 py-4 border-b text-lg font-semibold">
-        Trade Review
-      </div>
+    <div className="bg-white border rounded-xl p-6 space-y-4">
+      <h3 className="text-lg font-semibold">Post-Trade Review</h3>
 
-      <div className="px-6 py-4 space-y-4">
-        <select className="input" onChange={(e) => update("exit_reason", e.target.value)}>
-          <option value="">Exit Reason</option>
-          <option value="STOP_HIT">Stop Hit</option>
-          <option value="TARGET_HIT">Target Hit</option>
-        </select>
+      <select
+        className="border rounded-md px-3 py-2 w-full"
+        onChange={(e) => setReview({ ...review, exit_reason: e.target.value })}
+      >
+        <option value="">Exit Reason</option>
+        <option value="STOP_HIT">Stop Hit</option>
+        <option value="TARGET_HIT">Target Hit</option>
+      </select>
 
-        <select className="input" onChange={(e) => update("emotional_state", e.target.value)}>
-          <option>CALM</option>
-          <option>HESITANT</option>
-          <option>FEARFUL</option>
-          <option>CONFIDENT</option>
-        </select>
+      <textarea
+        placeholder="What did you learn?"
+        className="border rounded-md px-3 py-2 w-full"
+        rows={3}
+        onChange={(e) =>
+          setReview({ ...review, learning_insight: e.target.value })
+        }
+      />
 
-        <textarea
-          className="input"
-          placeholder="Learning Insight"
-          rows={3}
-          onChange={(e) => update("learning_insight", e.target.value)}
-        />
-
-        <select className="input" onChange={(e) => update("trade_grade", e.target.value)}>
-          <option>A</option>
-          <option>B</option>
-          <option>C</option>
-        </select>
-      </div>
-
-      <div className="px-6 py-4 border-t flex justify-end">
-        <button
-          onClick={() => onSubmit(form)}
-          className="px-4 py-2 bg-purple-600 text-white rounded"
-        >
-          Submit Review
-        </button>
-      </div>
+      <button
+        onClick={() => onSubmit(review)}
+        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+      >
+        Submit Review
+      </button>
     </div>
-  )
+  );
 }
