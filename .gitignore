@@ -1,3 +1,5 @@
 node_modules/
 TradeJournal/frontend/node_modules/
 TradeJournal/frontend/.next
+TradeJournal/backend/app/__pycache__
+TradeJournal/backend/app/routers/__pycache__
