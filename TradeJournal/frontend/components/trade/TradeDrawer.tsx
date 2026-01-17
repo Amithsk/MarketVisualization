@@ -62,10 +62,7 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
       {/* ================= PLAN LIST ================= */}
       <div className="mt-6 space-y-4">
         {plans.map((plan: TradePlan) => (
-          <div
-            key={plan.id}
-            className="rounded border p-3"
-          >
+          <div key={plan.id} className="rounded border p-3">
             {/* -------- PLAN CARD -------- */}
             <TradePlanCard plan={plan} />
 
@@ -84,12 +81,14 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
             {plan.plan_status === "EXECUTED" && plan.trade_id && (
               <div className="mt-3">
                 <TradeExitForm
-                  onSubmit={() =>
-                    exitTrade(plan.trade_id!, {
-                      // TradeExitForm already collects values internally
-                      // so this callback is only a trigger
-                    } as any)
-                  }
+                  onSubmit={(payload) => {
+                    console.group("🟡 TradeDrawer → Exit Submit")
+                    console.log("trade_id:", plan.trade_id)
+                    console.log("payload RECEIVED:", payload)
+                    console.groupEnd()
+
+                    exitTrade(plan.trade_id!, payload)
+                  }}
                 />
               </div>
             )}
