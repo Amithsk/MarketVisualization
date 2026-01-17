@@ -1,42 +1,50 @@
 "use client"
 
-type Props = {
-  value: {
-    exitPrice: string
-    exitTimestamp: string
-    exitReason: string
-  }
-  onChange: (v: Props["value"]) => void
-  onSubmit: () => void
+import { useState } from "react"
+
+type ExitPayload = {
+  exit_price: number
+  exit_timestamp: string
+  exit_reason: string
 }
 
-export default function TradeExitForm({
-  value,
-  onChange,
-  onSubmit,
-}: Props) {
-  const update = (k: keyof Props["value"], v: string) => {
-    onChange({ ...value, [k]: v })
-  }
+type Props = {
+  onSubmit: (payload: ExitPayload) => void
+}
+
+export default function TradeExitForm({ onSubmit }: Props) {
+  const [exitPrice, setExitPrice] = useState("")
+  const [exitTimestamp, setExitTimestamp] = useState("")
+  const [exitReason, setExitReason] = useState("")
 
   const isValid =
-    value.exitPrice &&
-    value.exitTimestamp &&
-    value.exitReason
+    exitPrice !== "" &&
+    exitTimestamp !== "" &&
+    exitReason !== ""
+
+  const handleSubmit = () => {
+    if (!isValid) return
+
+    onSubmit({
+      exit_price: Number(exitPrice),
+      exit_timestamp: exitTimestamp,
+      exit_reason: exitReason,
+    })
+  }
 
   return (
     <div className="space-y-3 text-sm">
-      <h3 className="font-semibold text-sm tracking-wide text-gray-700">
-        2 · EXIT TRADE
+      <h3 className="font-semibold tracking-wide text-gray-700">
+        Exit Trade
       </h3>
 
       {/* Exit price */}
       <div>
         <label className="block font-medium">Exit Price *</label>
         <input
-          className="w-full rounded-lg border p-2"
-          value={value.exitPrice}
-          onChange={(e) => update("exitPrice", e.target.value)}
+          className="w-full rounded border p-2"
+          value={exitPrice}
+          onChange={(e) => setExitPrice(e.target.value)}
           placeholder="e.g. 426.50"
         />
       </div>
@@ -46,9 +54,9 @@ export default function TradeExitForm({
         <label className="block font-medium">Exit Time *</label>
         <input
           type="datetime-local"
-          className="w-full rounded-lg border p-2"
-          value={value.exitTimestamp}
-          onChange={(e) => update("exitTimestamp", e.target.value)}
+          className="w-full rounded border p-2"
+          value={exitTimestamp}
+          onChange={(e) => setExitTimestamp(e.target.value)}
         />
       </div>
 
@@ -56,9 +64,9 @@ export default function TradeExitForm({
       <div>
         <label className="block font-medium">Exit Reason *</label>
         <select
-          className="w-full rounded-lg border p-2"
-          value={value.exitReason}
-          onChange={(e) => update("exitReason", e.target.value)}
+          className="w-full rounded border p-2"
+          value={exitReason}
+          onChange={(e) => setExitReason(e.target.value)}
         >
           <option value="">Select reason</option>
           <option value="TARGET_HIT">Target Hit</option>
@@ -72,8 +80,8 @@ export default function TradeExitForm({
 
       <button
         disabled={!isValid}
-        onClick={onSubmit}
-        className="w-full rounded-lg bg-black py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-40"
+        onClick={handleSubmit}
+        className="w-full rounded bg-black py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-40"
       >
         ⏹ Confirm Exit
       </button>

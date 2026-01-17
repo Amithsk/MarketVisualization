@@ -1,84 +1,39 @@
 "use client"
 
-type TradePlanDraft = {
-  strategy: string
-  direction: "LONG" | "SHORT"
-  setup: string
-  entry: string
-  stop: string
-  target: string
-  risk: string
-}
+import { TradePlan } from "@/types/trade"
 
 type Props = {
-  value: TradePlanDraft
-  onChange: (next: TradePlanDraft) => void
+  plan: TradePlan
 }
 
-export default function TradePlanCard({ value, onChange }: Props) {
-  const update = <K extends keyof TradePlanDraft>(
-    key: K,
-    val: TradePlanDraft[K]
-  ) => {
-    onChange({ ...value, [key]: val })
-  }
-
+export default function TradePlanCard({ plan }: Props) {
   return (
-    <div className="space-y-3 rounded border p-4">
-      <h3 className="font-semibold">Trade Plan</h3>
+    <div className="space-y-1 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{plan.strategy}</span>
+        <span className="text-xs rounded bg-gray-100 px-2 py-0.5">
+          {plan.plan_status}
+        </span>
+      </div>
 
-      <input
-        className="w-full border p-2"
-        placeholder="Strategy"
-        value={value.strategy}
-        onChange={(e) => update("strategy", e.target.value)}
-      />
+      <div className="text-gray-600">
+        {plan.position_type}
+        {plan.trade_mode && ` · ${plan.trade_mode}`}
+      </div>
 
-      <select
-        className="w-full border p-2"
-        value={value.direction}
-        onChange={(e) =>
-          update("direction", e.target.value as "LONG" | "SHORT")
-        }
-      >
-        <option value="LONG">Long</option>
-        <option value="SHORT">Short</option>
-      </select>
+      {plan.planned_entry_price && (
+        <div className="text-gray-500">
+          Entry: {plan.planned_entry_price} ·
+          Stop: {plan.planned_stop_price} ·
+          Target: {plan.planned_target_price}
+        </div>
+      )}
 
-      <textarea
-        className="w-full border p-2"
-        placeholder="Setup description"
-        value={value.setup}
-        onChange={(e) => update("setup", e.target.value)}
-      />
-
-      <input
-        className="w-full border p-2"
-        placeholder="Planned entry"
-        value={value.entry}
-        onChange={(e) => update("entry", e.target.value)}
-      />
-
-      <input
-        className="w-full border p-2"
-        placeholder="Planned stop"
-        value={value.stop}
-        onChange={(e) => update("stop", e.target.value)}
-      />
-
-      <input
-        className="w-full border p-2"
-        placeholder="Target (optional)"
-        value={value.target}
-        onChange={(e) => update("target", e.target.value)}
-      />
-
-      <input
-        className="w-full border p-2"
-        placeholder="Risk (₹)"
-        value={value.risk}
-        onChange={(e) => update("risk", e.target.value)}
-      />
+      {plan.not_taken_reason && (
+        <div className="text-xs text-red-600">
+          Not taken: {plan.not_taken_reason}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,107 +1,69 @@
-import { useState } from "react"
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
 
 import {
-  createTradePlan,
-  executeTrade,
-  exitTrade,
-  submitReview,
   fetchTradePlansByDate,
+  createTradePlan,
+  executeTradePlan,
+  exitTrade,
+  submitTradeReview,
 } from "@/services/tradeApi"
 
-import {
-  TradePlan,
-  TradingDayState,
-} from "@/types/trade"
+import { TradePlan } from "@/types/trade"
 
-// --------------------------------------------------
-// Hook: useTradeActions
-// --------------------------------------------------
+/* ======================================================
+   Hook — Plan-centric, Multi-plan safe
+====================================================== */
 
 export function useTradeActions(tradingDate: string) {
+  /* ---------------- STATE ---------------- */
+
   const [plans, setPlans] = useState<TradePlan[]>([])
-  const [dayState, setDayState] = useState<TradingDayState>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // --------------------------------------------------
-  // Load all plans for the selected day
-  // --------------------------------------------------
-  const loadPlans = async () => {
+  /* ---------------- LOAD PLANS ---------------- */
+
+  const loadPlans = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
       const data = await fetchTradePlansByDate(tradingDate)
-
-      setPlans(
-        data.map((p: any) => ({
-          id: p.id,
-          plan_date: p.plan_date,
-          strategy: p.strategy,
-          position_type: p.position_type as "LONG" | "SHORT",
-          plan_status: p.plan_status as "PLANNED" | "EXECUTED" | "NOT_TAKEN",
-          trade_id: p.trade_id,
-        }))
-      )
-    } catch (err: any) {
-      setError(err.message || "Failed to load plans")
+      setPlans(data)
+    } catch (err) {
+      setError("Failed to load trade plans")
     } finally {
       setLoading(false)
     }
-  }
+  }, [tradingDate])
 
-  // --------------------------------------------------
-  // Create trade plan
-  // --------------------------------------------------
+  useEffect(() => {
+    loadPlans()
+  }, [loadPlans])
+
+  /* ---------------- CREATE PLAN ---------------- */
+
   const createPlan = async (payload: any) => {
-    try {
-      setLoading(true)
-      setError(null)
+    await createTradePlan({
+      ...payload,
+      plan_date: tradingDate,
+    })
 
-      const res = await createTradePlan(payload)
-      await loadPlans()
-
-      setDayState({
-        planId: res.plan_id,
-        planStatus: "PLANNED",
-        tradeExited: false,
-        reviewCompleted: false,
-      })
-    } catch (err: any) {
-      setError(err.message || "Failed to create plan")
-    } finally {
-      setLoading(false)
-    }
+    await loadPlans()
   }
 
-  // --------------------------------------------------
-  // Execute trade
-  // --------------------------------------------------
+  /* ---------------- EXECUTE PLAN ---------------- */
+
   const executePlan = async (planId: number) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const res = await executeTrade(planId)
-      await loadPlans()
-
-      setDayState((prev) => ({
-        ...prev,
-        planId,
-        tradeId: res.trade_id,
-        planStatus: "EXECUTED",
-      }))
-    } catch (err: any) {
-      setError(err.message || "Failed to execute trade")
-    } finally {
-      setLoading(false)
-    }
+    await executeTradePlan(planId)
+    await loadPlans()
   }
 
-  // --------------------------------------------------
-  // Exit trade
-  // --------------------------------------------------
-  const exitCurrentTrade = async (
+  /* ---------------- EXIT TRADE ---------------- */
+
+  const exitTradeAction = async (
     tradeId: number,
     payload: {
       exit_price: number
@@ -109,83 +71,49 @@ export function useTradeActions(tradingDate: string) {
       exit_timestamp: string
     }
   ) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      await exitTrade(tradeId, payload)
-
-      setDayState((prev) => ({
-        ...prev,
-        tradeExited: true,
-      }))
-    } catch (err: any) {
-      setError(err.message || "Failed to exit trade")
-    } finally {
-      setLoading(false)
-    }
+    await exitTrade(tradeId, payload)
+    await loadPlans()
   }
 
-  // --------------------------------------------------
-  // Submit review
-  // --------------------------------------------------
-  const submitTradeReview = async (
-    tradeId: number,
-    payload: {
-      exit_reason: string
-      followed_entry_rules: boolean
-      followed_stop_rules: boolean
-      followed_position_sizing: boolean
-      emotional_state: string
-      market_context: string
-      learning_insight: string
-      trade_grade: string
-    }
-  ) => {
-    try {
-      setLoading(true)
-      setError(null)
+  /* ---------------- REVIEW ---------------- */
 
-      await submitReview(tradeId, payload)
-
-      setDayState((prev) => ({
-        ...prev,
-        reviewCompleted: true,
-      }))
-    } catch (err: any) {
-      setError(err.message || "Failed to submit review")
-    } finally {
-      setLoading(false)
-    }
+  const submitReview = async (tradeId: number, payload: any) => {
+    await submitTradeReview(tradeId, payload)
+    await loadPlans()
   }
 
-  // --------------------------------------------------
-  // Select plan (multi-plan support)
-  // --------------------------------------------------
-  const selectPlan = (plan: TradePlan) => {
-    setDayState({
-      planId: plan.id,
-      tradeId: plan.trade_id,
-      planStatus: plan.plan_status,
-      tradeExited: !!plan.trade_id,
-      reviewCompleted: false,
-    })
-  }
+  /* ---------------- DERIVED UI RULES ---------------- */
 
-  // --------------------------------------------------
-  // Public API
-  // --------------------------------------------------
+  const executedPlans = plans.filter(
+    (p) => p.plan_status === "EXECUTED"
+  )
+
+  const canExecuteMoreTrades = true
+  // intentionally flexible — can later enforce:
+  // - max concurrent trades
+  // - strategy caps
+  // - risk rules
+  // - market condition rules
+
+  /* ---------------- PUBLIC API ---------------- */
+
   return {
+    /* data */
     plans,
-    dayState,
+
+    /* derived info (read-only) */
+    executedPlans,
+    canExecuteMoreTrades,
+
+    /* flags */
     loading,
     error,
 
+    /* actions */
     loadPlans,
     createPlan,
     executePlan,
-    exitCurrentTrade,
-    submitTradeReview,
-    selectPlan,
+    exitTrade: exitTradeAction,
+    submitTradeReview: submitReview,
   }
 }
