@@ -18,16 +18,17 @@ export default function TradeExitForm({ onSubmit }: Props) {
   const [exitReason, setExitReason] = useState("")
 
   const isValid =
-    exitPrice !== "" &&
-    exitTimestamp !== "" &&
-    exitReason !== ""
+    exitPrice.trim() !== "" &&
+    exitTimestamp.trim() !== "" &&
+    exitReason.trim() !== ""
 
   const handleSubmit = () => {
     if (!isValid) return
 
     onSubmit({
       exit_price: Number(exitPrice),
-      exit_timestamp: exitTimestamp,
+      // ensure backend-friendly ISO string
+      exit_timestamp: new Date(exitTimestamp).toISOString(),
       exit_reason: exitReason,
     })
   }
@@ -42,10 +43,12 @@ export default function TradeExitForm({ onSubmit }: Props) {
       <div>
         <label className="block font-medium">Exit Price *</label>
         <input
+          type="number"
+          step="0.01"
           className="w-full rounded border p-2"
           value={exitPrice}
           onChange={(e) => setExitPrice(e.target.value)}
-          placeholder="e.g. 426.50"
+          placeholder="e.g. 590.00"
         />
       </div>
 

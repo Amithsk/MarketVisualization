@@ -52,3 +52,18 @@ def mark_not_taken(
     db.commit()
 
     return {"status": "NOT_TAKEN"}
+
+@router.get("")
+def list_plans(
+    trade_date: str,
+    db: Session = Depends(get_db)
+):
+    plans = (
+        db.query(models.TradePlan)
+        .filter(models.TradePlan.plan_date == trade_date)
+        .order_by(models.TradePlan.id.asc())
+        .all()
+    )
+
+    return plans
+

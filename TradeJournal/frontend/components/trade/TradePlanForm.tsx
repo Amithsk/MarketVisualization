@@ -1,8 +1,12 @@
-"use client";
+"use client"
 
-import { useState } from "react";
+import { useState } from "react"
 
-export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => void }) {
+type Props = {
+  onSubmit: (data: any) => void
+}
+
+export default function TradePlanForm({ onSubmit }: Props) {
   const [form, setForm] = useState({
     plan_date: "",
     trade_mode: "PAPER",
@@ -14,7 +18,11 @@ export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => v
     planned_target_price: "",
     planned_risk_amount: "",
     planned_position_size: "",
-  });
+  })
+
+  const update = (k: keyof typeof form, v: string) => {
+    setForm((prev) => ({ ...prev, [k]: v }))
+  }
 
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border p-6 space-y-6">
@@ -27,13 +35,13 @@ export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => v
           type="date"
           className="border rounded-md px-3 py-2"
           value={form.plan_date}
-          onChange={(e) => setForm({ ...form, plan_date: e.target.value })}
+          onChange={(e) => update("plan_date", e.target.value)}
         />
 
         <select
           className="border rounded-md px-3 py-2"
           value={form.trade_mode}
-          onChange={(e) => setForm({ ...form, trade_mode: e.target.value })}
+          onChange={(e) => update("trade_mode", e.target.value)}
         >
           <option value="PAPER">Paper</option>
           <option value="REAL">Real</option>
@@ -42,13 +50,14 @@ export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => v
         <input
           placeholder="Strategy (e.g. ORB)"
           className="border rounded-md px-3 py-2 col-span-2"
-          onChange={(e) => setForm({ ...form, strategy: e.target.value })}
+          value={form.strategy}
+          onChange={(e) => update("strategy", e.target.value)}
         />
 
         <select
           className="border rounded-md px-3 py-2"
           value={form.position_type}
-          onChange={(e) => setForm({ ...form, position_type: e.target.value })}
+          onChange={(e) => update("position_type", e.target.value)}
         >
           <option value="LONG">Long</option>
           <option value="SHORT">Short</option>
@@ -59,20 +68,56 @@ export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => v
         placeholder="Setup description"
         className="border rounded-md px-3 py-2 w-full"
         rows={3}
+        value={form.setup_description}
         onChange={(e) =>
-          setForm({ ...form, setup_description: e.target.value })
+          update("setup_description", e.target.value)
         }
       />
 
       <div className="grid grid-cols-3 gap-4">
-        <input placeholder="Entry Price" className="border rounded-md px-3 py-2" />
-        <input placeholder="Stop Loss" className="border rounded-md px-3 py-2" />
-        <input placeholder="Target" className="border rounded-md px-3 py-2" />
+        <input
+          placeholder="Entry Price"
+          className="border rounded-md px-3 py-2"
+          value={form.planned_entry_price}
+          onChange={(e) =>
+            update("planned_entry_price", e.target.value)
+          }
+        />
+        <input
+          placeholder="Stop Loss"
+          className="border rounded-md px-3 py-2"
+          value={form.planned_stop_price}
+          onChange={(e) =>
+            update("planned_stop_price", e.target.value)
+          }
+        />
+        <input
+          placeholder="Target"
+          className="border rounded-md px-3 py-2"
+          value={form.planned_target_price}
+          onChange={(e) =>
+            update("planned_target_price", e.target.value)
+          }
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <input placeholder="Risk Amount" className="border rounded-md px-3 py-2" />
-        <input placeholder="Position Size" className="border rounded-md px-3 py-2" />
+        <input
+          placeholder="Risk Amount"
+          className="border rounded-md px-3 py-2"
+          value={form.planned_risk_amount}
+          onChange={(e) =>
+            update("planned_risk_amount", e.target.value)
+          }
+        />
+        <input
+          placeholder="Position Size"
+          className="border rounded-md px-3 py-2"
+          value={form.planned_position_size}
+          onChange={(e) =>
+            update("planned_position_size", e.target.value)
+          }
+        />
       </div>
 
       <button
@@ -82,5 +127,5 @@ export default function TradePlanForm({ onSubmit }: { onSubmit: (data: any) => v
         Save Plan
       </button>
     </div>
-  );
+  )
 }

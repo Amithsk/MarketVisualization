@@ -4,17 +4,19 @@ const API_BASE = "http://localhost:8000/api"
 
 /* ===============================
    LOW-LEVEL FETCH WRAPPER
+   (FIXED – DO NOT CHANGE)
 ================================ */
 
 async function api<T>(
   url: string,
-  options?: RequestInit
+  options: RequestInit = {}
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(options.headers || {}),
     },
-    ...options,
   })
 
   if (!res.ok) {
