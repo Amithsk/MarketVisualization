@@ -37,7 +37,11 @@ type ReviewPayload = {
 }
 
 type Props = {
-  onSubmit: (data: Omit<ReviewPayload, "exit_reason"> & { exit_reason: Exclude<ReviewPayload["exit_reason"], ""> }) => void
+  onSubmit: (
+    data: Omit<ReviewPayload, "exit_reason"> & {
+      exit_reason: Exclude<ReviewPayload["exit_reason"], "">
+    }
+  ) => void
 }
 
 export default function TradeReviewForm({ onSubmit }: Props) {
@@ -59,7 +63,6 @@ export default function TradeReviewForm({ onSubmit }: Props) {
   const submit = () => {
     if (!isValid) return
 
-    // safe cast: validated above
     onSubmit({
       ...review,
       exit_reason: review.exit_reason as Exclude<
@@ -75,7 +78,7 @@ export default function TradeReviewForm({ onSubmit }: Props) {
         3 · POST-TRADE REVIEW
       </h3>
 
-      {/* Exit reason */}
+      {/* Exit Reason */}
       <div>
         <label className="block text-sm font-medium mb-1">
           Exit Reason *
@@ -84,7 +87,10 @@ export default function TradeReviewForm({ onSubmit }: Props) {
           className="w-full rounded border p-2 text-sm"
           value={review.exit_reason}
           onChange={(e) =>
-            setReview({ ...review, exit_reason: e.target.value as ReviewPayload["exit_reason"] })
+            setReview({
+              ...review,
+              exit_reason: e.target.value as ReviewPayload["exit_reason"],
+            })
           }
         >
           <option value="">Select reason</option>
@@ -94,6 +100,54 @@ export default function TradeReviewForm({ onSubmit }: Props) {
           <option value="MANUAL_FEAR">Manual – Fear</option>
           <option value="MANUAL_CONFUSION">Manual – Confusion</option>
           <option value="RULE_VIOLATION">Rule Violation</option>
+        </select>
+      </div>
+
+      {/* Emotional State */}
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Emotional State
+        </label>
+        <select
+          className="w-full rounded border p-2 text-sm"
+          value={review.emotional_state}
+          onChange={(e) =>
+            setReview({
+              ...review,
+              emotional_state: e.target.value as ReviewPayload["emotional_state"],
+            })
+          }
+        >
+          <option value="CALM">Calm</option>
+          <option value="CONFIDENT">Confident</option>
+          <option value="HESITANT">Hesitant</option>
+          <option value="FEARFUL">Fearful</option>
+          <option value="FOMO">FOMO</option>
+          <option value="REVENGE">Revenge</option>
+          <option value="DISTRACTED">Distracted</option>
+        </select>
+      </div>
+
+      {/* Market Context */}
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Market Context
+        </label>
+        <select
+          className="w-full rounded border p-2 text-sm"
+          value={review.market_context}
+          onChange={(e) =>
+            setReview({
+              ...review,
+              market_context: e.target.value as ReviewPayload["market_context"],
+            })
+          }
+        >
+          <option value="TRENDING">Trending</option>
+          <option value="RANGE">Range</option>
+          <option value="CHOPPY">Choppy</option>
+          <option value="NEWS_DRIVEN">News Driven</option>
+          <option value="LOW_LIQUIDITY">Low Liquidity</option>
         </select>
       </div>
 
