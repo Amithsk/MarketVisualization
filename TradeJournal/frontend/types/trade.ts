@@ -27,6 +27,10 @@ export type TradeStatus =
  */
 export type TradePlan = {
   id: number
+
+  // ✅ NEW — primary identity for the trade
+  symbol: string
+
   plan_date: string
 
   strategy: string
@@ -56,6 +60,8 @@ export type TradePlan = {
 export type TradeLog = {
   id: number
   timestamp: string
+
+  // already exists and stays
   symbol: string
 
   side: TradeSide
