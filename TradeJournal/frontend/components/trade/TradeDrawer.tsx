@@ -97,9 +97,18 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
             {plan.plan_status === "EXECUTED" && plan.trade_id && (
               <div className="mt-3">
                 <TradeReviewForm
-                  onSubmit={(payload) =>
-                    submitTradeReview(plan.trade_id!, payload)
-                  }
+                  onSubmit={(payload) => {
+                    console.group("🟢 TradeDrawer → Review Submit")
+                    console.log("trade_id:", plan.trade_id)
+                    console.log("symbol:", plan.symbol)
+                    console.log("payload RECEIVED:", payload)
+                    console.groupEnd()
+
+                    submitTradeReview(plan.trade_id!, {
+                      ...payload,
+                      symbol: plan.symbol, // ✅ REQUIRED FIX
+                    })
+                  }}
                 />
               </div>
             )}

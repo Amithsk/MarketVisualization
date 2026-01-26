@@ -4,7 +4,7 @@ const API_BASE = "http://localhost:8000/api"
 
 /* ===============================
    LOW-LEVEL FETCH WRAPPER
-   (FIXED – DO NOT CHANGE)
+   (DO NOT TOUCH)
 ================================ */
 
 async function api<T>(
@@ -44,6 +44,7 @@ export async function fetchTradePlansByDate(
 
 /**
  * Create a new trade plan
+ * (symbol is passed transparently in payload)
  */
 export async function createTradePlan(
   payload: Partial<TradePlan>

@@ -10,7 +10,6 @@ from app.deps import get_db
 router = APIRouter(prefix="/api", tags=["Trades"])
 
 
-
 # --------------------------------------------------
 # EXECUTE TRADE
 # --------------------------------------------------
@@ -30,10 +29,14 @@ def execute_trade(plan_id: int, db: Session = Depends(get_db)):
     trade = models.TradeLog(
         # REQUIRED FIELDS
         timestamp=datetime.utcnow(),
-        symbol="UNKNOWN",
+
+        # ✅ FIX 1: symbol comes from plan
+        symbol=plan.symbol,
+
         side=models.TradeSide.BUY
         if plan.position_type == "LONG"
         else models.TradeSide.SELL,
+
         quantity=plan.planned_position_size,
         price=plan.planned_entry_price,
 
@@ -112,6 +115,10 @@ def submit_review(
 
     review = models.TradeExecutionReview(
         trade_id=trade_id,
+
+        # ✅ FIX 2: freeze symbol from executed trade
+        symbol=trade.symbol,
+
         exit_reason=payload.exit_reason,
         followed_entry_rules=payload.followed_entry_rules,
         followed_stop_rules=payload.followed_stop_rules,
