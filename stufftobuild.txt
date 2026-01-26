@@ -1,0 +1,408 @@
+PROJECT INSTRUCTION DOCUMENT
+Intraday Market Context & Decision UI
+1️⃣ PROJECT NAME
+
+Intraday Market Context & Decision Dashboard (UI Only)
+
+2️⃣ PROJECT PURPOSE
+
+This project exists only to design and iterate on the USER INTERFACE (UI) for capturing:
+
+STEP 1 — Market Context (Pre-Market)
+
+STEP 2 — Market Open Behavior
+
+End-of-Day Review
+
+The UI is meant to:
+
+Help a trader input data cleanly
+
+Reduce cognitive load
+
+Encourage consistency & discipline
+
+Make daily review easy
+
+🚫 This project must NOT:
+
+Implement calculations
+
+Write backend logic
+
+Handle databases or APIs
+
+Decide market state automatically
+
+All calculations and logic will be handled outside this project.
+
+3️⃣ CORE UI PHILOSOPHY (VERY IMPORTANT)
+
+The UI should be designed with these principles:
+
+Form-driven, not chart-driven
+
+Minimal inputs, maximum clarity
+
+Explicit decision recording
+
+Friction for impulsive trading
+
+Optimized for daily repetition
+
+The UI should feel like a professional trading checklist, not a trading app.
+
+4️⃣ TARGET USER
+
+Single discretionary intraday trader
+
+Uses NIFTY 50 as market context
+
+Wants to learn and refine judgment
+
+Will fill this UI daily, manually
+
+Wants to review past days for patterns
+
+5️⃣ HIGH-LEVEL UI STRUCTURE
+
+The UI must be divided into 4 clear sections, preferably in this order:
+
+A. Header & Session Info
+B. STEP 1 — Market Context (Pre-Market)
+C. STEP 2 — Market Open Behavior
+D. Review & Reflection (End of Day)
+
+
+Each section should be visually separated.
+
+6️⃣ SECTION A — HEADER & SESSION INFO (UI REQUIREMENTS)
+Fields
+
+Date (date picker)
+
+Day of week (auto or selectable)
+
+Instrument (fixed label: “NIFTY 50”)
+
+UI Notes
+
+Keep this compact
+
+Should always be visible at top
+
+No edit once saved (lock icon optional)
+
+7️⃣ SECTION B — STEP 1 UI (PRE-MARKET CONTEXT)
+Purpose (UI level)
+
+Capture market context classification and reasoning, not calculation.
+
+B1️⃣ Gap Analysis (Input UI)
+
+Fields:
+
+Yesterday Close (number input)
+
+Pre-open Price (number input)
+
+Gap % (number input OR read-only if backend later)
+
+Gap Classification (radio buttons):
+
+RANGE
+
+SELECTIVE
+
+STRONG
+
+EVENT
+
+UI Notes:
+
+Classification must be manual selection
+
+Do not auto-infer in UI
+
+Show classification as colored pill (optional)
+
+B2️⃣ Yesterday’s Range & Structure (DB2 UI)
+
+Fields:
+
+Yesterday High
+
+Yesterday Low
+
+Yesterday Range
+
+5-Day Avg Range
+
+Range Ratio
+
+Selections:
+
+Range Size:
+
+SMALL
+
+NORMAL
+
+LARGE
+
+EXTREME
+
+Overlap Type:
+
+FULL
+
+PARTIAL
+
+NONE
+
+DB2 State:
+
+RANGE
+
+UNCERTAIN
+
+TREND_BIASED
+
+NO_TRADE
+
+UI Notes:
+
+Use dropdowns or segmented buttons
+
+Prevent skipping DB2 State selection
+
+B3️⃣ STEP 1 FINAL DECISION (MANDATORY)
+
+UI Element:
+
+Market Context (radio buttons):
+
+TREND DAY
+
+RANGE / UNCERTAIN DAY
+
+NO-TRADE DAY
+
+Text Area (mandatory):
+
+“Why did I classify the day this way?”
+
+UI Enforcement:
+
+Cannot proceed to STEP 2 without filling this
+
+8️⃣ SECTION C — STEP 2 UI (MARKET OPEN BEHAVIOR)
+Purpose (UI level)
+
+Capture how the open behaved, not predict trades.
+
+C1️⃣ Initial Range (IR)
+
+Fields:
+
+IR High
+
+IR Low
+
+IR Range
+
+C2️⃣ Volatility Quality
+
+Fields:
+
+Avg 5-min Range (Prev Day)
+
+IR Ratio
+
+Selection:
+
+Volatility State:
+
+LOW
+
+NORMAL
+
+EXCESSIVE
+
+C3️⃣ VWAP Behavior
+
+Fields:
+
+VWAP Cross Count (integer input)
+
+Selection:
+
+VWAP State:
+
+CLEAN
+
+CAUTION
+
+CHOPPY
+
+C4️⃣ Range Break Behavior
+
+Selections:
+
+Break Direction:
+
+NONE
+
+UP
+
+DOWN
+
+Break Candle Time (time input)
+
+Break Type:
+
+VALID
+
+FAILED
+
+NONE
+
+C5️⃣ STEP 2 FINAL DECISION (MANDATORY)
+
+Selection:
+
+Trade Permission:
+
+YES
+
+LIMITED
+
+NO
+
+Text Area (mandatory):
+
+“Why was this permission given?”
+
+UI Enforcement:
+
+This section must be clearly separated
+
+Decision must be intentional, not default
+
+9️⃣ SECTION D — REVIEW & REFLECTION UI
+
+This section is filled after market close.
+
+D1️⃣ Open Behavior (Subjective)
+
+Selection:
+
+Clean
+
+Messy
+
+Confusing
+
+Text Area:
+
+Why did it feel this way?
+
+D2️⃣ Expected vs Actual
+
+Selections:
+
+Expected Behavior:
+
+Smooth Trend
+
+Range
+
+High Volatility / Trap
+
+Actual Behavior:
+
+Trending
+
+Range
+
+Choppy / Trap
+
+D3️⃣ Alignment Check
+
+Checkboxes:
+
+STEP 1 context was correct
+
+STEP 2 permission was correct
+
+D4️⃣ One Learning (MANDATORY)
+
+Text Area:
+
+“What did I learn about the market today?”
+
+🔟 GLOBAL UI BEHAVIOR RULES
+
+The UI must:
+
+Enforce mandatory fields for:
+
+STEP 1 decision
+
+STEP 2 permission
+
+End-of-day learning
+
+Allow saving drafts
+
+Allow read-only review mode
+
+Support day-by-day navigation
+
+Avoid clutter, charts, or indicators
+
+1️⃣1️⃣ WHAT THE UI SHOULD NOT DO
+
+🚫 No strategy suggestions
+🚫 No trade entry buttons
+🚫 No P&L display
+🚫 No charts required
+🚫 No automation logic
+
+This UI is a decision journal, not a trading terminal.
+
+1️⃣2️⃣ FUTURE-READY (OPTIONAL UI CONSIDERATIONS)
+
+Color coding for:
+
+Trend / Range / No-trade
+
+Timeline view of past days
+
+Filters by Market Context
+
+Export to CSV
+
+Do not implement unless explicitly asked.
+
+1️⃣3️⃣ FINAL INSTRUCTION TO CHATGPT (IMPORTANT)
+
+When working inside this project, ChatGPT must:
+
+Focus only on UI / UX
+
+Ask questions only about layout, flow, usability
+
+Avoid backend, logic, or calculations
+
+Suggest UI improvements that:
+
+Reduce bias
+
+Encourage discipline
+
+Improve reviewability
+
+🧠 ONE-LINE PROJECT GOAL
+
+Design a calm, disciplined UI that helps a trader think clearly before trading, not trade more.
