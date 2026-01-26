@@ -6,6 +6,18 @@ type Props = {
   onSubmit: (data: any) => void
 }
 
+/**
+ * UI-only strategy list
+ * (safe to edit anytime)
+ */
+const STRATEGIES = [
+  "ORB",
+  "VWAP",
+  "GAP",
+  "BREAKOUT",
+  "REVERSAL",
+]
+
 export default function TradePlanForm({ onSubmit }: Props) {
   const [form, setForm] = useState({
     // 🔹 REQUIRED
@@ -63,12 +75,19 @@ export default function TradePlanForm({ onSubmit }: Props) {
           <option value="REAL">Real</option>
         </select>
 
-        <input
-          placeholder="Strategy (e.g. ORB)"
+        {/* STRATEGY DROPDOWN (UI ONLY) */}
+        <select
           className="border rounded-md px-3 py-2 col-span-2"
           value={form.strategy}
           onChange={(e) => update("strategy", e.target.value)}
-        />
+        >
+          <option value="">Select Strategy</option>
+          {STRATEGIES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
 
         <select
           className="border rounded-md px-3 py-2"
@@ -138,7 +157,11 @@ export default function TradePlanForm({ onSubmit }: Props) {
 
       <button
         onClick={() => onSubmit(form)}
+<<<<<<< HEAD
         disabled={!form.symbol}
+=======
+        disabled={!form.strategy}
+>>>>>>> 693af4c (Updated the code to support the dropdown of the strategy)
         className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition"
       >
         Save Plan
