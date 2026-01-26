@@ -1,4 +1,4 @@
-# app/schemas.py
+# backend/app/schemas.py
 from pydantic import BaseModel
 from datetime import datetime, date
 from typing import Optional
@@ -6,6 +6,9 @@ from typing import Optional
 # -------- Trade Plan --------
 
 class TradePlanCreate(BaseModel):
+    # ✅ NEW — symbol captured at planning time
+    symbol: str
+
     plan_date: date
     trade_mode: str
     strategy: str
@@ -41,6 +44,9 @@ class ExitTradePayload(BaseModel):
 # -------- Review --------
 
 class TradeReviewPayload(BaseModel):
+    # ✅ NEW — symbol stored with review
+    symbol: str
+
     exit_reason: str
     followed_entry_rules: bool
     followed_stop_rules: bool
@@ -49,7 +55,3 @@ class TradeReviewPayload(BaseModel):
     market_context: str
     learning_insight: str
     trade_grade: str
-
-
-
-    

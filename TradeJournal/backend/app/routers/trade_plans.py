@@ -13,6 +13,9 @@ def create_plan(
     db: Session = Depends(get_db)
 ):
     plan = models.TradePlan(
+        # ✅ NEW — persist symbol at plan level
+        symbol=payload.symbol,
+
         plan_date=payload.plan_date,
         trade_mode=payload.trade_mode,
         strategy=payload.strategy,
@@ -53,6 +56,7 @@ def mark_not_taken(
 
     return {"status": "NOT_TAKEN"}
 
+
 @router.get("")
 def list_plans(
     trade_date: str,
@@ -66,4 +70,3 @@ def list_plans(
     )
 
     return plans
-
