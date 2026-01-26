@@ -1,8 +1,8 @@
-#Main to control
+# Main to control
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import trade_plans, trades
+from app.routers import trade_plans, trades, calendar  
 
 app = FastAPI(title="Trade Journal API")
 
@@ -22,3 +22,4 @@ app.add_middleware(
 # --------------------------------------------------
 app.include_router(trade_plans.router)
 app.include_router(trades.router)
+app.include_router(calendar.router)  # ✅ REGISTER calendar route

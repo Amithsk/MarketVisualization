@@ -6,11 +6,20 @@ type Props = {
   onSubmit: (data: any) => void
 }
 
+/**
+ * UI-only strategy list
+ */
+const STRATEGIES = [
+  "ORB",
+  "VWAP",
+  "GAP",
+  "BREAKOUT",
+  "REVERSAL",
+]
+
 export default function TradePlanForm({ onSubmit }: Props) {
   const [form, setForm] = useState({
-    // 🔹 REQUIRED
     symbol: "",
-
     plan_date: "",
     trade_mode: "PAPER",
     strategy: "",
@@ -42,7 +51,9 @@ export default function TradePlanForm({ onSubmit }: Props) {
           placeholder="e.g. RELIANCE, NIFTY, BANKNIFTY"
           className="w-full border rounded-md px-3 py-2"
           value={form.symbol}
-          onChange={(e) => update("symbol", e.target.value.toUpperCase())}
+          onChange={(e) =>
+            update("symbol", e.target.value.toUpperCase())
+          }
         />
       </div>
 
@@ -51,29 +62,44 @@ export default function TradePlanForm({ onSubmit }: Props) {
           type="date"
           className="border rounded-md px-3 py-2"
           value={form.plan_date}
-          onChange={(e) => update("plan_date", e.target.value)}
+          onChange={(e) =>
+            update("plan_date", e.target.value)
+          }
         />
 
         <select
           className="border rounded-md px-3 py-2"
           value={form.trade_mode}
-          onChange={(e) => update("trade_mode", e.target.value)}
+          onChange={(e) =>
+            update("trade_mode", e.target.value)
+          }
         >
           <option value="PAPER">Paper</option>
           <option value="REAL">Real</option>
         </select>
 
-        <input
-          placeholder="Strategy (e.g. ORB)"
+        {/* STRATEGY */}
+        <select
           className="border rounded-md px-3 py-2 col-span-2"
           value={form.strategy}
-          onChange={(e) => update("strategy", e.target.value)}
-        />
+          onChange={(e) =>
+            update("strategy", e.target.value)
+          }
+        >
+          <option value="">Select Strategy</option>
+          {STRATEGIES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
 
         <select
           className="border rounded-md px-3 py-2"
           value={form.position_type}
-          onChange={(e) => update("position_type", e.target.value)}
+          onChange={(e) =>
+            update("position_type", e.target.value)
+          }
         >
           <option value="LONG">Long</option>
           <option value="SHORT">Short</option>
@@ -138,7 +164,7 @@ export default function TradePlanForm({ onSubmit }: Props) {
 
       <button
         onClick={() => onSubmit(form)}
-        disabled={!form.symbol}
+        disabled={!form.strategy}
         className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition"
       >
         Save Plan

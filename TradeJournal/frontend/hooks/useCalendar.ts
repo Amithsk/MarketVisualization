@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CalendarDay } from "@/types/calendar"
+import { fetchCalendarSummary } from "@/services/calendarApi"
 
 function formatDate(date: Date) {
   return date.toISOString().split("T")[0]
@@ -14,8 +15,31 @@ export function useCalendar() {
     return d
   })
 
+  const [summary, setSummary] = useState<
+    Record<string, { tradeCount: number; pnl: number }>
+  >({})
+
   const year = current.getFullYear()
-  const month = current.getMonth()
+  const month = current.getMonth() // 0-based
+
+  /* ----------------------------------------
+     Fetch backend calendar aggregation
+  ---------------------------------------- */
+  useEffect(() => {
+    let active = true
+
+    fetchCalendarSummary(year, month + 1)
+      .then((data) => {
+        if (active) setSummary(data)
+      })
+      .catch(() => {
+        if (active) setSummary({})
+      })
+
+    return () => {
+      active = false
+    }
+  }, [year, month])
 
   const startOfMonth = new Date(year, month, 1)
   const endOfMonth = new Date(year, month + 1, 0)
@@ -25,27 +49,34 @@ export function useCalendar() {
 
   const days: CalendarDay[] = []
 
-  // ---- Previous month filler ----
+  /* ---------- Previous month filler ---------- */
   for (let i = startDay - 1; i >= 0; i--) {
     const d = new Date(year, month, -i)
     days.push({
       date: formatDate(d),
       day: d.getDate(),
       isCurrentMonth: false,
+      tradeCount: 0,
+      pnl: 0,
     })
   }
 
-  // ---- Current month ----
+  /* ---------- Current month ---------- */
   for (let day = 1; day <= totalDays; day++) {
     const d = new Date(year, month, day)
+    const dateStr = formatDate(d)
+    const daySummary = summary[dateStr]
+
     days.push({
-      date: formatDate(d),
+      date: dateStr,
       day,
       isCurrentMonth: true,
+      tradeCount: daySummary?.tradeCount ?? 0,
+      pnl: daySummary?.pnl ?? 0,
     })
   }
 
-  // ---- Next month filler (to complete grid) ----
+  /* ---------- Next month filler ---------- */
   while (days.length % 7 !== 0) {
     const last = days[days.length - 1]
     const d = new Date(last.date)
@@ -55,6 +86,8 @@ export function useCalendar() {
       date: formatDate(d),
       day: d.getDate(),
       isCurrentMonth: false,
+      tradeCount: 0,
+      pnl: 0,
     })
   }
 

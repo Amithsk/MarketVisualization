@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 import TradePlanForm from "./TradePlanForm"
 import TradePlanCard from "./TradePlanCard"
 import TradeExitForm from "./TradeExitForm"
@@ -25,6 +27,13 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
     submitTradeReview,
   } = useTradeActions(tradeDate)
 
+  // which plan is expanded
+  const [expandedPlanId, setExpandedPlanId] = useState<number | null>(null)
+
+  const toggleExpand = (planId: number) => {
+    setExpandedPlanId((prev) => (prev === planId ? null : planId))
+  }
+
   return (
     <div className="fixed right-0 top-0 z-50 h-full w-[420px] overflow-y-auto border-l bg-white p-4 shadow-lg">
       {/* ================= HEADER ================= */}
@@ -49,71 +58,79 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
 
       {/* ================= CREATE PLAN ================= */}
       {canExecuteMoreTrades && (
-        <TradePlanForm
-          onSubmit={(payload) =>
-            createPlan({
-              ...payload,
-              plan_date: tradeDate,
-            })
-          }
-        />
+        <div className="mb-6">
+          <TradePlanForm
+            onSubmit={(payload) =>
+              createPlan({
+                ...payload,
+                plan_date: tradeDate,
+              })
+            }
+          />
+        </div>
       )}
 
       {/* ================= PLAN LIST ================= */}
-      <div className="mt-6 space-y-4">
-        {plans.map((plan: TradePlan) => (
-          <div key={plan.id} className="rounded border p-3">
-            {/* -------- PLAN CARD -------- */}
-            <TradePlanCard plan={plan} />
+      <div className="space-y-3">
+        {plans.map((plan: TradePlan) => {
+          const isExpanded = expandedPlanId === plan.id
 
-            {/* -------- EXECUTE -------- */}
-            {plan.plan_status === "PLANNED" && (
+          return (
+            <div
+              key={plan.id}
+              className="rounded-lg border bg-white"
+            >
+              {/* -------- SUMMARY (CLICKABLE) -------- */}
               <button
-                className="mt-2 w-full rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-                disabled={loading || !canExecuteMoreTrades}
-                onClick={() => executePlan(plan.id)}
+                onClick={() => toggleExpand(plan.id)}
+                className="w-full text-left p-3"
               >
-                Execute Trade
+                <TradePlanCard plan={plan} />
               </button>
-            )}
 
-            {/* -------- EXIT -------- */}
-            {plan.plan_status === "EXECUTED" && plan.trade_id && (
-              <div className="mt-3">
-                <TradeExitForm
-                  onSubmit={(payload) => {
-                    console.group("🟡 TradeDrawer → Exit Submit")
-                    console.log("trade_id:", plan.trade_id)
-                    console.log("payload RECEIVED:", payload)
-                    console.groupEnd()
+              {/* -------- EXPANDED CONTENT -------- */}
+              {isExpanded && (
+                <div className="border-t px-3 pb-3">
+                  {/* EXECUTE */}
+                  {plan.plan_status === "PLANNED" && (
+                    <button
+                      className="mt-3 w-full rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                      disabled={loading || !canExecuteMoreTrades}
+                      onClick={() => executePlan(plan.id)}
+                    >
+                      Execute Trade
+                    </button>
+                  )}
 
-                    exitTrade(plan.trade_id!, payload)
-                  }}
-                />
-              </div>
-            )}
+                  {/* EXIT */}
+                  {plan.plan_status === "EXECUTED" && plan.trade_id && (
+                    <div className="mt-4">
+                      <TradeExitForm
+                        onSubmit={(payload) =>
+                          exitTrade(plan.trade_id!, payload)
+                        }
+                      />
+                    </div>
+                  )}
 
-            {/* -------- REVIEW -------- */}
-            {plan.plan_status === "EXECUTED" && plan.trade_id && (
-              <div className="mt-3">
-                <TradeReviewForm
-                  onSubmit={(payload) => {
-                    console.group("🟢 TradeDrawer → Review Submit")
-                    console.log("trade_id:", plan.trade_id)
-                    console.log("symbol:", plan.symbol)
-                    console.log("payload RECEIVED:", payload)
-                    console.groupEnd()
-
-                    submitTradeReview(plan.trade_id!, {
-                      ...payload,
-                      symbol: plan.symbol, // ✅ REQUIRED FIX
-                    })
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        ))}
+                  {/* REVIEW */}
+                  {plan.plan_status === "EXECUTED" && plan.trade_id && (
+                    <div className="mt-4">
+                      <TradeReviewForm
+                        onSubmit={(payload) =>
+                          submitTradeReview(plan.trade_id!, {
+                            ...payload,
+                            symbol: plan.symbol, // required
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {!loading && plans.length === 0 && (
           <div className="text-sm text-gray-500">
