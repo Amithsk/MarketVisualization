@@ -70,6 +70,9 @@ class TradePlan(Base):
         nullable=True,
     )
 
+    # ✅ NEW — symbol captured at planning time
+    symbol = Column(String(32), nullable=False)
+
     plan_date = Column(Date, nullable=False)
     trade_mode = Column(Enum("PAPER", "REAL"), nullable=False)
     strategy = Column(String(64), nullable=False)
@@ -104,13 +107,14 @@ class TradePlan(Base):
         server_onupdate="CURRENT_TIMESTAMP",
     )
 
-    # ✅ ONE-WAY relationship ONLY (no back_populates)
+    # ONE-WAY relationship
     trade = relationship("TradeLog", uselist=False)
 
 
 # --------------------------------------------------
 # TRADE LOG
 # Table: intradaytrading.trade_log
+# (UNCHANGED)
 # --------------------------------------------------
 
 class TradeLog(Base):
@@ -155,11 +159,6 @@ class TradeLog(Base):
     instrument_type = Column(String(32), nullable=True)
     position_type = Column(Enum(PositionType), nullable=True)
     trade_tag = Column(String(64), nullable=True)
-
-    # --------------------------------------------------
-    # GENERATED COLUMNS — DO NOT WRITE FROM ORM
-    # (MySQL STORED GENERATED)
-    # --------------------------------------------------
 
     pnl_amount = Column(
         DECIMAL(24, 6),
@@ -217,6 +216,9 @@ class TradeExecutionReview(Base):
         nullable=False,
     )
 
+    # ✅ NEW — symbol frozen at review time
+    symbol = Column(String(32), nullable=False)
+
     exit_reason = Column(
         Enum(
             "STOP_HIT",
@@ -266,5 +268,4 @@ class TradeExecutionReview(Base):
         server_default="CURRENT_TIMESTAMP",
     )
 
-    # ONE-WAY relationship
     trade = relationship("TradeLog", uselist=False)

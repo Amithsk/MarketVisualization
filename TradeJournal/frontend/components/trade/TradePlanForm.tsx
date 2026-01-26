@@ -8,6 +8,9 @@ type Props = {
 
 export default function TradePlanForm({ onSubmit }: Props) {
   const [form, setForm] = useState({
+    // 🔹 REQUIRED
+    symbol: "",
+
     plan_date: "",
     trade_mode: "PAPER",
     strategy: "",
@@ -29,6 +32,19 @@ export default function TradePlanForm({ onSubmit }: Props) {
       <h2 className="text-xl font-semibold text-gray-800">
         Create Trade Plan
       </h2>
+
+      {/* SYMBOL */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Symbol *
+        </label>
+        <input
+          placeholder="e.g. RELIANCE, NIFTY, BANKNIFTY"
+          className="w-full border rounded-md px-3 py-2"
+          value={form.symbol}
+          onChange={(e) => update("symbol", e.target.value.toUpperCase())}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <input
@@ -122,7 +138,8 @@ export default function TradePlanForm({ onSubmit }: Props) {
 
       <button
         onClick={() => onSubmit(form)}
-        className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+        disabled={!form.symbol}
+        className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition"
       >
         Save Plan
       </button>
