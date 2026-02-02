@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Intraday Trading API
+  version: 1.0.0
+  description: |
+    Backend API contract for intraday trading workflow.
+    Preview endpoints compute derived values.
+    Context endpoints freeze decisions.
+
+paths:
+
+  /api/step1/preview:
+    post:
+      summary: Preview STEP-1 Pre-Market Context (NO SAVE)
+      description: |
+        Computes gap, range, overlap and structure state.
+        Does NOT store anything in DB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trade_date, preopen_price]
+              additionalProperties: false
+              properties:
+                trade_date:
+                  type: string
+                  format: date
+                preopen_price:
+                  type: number
+      responses:
+        '200':
+          description: Preview of derived market context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  computed:
+                    type: object
+                    properties:
+                      gap_pct:
+                        type: number
+                      gap_class:
+                        type: string
+                      prior_range_size:
+                        type: string
+                      prior_day_overlap:
+                        type: string
+                      prior_structure_state:
+                        type: string
+                  suggested_market_context:
+                    type: string
+
+  /api/step1/context:
+    post:
+      summary: Freeze STEP-1 Pre-Market Context (SAVE)
+      description: |
+        Finalizes STEP-1 decision.
+        Recomputes all derived values and saves one immutable row.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trade_date
+                - preopen_price
+                - final_market_context
+                - final_reason
+              additionalProperties: false
+              properties:
+                trade_date:
+                  type: string
+                  format: date
+                preopen_price:
+                  type: number
+                final_market_context:
+                  type: string
+                  enum:
+                    - TREND_DAY
+                    - RANGE_UNCERTAIN_DAY
+                    - NO_TRADE_DAY
+                final_reason:
+                  type: string
+      responses:
+        '201':
+          description: STEP-1 frozen successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  trade_date:
+                    type: string
+                  final_market_context:
+                    type: string
