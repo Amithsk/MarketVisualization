@@ -1,5 +1,7 @@
 // src/types/step3.types.ts
 
+import { TradeDate, IsoTimestamp } from "./common.types";
+
 /**
  * STEP-3: Execution Control & Stock Selection
  * -------------------------------------------
@@ -48,15 +50,16 @@ export interface TradeCandidate {
 }
 
 /**
- * Core STEP-3 snapshot as shown in the UI.
+ * Core STEP-3 snapshot as returned by backend.
+ * NOTE: STEP-3 is NOT frozen.
  */
 export interface Step3ExecutionSnapshot {
-  tradeDate: string;
+  tradeDate: TradeDate;
 
   /**
-   * Whether STEP-3 is active.
-   * Depends on STEP-1 and STEP-2 being frozen
-   * AND tradeAllowed === true.
+   * Whether execution is allowed.
+   * Depends on STEP-1 + STEP-2 being frozen
+   * and STEP-2.tradeAllowed === true.
    */
   executionEnabled: boolean;
 
@@ -68,13 +71,12 @@ export interface Step3ExecutionSnapshot {
 
   /**
    * When STEP-3 was generated.
-   * This step is not "frozen" — it is regenerated.
    */
-  generatedAt: string;
+  generatedAt: IsoTimestamp;
 }
 
 /**
- * Response shape for STEP-3 execution preview.
+ * Response shape for STEP-3 execution API.
  */
 export interface Step3ExecutionResponse {
   snapshot: Step3ExecutionSnapshot;
