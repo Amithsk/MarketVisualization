@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: Intraday Trading API
+  version: 1.0.0
+  description: |
+    Backend API contract for intraday trading workflow.
+    Preview endpoints compute derived values.
+    Context endpoints freeze decisions.
+
+paths:
+
+  /api/step1/preview:
+    post:
+      summary: Preview STEP-1 Pre-Market Context (NO SAVE)
+      description: |
+        Computes gap, range, overlap and structure state.
+        Does NOT store anything in DB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trade_date, preopen_price]
+              additionalProperties: false
+              properties:
+                trade_date:
+                  type: string
+                  format: date
+                preopen_price:
+                  type: number
+      responses:
+        '200':
+          description: Preview of derived market context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  computed:
+                    type: object
+                    properties:
+                      gap_pct:
+                        type: number
+                      gap_class:
+                        type: string
+                      prior_range_size:
+                        type: string
+                      prior_day_overlap:
+                        type: string
+                      prior_structure_state:
+                        type: string
+                  suggested_market_context:
+                    type: string
+
+  /api/step1/context:
+    post:
+      summary: Freeze STEP-1 Pre-Market Context (SAVE)
+      description: |
+        Finalizes STEP-1 decision.
+        Recomputes all derived values and saves one immutable row.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trade_date
+                - preopen_price
+                - final_market_context
+                - final_reason
+              additionalProperties: false
+              properties:
+                trade_date:
+                  type: string
+                  format: date
+                preopen_price:
+                  type: number
+                final_market_context:
+                  type: string
+                  enum:
+                    - TREND_DAY
+                    - RANGE_UNCERTAIN_DAY
+                    - NO_TRADE_DAY
+                final_reason:
+                  type: string
+      responses:
+        '201':
+          description: STEP-1 frozen successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  trade_date:
+                    type: string
+                  final_market_context:
+                    type: string
+
+#-------------------Step2 Market Open behaviour----------------------------------------------
+  /api/step2/preview:
+  post:
+    summary: Preview STEP-2 Market Open Behavior (NO SAVE)
+    description: |
+      Computes initial range, volatility state, VWAP behavior,
+      range hold/fail and suggested trade permission.
+      Does NOT write to DB.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trade_date
+              - ir_high
+              - ir_low
+              - ir_range
+              - ir_ratio
+              - vwap_cross_count
+              - range_hold_status
+            additionalProperties: false
+            properties:
+              trade_date:
+                type: string
+                format: date
+              ir_high:
+                type: number
+              ir_low:
+                type: number
+              ir_range:
+                type: number
+              ir_ratio:
+                type: number
+              vwap_cross_count:
+                type: integer
+              range_hold_status:
+                type: string
+                enum: [VALID, FAILED, NONE]
+    responses:
+      '200':
+        description: Preview of STEP-2 derived behavior
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                volatility_state:
+                  type: string
+                  enum: [LOW, NORMAL, EXCESSIVE]
+                vwap_state:
+                  type: string
+                  enum: [CLEAN, CAUTION, CHOPPY]
+                suggested_trade_permission:
+                  type: string
+                  enum: [YES, LIMITED, NO]
+
+  /api/step2/context:
+  post:
+    summary: Freeze STEP-2 Market Open Behavior (SAVE)
+    description: |
+      Finalizes STEP-2 decision.
+      Recomputes all signals and stores one immutable record.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trade_date
+              - ir_high
+              - ir_low
+              - ir_range
+              - ir_ratio
+              - vwap_cross_count
+              - range_hold_status
+              - reason
+            additionalProperties: false
+            properties:
+              trade_date:
+                type: string
+                format: date
+              ir_high:
+                type: number
+              ir_low:
+                type: number
+              ir_range:
+                type: number
+              ir_ratio:
+                type: number
+              vwap_cross_count:
+                type: integer
+              range_hold_status:
+                type: string
+                enum: [VALID, FAILED, NONE]
+              reason:
+                type: string
+    responses:
+      '201':
+        description: STEP-2 frozen successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                trade_date:
+                  type: string
+                trade_permission:
+                  type: string
+                  enum: [YES, LIMITED, NO]
+  /api/step2/context:
+  get:
+    summary: Get frozen STEP-2 Market Open Behavior
+    parameters:
+      - in: query
+        name: date
+        required: true
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Frozen STEP-2 record
+
+#-------------------Step3  Execution Control (Index → Stock)----------------------------------------------
+
+  /api/step3/generate:
+  post:
+    summary: Generate STEP-3 Execution Control & Stock Selection
+    description: |
+      Derives execution limits and eligible stocks using:
+      - Frozen STEP-1 market context
+      - Frozen STEP-2 trade permission
+      - System market data (stocks & index)
+
+      No user input is accepted.
+      This endpoint writes STEP-3 results to DB.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [trade_date]
+            additionalProperties: false
+            properties:
+              trade_date:
+                type: string
+                format: date
+    responses:
+      '201':
+        description: STEP-3 generated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allowed_strategies:
+                  type: array
+                  items:
+                    type: string
+                    enum: [GAP_FOLLOW, MOMENTUM]
+                max_trades_allowed:
+                  type: integer
+                stock_count:
+                  type: integer
+
+  /api/step3/context:
+  get:
+    summary: Get STEP-3 Execution Control & Stock Selection
+    parameters:
+      - in: query
+        name: date
+        required: true
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Frozen STEP-3 results
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                execution_control:
+                  type: object
+                  properties:
+                    allowed_strategies:
+                      type: array
+                      items:
+                        type: string
+                    max_trades_allowed:
+                      type: integer
+                stocks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      symbol:
+                        type: string
+                      direction:
+                        type: string
+                        enum: [LONG, SHORT]
+                      strategy_used:
+                        type: string
+                        enum: [GAP_FOLLOW, MOMENTUM]
+                      reason:
+                        type: string
+
+
+#----------------------------------------Step4:Execution & Trade Construction----------------------------------------------------------
+  /api/step4/preview:
+  post:
+    summary: Preview STEP-4 Execution & Trade Construction (NO SAVE)
+    description: |
+      Computes entry, stop, quantity and target for a STEP-3 approved stock.
+      Does NOT write to DB.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trade_date
+              - symbol
+              - capital
+              - risk_pct
+              - entry_buffer
+              - r_multiple
+            additionalProperties: false
+            properties:
+              trade_date:
+                type: string
+                format: date
+              symbol:
+                type: string
+              capital:
+                type: number
+              risk_pct:
+                type: number
+              entry_buffer:
+                type: number
+              r_multiple:
+                type: number
+    responses:
+      '200':
+        description: Preview of execution numbers
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entry_price:
+                  type: number
+                stop_loss:
+                  type: number
+                risk_per_share:
+                  type: number
+                quantity:
+                  type: integer
+                target_price:
+                  type: number
+                trade_status:
+                  type: string
+                  enum: [READY, BLOCKED]
+                block_reason:
+                  type: string
+  /api/step4/construct:
+  post:
+    summary: Freeze STEP-4 Trade Construction (SAVE)
+    description: |
+      Finalizes trade execution plan.
+      Recomputes all values and stores one immutable record.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trade_date
+              - symbol
+              - capital
+              - risk_pct
+              - entry_buffer
+              - r_multiple
+            additionalProperties: false
+            properties:
+              trade_date:
+                type: string
+                format: date
+              symbol:
+                type: string
+              capital:
+                type: number
+              risk_pct:
+                type: number
+              entry_buffer:
+                type: number
+              r_multiple:
+                type: number
+    responses:
+      '201':
+        description: STEP-4 trade constructed
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                trade_date:
+                  type: string
+                symbol:
+                  type: string
+                trade_status:
+                  type: string
+                  enum: [READY, BLOCKED]
+
+  /api/step4/trade:
+  get:
+    summary: Get frozen STEP-4 trade construction
+    parameters:
+      - in: query
+        name: date
+        required: true
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: symbol
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Frozen STEP-4 trade plan
