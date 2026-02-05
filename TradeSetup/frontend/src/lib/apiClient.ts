@@ -7,7 +7,7 @@ import axios, { AxiosError, AxiosInstance } from "axios";
  * All API calls must go through this instance.
  */
 const apiClient: AxiosInstance = axios.create({
-  baseURL: "", // same-origin (/api/*)
+  baseURL: "http://localhost:8000/api",
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",
@@ -15,19 +15,29 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 /**
- * Basic response interceptor.
- * Keeps UI and services clean.
+ * Normalized API error shape
+ */
+export interface ApiError {
+  status: number;
+  message: string;
+  raw?: any;
+}
+
+/**
+ * Response interceptor
+ * Normalizes backend + network errors into a predictable shape
  */
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    // Normalize error shape
-    const normalizedError = {
-      status: error.response?.status,
+    const normalizedError: ApiError = {
+      status: error.response?.status ?? 500,
       message:
         (error.response?.data as any)?.message ||
+        (error.response?.data as any)?.detail ||
         error.message ||
         "Unexpected API error",
+      raw: error.response?.data,
     };
 
     return Promise.reject(normalizedError);

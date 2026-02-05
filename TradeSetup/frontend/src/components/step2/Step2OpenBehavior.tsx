@@ -1,14 +1,33 @@
 // src/components/step2/Step2OpenBehavior.tsx
 
-import React from "react";
+"use client";
+
+import React, { useEffect } from "react";
+import { useStep2 } from "@/hooks/useStep2";
+import type { TradeDate } from "@/types/common.types";
 
 interface Step2OpenBehaviorProps {
-  tradeDate: string;
+  tradeDate: TradeDate;
 }
 
 export default function Step2OpenBehavior({
   tradeDate,
 }: Step2OpenBehaviorProps) {
+  const {
+    snapshot,
+    isFrozen,
+    tradeAllowed,
+    loading,
+    error,
+    previewStep2,
+    freezeStep2,
+  } = useStep2(tradeDate);
+
+  // Auto-load STEP-2 preview when component mounts
+  useEffect(() => {
+    previewStep2();
+  }, [previewStep2]);
+
   return (
     <div className="space-y-6">
       {/* Meta */}
@@ -17,48 +36,89 @@ export default function Step2OpenBehavior({
         <span className="font-medium">{tradeDate}</span>
       </div>
 
+      {/* Loading / Error */}
+      {loading && (
+        <div className="text-sm text-gray-500">Loading STEP-2…</div>
+      )}
+
+      {error && (
+        <div className="text-sm text-red-600">
+          {error.message}
+        </div>
+      )}
+
       {/* Observation grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {/* Index Open */}
-        <div className="rounded border p-4">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Index Open
-          </h3>
-          <div className="mt-2 text-sm text-gray-400 italic">
-            Not captured yet
+      {snapshot && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Index Open */}
+          <div className="rounded border p-4">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Index Open
+            </h3>
+            <div className="mt-2 text-sm">
+              {snapshot.indexOpenBehavior}
+            </div>
           </div>
-        </div>
 
-        {/* Volatility / Range */}
-        <div className="rounded border p-4">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Early Volatility
-          </h3>
-          <div className="mt-2 text-sm text-gray-400 italic">
-            Not evaluated yet
+          {/* Early Volatility */}
+          <div className="rounded border p-4">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Early Volatility
+            </h3>
+            <div className="mt-2 text-sm">
+              {snapshot.earlyVolatility}
+            </div>
           </div>
-        </div>
 
-        {/* Market Participation */}
-        <div className="rounded border p-4">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Market Participation
-          </h3>
-          <div className="mt-2 text-sm text-gray-400 italic">
-            Not evaluated yet
+          {/* Market Participation */}
+          <div className="rounded border p-4">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Market Participation
+            </h3>
+            <div className="mt-2 text-sm">
+              {snapshot.marketParticipation}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Trade permission */}
-      <div className="rounded border border-dashed p-4">
-        <div className="text-sm font-medium text-gray-700">
-          Trade Permission
+      {snapshot && (
+        <div
+          className={`rounded border p-4 ${
+            tradeAllowed
+              ? "border-green-300 bg-green-50 text-green-700"
+              : "border-red-300 bg-red-50 text-red-700"
+          }`}
+        >
+          <div className="text-sm font-medium">
+            Trade Permission
+          </div>
+          <div className="mt-2 text-sm">
+            {tradeAllowed
+              ? "Trading is permitted based on STEP-2 evaluation."
+              : "Trading is NOT permitted for the day."}
+          </div>
         </div>
-        <div className="mt-2 text-sm text-gray-500 italic">
-          Trading is not permitted until STEP-2 is evaluated and frozen.
+      )}
+
+      {/* Freeze action / status */}
+      {!isFrozen ? (
+        <button
+          onClick={freezeStep2}
+          disabled={loading || !snapshot}
+          className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          Freeze STEP-2 Behavior
+        </button>
+      ) : (
+        <div className="rounded border border-green-300 bg-green-50 p-4 text-sm text-green-700">
+          STEP-2 frozen at{" "}
+          <span className="font-medium">
+            {snapshot?.frozenAt}
+          </span>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,12 +1,13 @@
-# backend/app/main.py
-
 from fastapi import FastAPI
-
 
 from backend.app.api.step1 import router as step1_router
 from backend.app.api.step2 import router as step2_router
-# Register routers
+from backend.app.api.step3 import router as step3_router
+from backend.app.api.step4 import router as step4_router
 
 app = FastAPI(title="TradeSetup Backend")
+
 app.include_router(step1_router)
 app.include_router(step2_router)
+app.include_router(step3_router)
+app.include_router(step4_router)

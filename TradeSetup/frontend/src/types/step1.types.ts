@@ -1,5 +1,7 @@
 // src/types/step1.types.ts
 
+import { FreezeMetadata, TradeDate } from "./common.types";
+
 /**
  * STEP-1: Pre-Market Context
  * --------------------------
@@ -28,10 +30,10 @@ export type GapContext =
   | "UNKNOWN";
 
 /**
- * Core STEP-1 snapshot as shown in the UI.
+ * Core STEP-1 snapshot as returned by backend.
  */
-export interface Step1ContextSnapshot {
-  tradeDate: string;
+export interface Step1ContextSnapshot extends FreezeMetadata {
+  tradeDate: TradeDate;
 
   marketBias: MarketBias;
   gapContext: GapContext;
@@ -41,21 +43,13 @@ export interface Step1ContextSnapshot {
    * Immutable after freeze.
    */
   preMarketNotes?: string;
-
-  /**
-   * When STEP-1 was frozen.
-   * Null = not frozen yet.
-   */
-  frozenAt: string | null;
 }
 
 /**
  * Response shape for STEP-1 preview API.
- * (Used before freezing)
  */
 export interface Step1PreviewResponse {
   snapshot: Step1ContextSnapshot;
-  canFreeze: boolean;
 }
 
 /**
@@ -63,5 +57,4 @@ export interface Step1PreviewResponse {
  */
 export interface Step1FrozenResponse {
   snapshot: Step1ContextSnapshot;
-  frozen: true;
 }

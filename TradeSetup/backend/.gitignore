@@ -1,0 +1,4 @@
+
+# Python cache (global)
+__pycache__/
+*.pyc

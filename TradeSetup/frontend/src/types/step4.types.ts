@@ -1,5 +1,7 @@
 // src/types/step4.types.ts
 
+import { TradeDate, IsoTimestamp, FreezeMetadata } from "./common.types";
+
 /**
  * STEP-4: Execution & Trade Construction
  * --------------------------------------
@@ -22,10 +24,10 @@ export type ExecutionMode =
   | "STOP_LIMIT";
 
 /**
- * Core frozen trade object.
+ * Core frozen trade object as returned by backend.
  */
-export interface FrozenTrade {
-  tradeDate: string;
+export interface FrozenTrade extends FreezeMetadata {
+  tradeDate: TradeDate;
 
   /**
    * Instrument details (from STEP-3).
@@ -60,12 +62,6 @@ export interface FrozenTrade {
    * Optional rationale written at commit time.
    */
   rationale?: string;
-
-  /**
-   * When the trade was frozen.
-   * This timestamp makes the trade immutable.
-   */
-  frozenAt: string;
 }
 
 /**
@@ -73,5 +69,4 @@ export interface FrozenTrade {
  */
 export interface Step4FrozenTradeResponse {
   trade: FrozenTrade;
-  frozen: true;
 }

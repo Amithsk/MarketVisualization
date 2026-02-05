@@ -5,11 +5,22 @@
  */
 
 /**
- * Standard API error shape (normalized by apiClient).
+ * Normalized API error shape (from apiClient).
+ * status is always present (defaults to 500).
  */
 export interface ApiError {
-  status?: number;
+  status: number;
   message: string;
+  raw?: any;
+}
+
+/**
+ * Generic async state wrapper used by all STEP hooks.
+ */
+export interface ApiState<T> {
+  data: T | null;
+  loading: boolean;
+  error: ApiError | null;
 }
 
 /**
@@ -30,3 +41,16 @@ export interface FreezeMetadata {
   freezeStatus: FreezeStatus;
   frozenAt: IsoTimestamp | null;
 }
+
+/**
+ * Common success response used by freeze endpoints.
+ */
+export interface ApiSuccess {
+  status: "OK" | "FROZEN" | "TRADE_FROZEN";
+  message?: string;
+}
+
+/**
+ * Utility type for date-scoped API calls.
+ */
+export type TradeDate = string; // YYYY-MM-DD

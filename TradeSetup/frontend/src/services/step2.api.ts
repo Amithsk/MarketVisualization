@@ -1,7 +1,8 @@
 // src/services/step2.api.ts
 
 import apiClient from "@/lib/apiClient";
-import {
+import type { TradeDate } from "@/types/common.types";
+import type {
   Step2PreviewResponse,
   Step2FrozenResponse,
 } from "@/types/step2.types";
@@ -11,10 +12,10 @@ import {
  * Used before the step is frozen.
  */
 export async function fetchStep2Preview(
-  tradeDate: string
+  tradeDate: TradeDate
 ): Promise<Step2PreviewResponse> {
   const response = await apiClient.post<Step2PreviewResponse>(
-    "/api/step2/preview",
+    "/step2/preview",
     { tradeDate }
   );
 
@@ -26,10 +27,10 @@ export async function fetchStep2Preview(
  * Once frozen, trade permission becomes authoritative for the day.
  */
 export async function freezeStep2Behavior(
-  tradeDate: string
+  tradeDate: TradeDate
 ): Promise<Step2FrozenResponse> {
   const response = await apiClient.post<Step2FrozenResponse>(
-    "/api/step2/freeze",
+    "/step2/freeze",
     { tradeDate }
   );
 
