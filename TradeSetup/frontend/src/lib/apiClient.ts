@@ -1,6 +1,7 @@
 // src/lib/apiClient.ts
 
 import axios, { AxiosError, AxiosInstance } from "axios";
+import type { ApiError } from "@/types/common.types";
 
 /**
  * Shared Axios client for frontend → backend communication.
@@ -15,17 +16,8 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 /**
- * Normalized API error shape
- */
-export interface ApiError {
-  status: number;
-  message: string;
-  raw?: any;
-}
-
-/**
  * Response interceptor
- * Normalizes backend + network errors into a predictable shape
+ * Normalizes backend + network errors into ApiError
  */
 apiClient.interceptors.response.use(
   (response) => response,

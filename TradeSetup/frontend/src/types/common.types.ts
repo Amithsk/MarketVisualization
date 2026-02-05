@@ -15,12 +15,37 @@ export interface ApiError {
 }
 
 /**
+ * API interaction mode
+ * AUTO   → backend data available
+ * MANUAL → backend missing / error, user input allowed
+ */
+export type ApiMode = "AUTO" | "MANUAL";
+
+/**
  * Generic async state wrapper used by all STEP hooks.
  */
 export interface ApiState<T> {
+  /**
+   * Data returned from backend (if any)
+   */
   data: T | null;
+
+  /**
+   * Loading indicator
+   */
   loading: boolean;
+
+  /**
+   * Normalized API error
+   */
   error: ApiError | null;
+
+  /**
+   * Determines UI behavior
+   * AUTO → read-only / system-driven
+   * MANUAL → user-editable
+   */
+  mode: ApiMode;
 }
 
 /**
