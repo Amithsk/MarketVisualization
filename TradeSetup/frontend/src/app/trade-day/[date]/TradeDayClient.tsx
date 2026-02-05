@@ -24,7 +24,20 @@ export default function TradeDayClient({
     canAccessStep2,
     canAccessStep3,
     canAccessStep4,
+
+    step3,
+    step4,
   } = useTradeDayState(tradeDate);
+
+  const { candidates } = step3;
+
+  const {
+    trade,
+    isFrozen,
+    freezeTrade,
+    loading: step4Loading,
+    error: step4Error,
+  } = step4;
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-6 space-y-8">
@@ -75,8 +88,20 @@ export default function TradeDayClient({
         disabled={!canAccessStep4}
       >
         <div className="space-y-6">
-          <Step4TradePreview tradeDate={tradeDate} />
-          <Step4TradeConstruct tradeDate={tradeDate} />
+          <Step4TradePreview
+            tradeDate={tradeDate}
+            trade={trade}
+            isFrozen={isFrozen}
+          />
+
+          <Step4TradeConstruct
+            tradeDate={tradeDate}
+            candidates={candidates}
+            freezeTrade={freezeTrade}
+            loading={step4Loading}
+            error={step4Error}
+            isFrozen={isFrozen}
+          />
         </div>
       </StepSection>
     </main>

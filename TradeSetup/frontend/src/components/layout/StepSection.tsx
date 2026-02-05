@@ -7,6 +7,7 @@ export interface StepSectionProps {
   title: string;
   description?: string;
   disabled?: boolean;
+  disabledReason?: string; // 🔒 UX guardrail
   children: React.ReactNode;
 }
 
@@ -15,12 +16,15 @@ export default function StepSection({
   title,
   description,
   disabled = false,
+  disabledReason,
   children,
 }: StepSectionProps) {
   return (
     <section
-      className={`rounded-lg border p-6 space-y-4 ${
-        disabled ? "opacity-50 pointer-events-none" : ""
+      className={`relative rounded-lg border p-6 space-y-4 transition ${
+        disabled
+          ? "bg-gray-50 border-dashed opacity-60 pointer-events-none"
+          : "bg-white"
       }`}
     >
       {/* Header */}
@@ -32,6 +36,12 @@ export default function StepSection({
           <h2 className="text-lg font-semibold text-gray-800">
             {title}
           </h2>
+
+          {disabled && (
+            <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+              Locked
+            </span>
+          )}
         </div>
 
         {description && (
@@ -44,10 +54,11 @@ export default function StepSection({
       {/* Content */}
       <div>{children}</div>
 
-      {/* Disabled hint */}
+      {/* Disabled explanation */}
       {disabled && (
-        <div className="mt-2 text-xs text-gray-400 italic">
-          Complete previous steps to unlock this section.
+        <div className="mt-2 rounded border border-gray-200 bg-gray-100 p-3 text-xs text-gray-600">
+          {disabledReason ??
+            "Complete the required previous steps to unlock this section."}
         </div>
       )}
     </section>
