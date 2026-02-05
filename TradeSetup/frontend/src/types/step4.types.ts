@@ -1,4 +1,4 @@
-// src/types/step4.types.ts
+// frontend/src/types/step4.types.ts
 
 import { TradeDate, IsoTimestamp, FreezeMetadata } from "./common.types";
 
@@ -24,9 +24,10 @@ export type ExecutionMode =
   | "STOP_LIMIT";
 
 /**
- * Core frozen trade object as returned by backend.
+ * Trade intent BEFORE freeze.
+ * This is what the UI constructs and sends to backend.
  */
-export interface FrozenTrade extends FreezeMetadata {
+export interface TradeIntent {
   tradeDate: TradeDate;
 
   /**
@@ -54,7 +55,6 @@ export interface FrozenTrade extends FreezeMetadata {
 
   /**
    * Quantity is explicitly committed.
-   * No auto-sizing at execution time.
    */
   quantity: number;
 
@@ -62,6 +62,32 @@ export interface FrozenTrade extends FreezeMetadata {
    * Optional rationale written at commit time.
    */
   rationale?: string;
+}
+
+/**
+ * Core frozen trade object as returned by backend.
+ * IMMUTABLE after creation.
+ */
+export interface FrozenTrade extends FreezeMetadata {
+  tradeDate: TradeDate;
+
+  symbol: string;
+  direction: FinalTradeDirection;
+
+  executionMode: ExecutionMode;
+
+  entryPrice: number;
+  stopLoss: number;
+
+  riskPercent: number;
+  quantity: number;
+
+  rationale?: string;
+
+  /**
+   * Audit timestamp
+   */
+  frozenAt: IsoTimestamp;
 }
 
 /**

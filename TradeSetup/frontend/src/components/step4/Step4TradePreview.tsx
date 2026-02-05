@@ -2,18 +2,20 @@
 "use client";
 
 import React from "react";
-import { useStep4 } from "@/hooks/useStep4";
 import type { TradeDate } from "@/types/common.types";
+import type { FrozenTrade } from "@/types/step4.types";
 
 interface Step4TradePreviewProps {
   tradeDate: TradeDate;
+  trade: FrozenTrade | null;
+  isFrozen: boolean;
 }
 
 export default function Step4TradePreview({
   tradeDate,
+  trade,
+  isFrozen,
 }: Step4TradePreviewProps) {
-  const { trade, isFrozen } = useStep4();
-
   return (
     <div className="space-y-6">
       {/* Meta */}

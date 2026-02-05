@@ -3,23 +3,36 @@
 
 import React, { useState } from "react";
 import type { TradeDate } from "@/types/common.types";
-import { useStep3 } from "@/hooks/useStep3";
-import { useStep4 } from "@/hooks/useStep4";
-import type { FinalTradeDirection, ExecutionMode } from "@/types/step4.types";
+import type {
+  TradeIntent,
+  FinalTradeDirection,
+  ExecutionMode,
+} from "@/types/step4.types";
+import type { TradeCandidate } from "@/types/step3.types";
 
 interface Step4TradeConstructProps {
   tradeDate: TradeDate;
+  candidates: TradeCandidate[];
+
+  freezeTrade: (trade: TradeIntent) => void;
+  loading: boolean;
+  error: any;
+  isFrozen: boolean;
 }
 
 export default function Step4TradeConstruct({
   tradeDate,
+  candidates,
+  freezeTrade,
+  loading,
+  error,
+  isFrozen,
 }: Step4TradeConstructProps) {
-  const { candidates } = useStep3(tradeDate);
-  const { freezeTrade, loading, error, isFrozen } = useStep4();
-
   const [symbol, setSymbol] = useState<string>("");
-  const [direction, setDirection] = useState<FinalTradeDirection>("LONG");
-  const [executionMode] = useState<ExecutionMode>("MARKET");
+  const [direction, setDirection] =
+    useState<FinalTradeDirection>("LONG");
+  const [executionMode] =
+    useState<ExecutionMode>("MARKET");
   const [riskPercent, setRiskPercent] = useState<number>(0.5);
   const [entryPrice, setEntryPrice] = useState<number>(0);
   const [stopLoss, setStopLoss] = useState<number>(0);
@@ -27,7 +40,7 @@ export default function Step4TradeConstruct({
   const [rationale, setRationale] = useState<string>("");
 
   const onFreeze = () => {
-    freezeTrade({
+    const tradeIntent: TradeIntent = {
       tradeDate,
       symbol,
       direction,
@@ -37,9 +50,9 @@ export default function Step4TradeConstruct({
       stopLoss,
       quantity,
       rationale,
-      freezeStatus: "FROZEN",
-      frozenAt: new Date().toISOString(),
-    });
+    };
+
+    freezeTrade(tradeIntent);
   };
 
   return (
@@ -59,7 +72,15 @@ export default function Step4TradeConstruct({
         <select
           disabled={isFrozen}
           value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
+          onChange={(e) => {
+            const selected = candidates.find(
+              (c) => c.symbol === e.target.value
+            );
+            setSymbol(e.target.value);
+            if (selected) {
+              setDirection(selected.direction);
+            }
+          }}
           className="w-full rounded border px-2 py-1 text-sm"
         >
           <option value="">Select candidate</option>
@@ -86,7 +107,9 @@ export default function Step4TradeConstruct({
               type="number"
               disabled={isFrozen}
               value={riskPercent}
-              onChange={(e) => setRiskPercent(Number(e.target.value))}
+              onChange={(e) =>
+                setRiskPercent(Number(e.target.value))
+              }
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
             />
           </div>
@@ -99,7 +122,9 @@ export default function Step4TradeConstruct({
               type="number"
               disabled={isFrozen}
               value={entryPrice}
-              onChange={(e) => setEntryPrice(Number(e.target.value))}
+              onChange={(e) =>
+                setEntryPrice(Number(e.target.value))
+              }
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
             />
           </div>
@@ -112,7 +137,9 @@ export default function Step4TradeConstruct({
               type="number"
               disabled={isFrozen}
               value={stopLoss}
-              onChange={(e) => setStopLoss(Number(e.target.value))}
+              onChange={(e) =>
+                setStopLoss(Number(e.target.value))
+              }
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
             />
           </div>
@@ -127,7 +154,9 @@ export default function Step4TradeConstruct({
               type="number"
               disabled={isFrozen}
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) =>
+                setQuantity(Number(e.target.value))
+              }
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
             />
           </div>
@@ -140,7 +169,9 @@ export default function Step4TradeConstruct({
               type="text"
               disabled={isFrozen}
               value={rationale}
-              onChange={(e) => setRationale(e.target.value)}
+              onChange={(e) =>
+                setRationale(e.target.value)
+              }
               className="mt-1 w-full rounded border px-2 py-1 text-sm"
             />
           </div>
