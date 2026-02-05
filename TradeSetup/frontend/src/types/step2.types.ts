@@ -1,6 +1,9 @@
 // src/types/step2.types.ts
 
-import { FreezeMetadata, TradeDate } from "./common.types";
+import type {
+  FreezeMetadata,
+  TradeDate,
+} from "@/types/common.types";
 
 /**
  * STEP-2: Market Open Behavior
@@ -41,7 +44,8 @@ export type MarketParticipation =
   | "UNKNOWN";
 
 /**
- * Core STEP-2 snapshot as returned by backend.
+ * Core STEP-2 snapshot
+ * Used in BOTH AUTO and MANUAL modes
  */
 export interface Step2OpenBehaviorSnapshot extends FreezeMetadata {
   tradeDate: TradeDate;
@@ -58,15 +62,17 @@ export interface Step2OpenBehaviorSnapshot extends FreezeMetadata {
 }
 
 /**
- * Response shape for STEP-2 preview API.
+ * STEP-2 preview response
  */
 export interface Step2PreviewResponse {
   snapshot: Step2OpenBehaviorSnapshot;
+  canFreeze: boolean;
 }
 
 /**
- * Response shape after STEP-2 is frozen.
+ * STEP-2 freeze response
  */
 export interface Step2FrozenResponse {
   snapshot: Step2OpenBehaviorSnapshot;
+  frozen: true;
 }

@@ -1,7 +1,8 @@
-// src/types/common.types.ts
+// frontend/src/types/common.types.ts
 
 /**
  * Common, shared types used across multiple steps.
+ * ⚠️ Must remain GENERIC — no step-specific behavior here.
  */
 
 /**
@@ -15,14 +16,10 @@ export interface ApiError {
 }
 
 /**
- * API interaction mode
- * AUTO   → backend data available
- * MANUAL → backend missing / error, user input allowed
- */
-export type ApiMode = "AUTO" | "MANUAL";
-
-/**
  * Generic async state wrapper used by all STEP hooks.
+ * IMPORTANT:
+ * - No AUTO / MANUAL
+ * - No business logic flags
  */
 export interface ApiState<T> {
   /**
@@ -39,13 +36,6 @@ export interface ApiState<T> {
    * Normalized API error
    */
   error: ApiError | null;
-
-  /**
-   * Determines UI behavior
-   * AUTO → read-only / system-driven
-   * MANUAL → user-editable
-   */
-  mode: ApiMode;
 }
 
 /**
