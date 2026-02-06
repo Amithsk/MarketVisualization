@@ -1,6 +1,4 @@
-# backend/app/services/step4_service.py
-
-from datetime import date, datetime
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.app.models.step1_market_context import Step1MarketContext
@@ -21,6 +19,7 @@ def freeze_step4_trade(
 ) -> Step4FrozenTradeResponse:
     """
     Freeze final trade execution intent (irreversible).
+    Money-impacting. Fully defensive.
     """
 
     trade_date = request.trade_date
@@ -28,22 +27,18 @@ def freeze_step4_trade(
     # -------------------------------------------------
     # STEP-1 must be frozen
     # -------------------------------------------------
-    step1 = (
-        db.query(Step1MarketContext)
-        .filter(Step1MarketContext.trade_date == trade_date)
-        .first()
-    )
+    step1 = db.query(Step1MarketContext).filter(
+        Step1MarketContext.trade_date == trade_date
+    ).first()
     if not step1 or not step1.frozen_at:
         raise ValueError("STEP-1 must be frozen before STEP-4")
 
     # -------------------------------------------------
     # STEP-2 must be frozen and trade must be allowed
     # -------------------------------------------------
-    step2 = (
-        db.query(Step2MarketBehavior)
-        .filter(Step2MarketBehavior.trade_date == trade_date)
-        .first()
-    )
+    step2 = db.query(Step2MarketBehavior).filter(
+        Step2MarketBehavior.trade_date == trade_date
+    ).first()
     if not step2 or not step2.frozen_at:
         raise ValueError("STEP-2 must be frozen before STEP-4")
 
@@ -53,42 +48,55 @@ def freeze_step4_trade(
     # -------------------------------------------------
     # STEP-3 must be generated and execution enabled
     # -------------------------------------------------
-    step3 = (
-        db.query(Step3ExecutionControl)
-        .filter(Step3ExecutionControl.trade_date == trade_date)
-        .first()
-    )
+    step3 = db.query(Step3ExecutionControl).filter(
+        Step3ExecutionControl.trade_date == trade_date
+    ).first()
     if not step3 or not step3.execution_enabled:
         raise ValueError("STEP-3 execution is not enabled")
 
     # -------------------------------------------------
+    # Normalize inputs
+    # -------------------------------------------------
+    symbol = request.symbol.strip().upper()
+    direction = request.direction.strip().upper()
+    execution_mode = request.execution_mode.strip().upper()
+    setup_type = request.setup_type.strip().upper()
+
+    # -------------------------------------------------
     # Symbol must exist in STEP-3 candidates
     # -------------------------------------------------
-    candidate = (
-        db.query(Step3StockSelection)
-        .filter(
-            Step3StockSelection.trade_date == trade_date,
-            Step3StockSelection.symbol == request.symbol,
-        )
-        .first()
-    )
+    candidate = db.query(Step3StockSelection).filter(
+        Step3StockSelection.trade_date == trade_date,
+        Step3StockSelection.symbol == symbol,
+    ).first()
     if not candidate:
         raise ValueError("Selected symbol is not a valid STEP-3 candidate")
 
-    # Direction must match
-    if candidate.direction != request.direction:
+    # Direction + setup must match STEP-3
+    if candidate.direction != direction:
         raise ValueError("Trade direction does not match STEP-3 direction")
 
+    if candidate.setup_type != setup_type:
+        raise ValueError("Setup type does not match STEP-3 setup")
+
     # -------------------------------------------------
-    # STEP-4 must not already exist
+    # Price sanity (capital protection)
     # -------------------------------------------------
-    existing_trade = (
-        db.query(Step4Trade)
-        .filter(Step4Trade.trade_date == trade_date)
-        .first()
-    )
+    if direction == "LONG" and request.stop_loss >= request.entry_price:
+        raise ValueError("For LONG trades, stop_loss must be below entry_price")
+
+    if direction == "SHORT" and request.stop_loss <= request.entry_price:
+        raise ValueError("For SHORT trades, stop_loss must be above entry_price")
+
+    # -------------------------------------------------
+    # STEP-4 uniqueness (per symbol per day)
+    # -------------------------------------------------
+    existing_trade = db.query(Step4Trade).filter(
+        Step4Trade.trade_date == trade_date,
+        Step4Trade.symbol == symbol,
+    ).first()
     if existing_trade:
-        raise ValueError("Trade is already frozen for this day")
+        raise ValueError("Trade for this symbol is already frozen today")
 
     # -------------------------------------------------
     # Freeze trade
@@ -97,9 +105,10 @@ def freeze_step4_trade(
 
     trade = Step4Trade(
         trade_date=trade_date,
-        symbol=request.symbol,
-        direction=request.direction,
-        execution_mode=request.execution_mode,
+        symbol=symbol,
+        direction=direction,
+        setup_type=setup_type,
+        execution_mode=execution_mode,
         entry_price=request.entry_price,
         stop_loss=request.stop_loss,
         risk_percent=request.risk_percent,
@@ -116,6 +125,7 @@ def freeze_step4_trade(
         trade_date=trade.trade_date,
         symbol=trade.symbol,
         direction=trade.direction,
+        setup_type=trade.setup_type,
         execution_mode=trade.execution_mode,
         entry_price=trade.entry_price,
         stop_loss=trade.stop_loss,
