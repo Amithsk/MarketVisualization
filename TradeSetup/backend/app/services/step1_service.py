@@ -1,5 +1,3 @@
-# backend/app/services/step1_service.py
-
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -12,15 +10,14 @@ from backend.app.schemas.step1_schema import (
 
 
 # -------------------------------------------------
-# Internal helpers (can be replaced later)
+# Internal helpers (replace with real data later)
 # -------------------------------------------------
 
 def _get_system_market_data(trade_date: date) -> dict:
     """
     Fetch system market data required for STEP-1.
-    This is a stub for now and will be replaced by real data sources.
+    Stub for now.
     """
-    # TODO: replace with real DB queries / data pipeline
     return {
         "prev_close": 22450.0,
         "prev_high": 22580.0,
@@ -31,7 +28,7 @@ def _get_system_market_data(trade_date: date) -> dict:
     }
 
 
-def _derive_gap_context(prev_close: float, preopen_price: float):
+def _derive_gap_context(prev_close: float, preopen_price: float | None):
     if preopen_price is None:
         return None, None
 
@@ -57,6 +54,27 @@ def _derive_range_context(prev_high: float, prev_low: float):
     return "NORMAL"
 
 
+def _to_snapshot(ctx: Step1MarketContext) -> Step1ContextSnapshot:
+    """
+    Convert ORM object to API snapshot.
+    """
+    return Step1ContextSnapshot(
+        trade_date=ctx.trade_date,
+        prev_close=ctx.prev_close,
+        prev_high=ctx.prev_high,
+        prev_low=ctx.prev_low,
+        day2_high=ctx.day2_high,
+        day2_low=ctx.day2_low,
+        preopen_price=ctx.preopen_price,
+        gap_pct=ctx.gap_pct,
+        gap_context=ctx.gap_context,
+        range_context=ctx.range_context,
+        market_bias=ctx.market_bias,
+        premarket_notes=ctx.premarket_notes,
+        frozen_at=ctx.frozen_at,
+    )
+
+
 # -------------------------------------------------
 # Public service methods
 # -------------------------------------------------
@@ -69,32 +87,23 @@ def preview_step1_context(
     Compute STEP-1 preview context (read-only).
     """
 
-    # Check if already frozen
     existing = (
         db.query(Step1MarketContext)
         .filter(Step1MarketContext.trade_date == trade_date)
         .first()
     )
 
+    # Already frozen → immutable preview
     if existing and existing.frozen_at:
-        snapshot = Step1ContextSnapshot(
-            trade_date=existing.trade_date,
-            prev_close=existing.prev_close,
-            prev_high=existing.prev_high,
-            prev_low=existing.prev_low,
-            day2_high=existing.day2_high,
-            day2_low=existing.day2_low,
-            preopen_price=existing.preopen_price,
-            gap_pct=existing.gap_pct,
-            gap_context=existing.gap_context,
-            range_context=existing.range_context,
-            market_bias=existing.market_bias,
-            premarket_notes=existing.premarket_notes,
-            frozen_at=existing.frozen_at,
+        return Step1PreviewResponse(
+            snapshot=_to_snapshot(existing),
+            can_freeze=False,
         )
-        return Step1PreviewResponse(snapshot=snapshot, can_freeze=False)
 
-    # Fetch system data
+    # TODO (Phase B5):
+    # - block preview on NSE holiday
+    # - block preview outside allowed window
+
     system_data = _get_system_market_data(trade_date)
 
     gap_pct, gap_context = _derive_gap_context(
@@ -145,7 +154,10 @@ def freeze_step1_context(
     if existing and existing.frozen_at:
         raise ValueError("STEP-1 context is already frozen")
 
-    # Fetch system data again (authoritative)
+    # Normalize trader intent
+    market_bias = market_bias.strip().upper()
+
+    # Fetch system data (authoritative)
     system_data = _get_system_market_data(trade_date)
 
     gap_pct, gap_context = _derive_gap_context(
@@ -158,40 +170,41 @@ def freeze_step1_context(
         system_data["prev_low"],
     )
 
-    context = Step1MarketContext(
-        trade_date=trade_date,
-        prev_close=system_data["prev_close"],
-        prev_high=system_data["prev_high"],
-        prev_low=system_data["prev_low"],
-        day2_high=system_data["day2_high"],
-        day2_low=system_data["day2_low"],
-        preopen_price=system_data["preopen_price"],
-        gap_pct=gap_pct,
-        gap_context=gap_context,
-        range_context=range_context,
-        market_bias=market_bias,
-        premarket_notes=premarket_notes,
-        frozen_at=datetime.utcnow(),
-    )
+    if existing:
+        # Update existing row
+        context = existing
+        context.prev_close = system_data["prev_close"]
+        context.prev_high = system_data["prev_high"]
+        context.prev_low = system_data["prev_low"]
+        context.day2_high = system_data["day2_high"]
+        context.day2_low = system_data["day2_low"]
+        context.preopen_price = system_data["preopen_price"]
+        context.gap_pct = gap_pct
+        context.gap_context = gap_context
+        context.range_context = range_context
+        context.market_bias = market_bias
+        context.premarket_notes = premarket_notes
+        context.frozen_at = datetime.utcnow()
+    else:
+        # Insert new row
+        context = Step1MarketContext(
+            trade_date=trade_date,
+            prev_close=system_data["prev_close"],
+            prev_high=system_data["prev_high"],
+            prev_low=system_data["prev_low"],
+            day2_high=system_data["day2_high"],
+            day2_low=system_data["day2_low"],
+            preopen_price=system_data["preopen_price"],
+            gap_pct=gap_pct,
+            gap_context=gap_context,
+            range_context=range_context,
+            market_bias=market_bias,
+            premarket_notes=premarket_notes,
+            frozen_at=datetime.utcnow(),
+        )
+        db.add(context)
 
-    db.add(context)
     db.commit()
     db.refresh(context)
 
-    snapshot = Step1ContextSnapshot(
-        trade_date=context.trade_date,
-        prev_close=context.prev_close,
-        prev_high=context.prev_high,
-        prev_low=context.prev_low,
-        day2_high=context.day2_high,
-        day2_low=context.day2_low,
-        preopen_price=context.preopen_price,
-        gap_pct=context.gap_pct,
-        gap_context=context.gap_context,
-        range_context=context.range_context,
-        market_bias=context.market_bias,
-        premarket_notes=context.premarket_notes,
-        frozen_at=context.frozen_at,
-    )
-
-    return Step1FrozenResponse(snapshot=snapshot)
+    return Step1FrozenResponse(snapshot=_to_snapshot(context))
