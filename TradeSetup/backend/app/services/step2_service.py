@@ -1,5 +1,3 @@
-# backend/app/services/step2_service.py
-
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -13,7 +11,7 @@ from backend.app.schemas.step2_schema import (
 
 
 # -------------------------------------------------
-# Internal helpers (rules can evolve here)
+# Internal helpers (rules evolve here)
 # -------------------------------------------------
 
 def _evaluate_trade_permission(
@@ -26,7 +24,6 @@ def _evaluate_trade_permission(
     Conservative by default.
     """
 
-    # Strong trend + broad participation → trade allowed
     if (
         index_open_behavior in ("STRONG_UP", "STRONG_DOWN")
         and market_participation == "BROAD"
@@ -34,12 +31,24 @@ def _evaluate_trade_permission(
     ):
         return True
 
-    # Chaotic volatility or thin participation → no trade
     if early_volatility == "CHAOTIC" or market_participation == "THIN":
         return False
 
-    # Default: no trade
     return False
+
+
+def _to_snapshot(ctx: Step2MarketBehavior) -> Step2OpenBehaviorSnapshot:
+    """
+    Convert ORM object to API snapshot.
+    """
+    return Step2OpenBehaviorSnapshot(
+        trade_date=ctx.trade_date,
+        index_open_behavior=ctx.index_open_behavior,
+        early_volatility=ctx.early_volatility,
+        market_participation=ctx.market_participation,
+        trade_allowed=ctx.trade_allowed,
+        frozen_at=ctx.frozen_at,
+    )
 
 
 # -------------------------------------------------
@@ -64,25 +73,24 @@ def preview_step2_behavior(
     if not step1 or not step1.frozen_at:
         raise ValueError("STEP-1 must be frozen before STEP-2")
 
-    # If STEP-2 already frozen, return it
     existing = (
         db.query(Step2MarketBehavior)
         .filter(Step2MarketBehavior.trade_date == trade_date)
         .first()
     )
 
+    # Already frozen → immutable preview
     if existing and existing.frozen_at:
-        snapshot = Step2OpenBehaviorSnapshot(
-            trade_date=existing.trade_date,
-            index_open_behavior=existing.index_open_behavior,
-            early_volatility=existing.early_volatility,
-            market_participation=existing.market_participation,
-            trade_allowed=existing.trade_allowed,
-            frozen_at=existing.frozen_at,
+        return Step2PreviewResponse(
+            snapshot=_to_snapshot(existing),
+            can_freeze=False,
         )
-        return Step2PreviewResponse(snapshot=snapshot, can_freeze=False)
 
-    # Default preview values (to be replaced by live data later)
+    # TODO (Phase B5):
+    # - block preview outside allowed market window
+    # - validate against exchange holidays
+
+    # Default preview values (stub; replace with live feed)
     index_open_behavior = "FLAT"
     early_volatility = "UNKNOWN"
     market_participation = "UNKNOWN"
@@ -136,26 +144,32 @@ def freeze_step2_behavior(
     if existing and existing.frozen_at:
         raise ValueError("STEP-2 is already frozen")
 
-    context = Step2MarketBehavior(
-        trade_date=trade_date,
-        index_open_behavior=index_open_behavior,
-        early_volatility=early_volatility,
-        market_participation=market_participation,
-        trade_allowed=trade_allowed,
-        frozen_at=datetime.utcnow(),
-    )
+    # Normalize inputs
+    index_open_behavior = index_open_behavior.strip().upper()
+    early_volatility = early_volatility.strip().upper()
+    market_participation = market_participation.strip().upper()
 
-    db.add(context)
+    if existing:
+        # Update existing row
+        context = existing
+        context.index_open_behavior = index_open_behavior
+        context.early_volatility = early_volatility
+        context.market_participation = market_participation
+        context.trade_allowed = trade_allowed
+        context.frozen_at = datetime.utcnow()
+    else:
+        # Insert new row
+        context = Step2MarketBehavior(
+            trade_date=trade_date,
+            index_open_behavior=index_open_behavior,
+            early_volatility=early_volatility,
+            market_participation=market_participation,
+            trade_allowed=trade_allowed,
+            frozen_at=datetime.utcnow(),
+        )
+        db.add(context)
+
     db.commit()
     db.refresh(context)
 
-    snapshot = Step2OpenBehaviorSnapshot(
-        trade_date=context.trade_date,
-        index_open_behavior=context.index_open_behavior,
-        early_volatility=context.early_volatility,
-        market_participation=context.market_participation,
-        trade_allowed=context.trade_allowed,
-        frozen_at=context.frozen_at,
-    )
-
-    return Step2FrozenResponse(snapshot=snapshot)
+    return Step2FrozenResponse(snapshot=_to_snapshot(context))

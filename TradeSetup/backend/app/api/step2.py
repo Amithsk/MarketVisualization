@@ -1,6 +1,4 @@
-# backend/app/api/step2.py
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
@@ -15,12 +13,16 @@ from backend.app.services.step2_service import (
     freeze_step2_behavior,
 )
 
-router = APIRouter(prefix="/api/step2", tags=["STEP-2"])
+router = APIRouter(
+    prefix="/api/step2",
+    tags=["STEP-2"],
+)
 
 
 @router.post(
     "/preview",
     response_model=Step2PreviewResponse,
+    status_code=status.HTTP_200_OK,
 )
 def preview_step2(
     request: Step2PreviewRequest,
@@ -28,6 +30,8 @@ def preview_step2(
 ):
     """
     Preview STEP-2 market open behavior (read-only).
+
+    Requires STEP-1 to be frozen.
     """
     try:
         return preview_step2_behavior(
@@ -35,14 +39,23 @@ def preview_step2(
             trade_date=request.trade_date,
         )
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Domain error (STEP-1 not frozen, invalid state)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+    except Exception:
+        # Infrastructure / unexpected error
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate STEP-2 preview",
+        )
 
 
 @router.post(
     "/freeze",
     response_model=Step2FrozenResponse,
+    status_code=status.HTTP_200_OK,
 )
 def freeze_step2(
     request: Step2FreezeRequest,
@@ -50,6 +63,8 @@ def freeze_step2(
 ):
     """
     Freeze STEP-2 market open behavior (irreversible).
+
+    STEP-1 must already be frozen.
     """
     try:
         return freeze_step2_behavior(
@@ -61,7 +76,13 @@ def freeze_step2(
             trade_allowed=request.trade_allowed,
         )
     except ValueError as e:
-        # STEP-1 not frozen, STEP-2 already frozen, etc.
-        raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Domain conflict (STEP-1 not frozen, STEP-2 already frozen)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to freeze STEP-2 behavior",
+        )
