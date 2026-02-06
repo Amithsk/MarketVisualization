@@ -1,5 +1,3 @@
-# backend/app/services/step3_service.py
-
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -21,10 +19,8 @@ from backend.app.schemas.step3_schema import (
 def _generate_trade_candidates(trade_date: date) -> list[TradeCandidate]:
     """
     Deterministically generate trade candidates.
-    This is a stub — replace with your real selection logic later.
+    Stub — replace with real logic later.
     """
-
-    # Example deterministic output (placeholder)
     return [
         TradeCandidate(
             symbol="RELIANCE",
@@ -41,6 +37,30 @@ def _generate_trade_candidates(trade_date: date) -> list[TradeCandidate]:
     ]
 
 
+def _load_persisted_candidates(
+    db: Session,
+    trade_date: date,
+) -> list[TradeCandidate]:
+    """
+    Load persisted STEP-3 stock selections.
+    """
+    rows = (
+        db.query(Step3StockSelection)
+        .filter(Step3StockSelection.trade_date == trade_date)
+        .all()
+    )
+
+    return [
+        TradeCandidate(
+            symbol=r.symbol,
+            direction=r.direction,
+            setup_type=r.setup_type,
+            notes=r.notes,
+        )
+        for r in rows
+    ]
+
+
 # -------------------------------------------------
 # Public service method
 # -------------------------------------------------
@@ -51,47 +71,66 @@ def generate_step3_execution(
 ) -> Step3ExecutionResponse:
     """
     Generate STEP-3 execution control & stock selection.
-    Read-only and deterministic.
+
+    Deterministic.
+    Idempotent.
+    Irreversible once generated.
     """
 
-    # STEP-1 must be frozen
+    # -------------------------
+    # Preconditions
+    # -------------------------
+
     step1 = (
         db.query(Step1MarketContext)
         .filter(Step1MarketContext.trade_date == trade_date)
         .first()
     )
-
     if not step1 or not step1.frozen_at:
         raise ValueError("STEP-1 must be frozen before STEP-3")
 
-    # STEP-2 must be frozen
     step2 = (
         db.query(Step2MarketBehavior)
         .filter(Step2MarketBehavior.trade_date == trade_date)
         .first()
     )
-
     if not step2 or not step2.frozen_at:
         raise ValueError("STEP-2 must be frozen before STEP-3")
 
+    # -------------------------
+    # Idempotency check
+    # -------------------------
+
+    existing = (
+        db.query(Step3ExecutionControl)
+        .filter(Step3ExecutionControl.trade_date == trade_date)
+        .first()
+    )
+
+    if existing and existing.frozen_at:
+        candidates = _load_persisted_candidates(db, trade_date)
+
+        snapshot = Step3ExecutionSnapshot(
+            trade_date=trade_date,
+            execution_enabled=existing.execution_enabled,
+            generated_at=existing.generated_at,
+            candidates=candidates,
+        )
+
+        return Step3ExecutionResponse(snapshot=snapshot)
+
+    # -------------------------
+    # Generate STEP-3
+    # -------------------------
+
     execution_enabled = step2.trade_allowed
-
-    # Clear previous STEP-3 data (regeneration allowed)
-    db.query(Step3ExecutionControl).filter(
-        Step3ExecutionControl.trade_date == trade_date
-    ).delete()
-
-    db.query(Step3StockSelection).filter(
-        Step3StockSelection.trade_date == trade_date
-    ).delete()
-
     generated_at = datetime.utcnow()
 
-    # Persist execution control
     execution_control = Step3ExecutionControl(
         trade_date=trade_date,
         execution_enabled=execution_enabled,
         generated_at=generated_at,
+        frozen_at=generated_at,
     )
     db.add(execution_control)
 
