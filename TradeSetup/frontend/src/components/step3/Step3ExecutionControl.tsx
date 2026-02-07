@@ -1,8 +1,6 @@
-// src/components/step3/Step3ExecutionControl.tsx
-
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useStep3 } from "@/hooks/useStep3";
 import type { TradeDate } from "@/types/common.types";
 
@@ -17,6 +15,7 @@ export default function Step3ExecutionControl({
     snapshot,
     executionEnabled,
     candidates,
+    candidatesMode,
     generatedAt,
     loading,
     error,
@@ -47,7 +46,7 @@ export default function Step3ExecutionControl({
       {/* Loading / Error */}
       {loading && (
         <div className="text-sm text-gray-500">
-          Generating execution candidates…
+          Generating execution control…
         </div>
       )}
 
@@ -57,22 +56,26 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* Candidate list */}
-      {executionEnabled && (
+      {/* STEP-3.2 — Candidate Section */}
+      {executionEnabled && snapshot && (
         <div className="rounded border">
           <div className="border-b px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-700">
-              Eligible Trade Candidates
+              Trade Candidates
             </h3>
             <p className="text-xs text-gray-500">
-              System-generated • Read-only
+              {candidatesMode === "AUTO"
+                ? "System-generated • Read-only"
+                : "Manual entry required • No automation available"}
             </p>
           </div>
 
           <div className="p-4 space-y-3">
             {candidates.length === 0 ? (
               <div className="text-sm text-gray-400 italic">
-                No candidates generated for today
+                {candidatesMode === "AUTO"
+                  ? "No candidates generated for today"
+                  : "Please add trade candidates manually"}
               </div>
             ) : (
               candidates.map((c) => (
@@ -103,9 +106,9 @@ export default function Step3ExecutionControl({
           Execution Constraints
         </h3>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-500 space-y-1">
-          <li>No discretionary stock additions</li>
-          <li>No quantity decisions at this step</li>
-          <li>No entry / exit definitions</li>
+          <li>Execution permission is system-controlled</li>
+          <li>Candidate automation may or may not be available</li>
+          <li>No quantity or risk decisions at this step</li>
         </ul>
 
         {generatedAt && (

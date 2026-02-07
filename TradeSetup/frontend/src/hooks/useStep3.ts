@@ -1,9 +1,8 @@
 // src/hooks/useStep3.ts
 "use client";
 
-
 import { useCallback, useState } from "react";
-import type { ApiState, TradeDate } from "@/types/common.types";
+import type { TradeDate } from "@/types/common.types";
 import type {
   Step3ExecutionSnapshot,
   Step3ExecutionResponse,
@@ -11,47 +10,58 @@ import type {
 import { fetchStep3Execution } from "@/services/step3.api";
 
 /**
- * STEP-3 hook
- * Read-only execution control & candidate generation.
+ * STEP-3 Hook — Execution Control & Candidate Selection
+ *
+ * Backend is the single source of truth.
+ * Frontend does NOT infer AUTO / MANUAL.
+ * Frontend only renders backend decisions.
  */
 export function useStep3(tradeDate: TradeDate) {
-  const [state, setState] = useState<ApiState<Step3ExecutionSnapshot>>({
-    data: null,
-    loading: false,
-    error: null,
-  });
+  const [snapshot, setSnapshot] =
+    useState<Step3ExecutionSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
 
   /**
-   * Fetch STEP-3 execution snapshot
+   * Execute STEP-3
+   *
+   * - Deterministic
+   * - Idempotent
+   * - Read-only
    */
   const executeStep3 = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setLoading(true);
+    setError(null);
 
     try {
       const response: Step3ExecutionResponse =
         await fetchStep3Execution(tradeDate);
 
-      setState({
-        data: response.snapshot,
-        loading: false,
-        error: null,
-      });
-    } catch (error: any) {
-      setState({
-        data: null,
-        loading: false,
-        error,
-      });
+      // Backend response already matches frontend contract
+      setSnapshot(response.snapshot);
+    } catch (err) {
+      setError(err);
+      setSnapshot(null);
+    } finally {
+      setLoading(false);
     }
   }, [tradeDate]);
 
   return {
-    snapshot: state.data,
-    executionEnabled: state.data?.executionEnabled ?? false,
-    candidates: state.data?.candidates ?? [],
-    generatedAt: state.data?.generatedAt ?? null,
-    loading: state.loading,
-    error: state.error,
+    snapshot,
+
+    // STEP-3.1 — System gate
+    executionEnabled: snapshot?.executionEnabled ?? false,
+
+    // STEP-3.2 — Backend authority
+    candidatesMode: snapshot?.candidatesMode ?? "MANUAL",
+    candidates: snapshot?.candidates ?? [],
+
+    generatedAt: snapshot?.generatedAt ?? null,
+
+    loading,
+    error,
+
     executeStep3,
   };
 }

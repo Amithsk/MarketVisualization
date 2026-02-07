@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class TradeCandidate(BaseModel):
     """
-    System-suggested trade candidate.
+    System-suggested or manually-entered trade candidate.
     Informational only — NOT an execution order.
     """
     symbol: str = Field(
@@ -48,15 +48,25 @@ class Step3ExecutionSnapshot(BaseModel):
     """
     Immutable STEP-3 execution verdict.
 
-    If execution_enabled = false,
-    candidates will typically be an empty list.
+    STEP-3.1: execution control (system)
+    STEP-3.2: candidate source (system vs manual)
     """
     trade_date: date
 
+    # ---- STEP-3.1 (System) ----
     execution_enabled: bool
     generated_at: datetime
 
-    candidates: List[TradeCandidate] = []
+    # ---- STEP-3.2 (Candidate selection mode) ----
+    candidates_mode: Literal["AUTO", "MANUAL"] = Field(
+        ...,
+        description="AUTO = system-loaded candidates, MANUAL = trader must add"
+    )
+
+    candidates: List[TradeCandidate] = Field(
+        default_factory=list,
+        description="System-generated or manually-added candidates"
+    )
 
     class Config:
         orm_mode = True

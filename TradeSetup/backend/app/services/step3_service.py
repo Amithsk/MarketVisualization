@@ -1,3 +1,5 @@
+# backend/app/services/step3_service.py
+
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -13,13 +15,20 @@ from backend.app.schemas.step3_schema import (
 
 
 # -------------------------------------------------
-# Internal helpers (deterministic rules)
+# Internal helpers
 # -------------------------------------------------
+
+def _automation_available(trade_date: date) -> bool:
+    """
+    Stub for candidate automation availability.
+    MANUAL-FIRST by default.
+    """
+    return False
+
 
 def _generate_trade_candidates(trade_date: date) -> list[TradeCandidate]:
     """
-    Deterministically generate trade candidates.
-    Stub — replace with real logic later.
+    Deterministic AUTO candidate generation.
     """
     return [
         TradeCandidate(
@@ -42,7 +51,7 @@ def _load_persisted_candidates(
     trade_date: date,
 ) -> list[TradeCandidate]:
     """
-    Load persisted STEP-3 stock selections.
+    Load already persisted STEP-3 candidates.
     """
     rows = (
         db.query(Step3StockSelection)
@@ -62,7 +71,7 @@ def _load_persisted_candidates(
 
 
 # -------------------------------------------------
-# Public service method
+# Public service
 # -------------------------------------------------
 
 def generate_step3_execution(
@@ -70,11 +79,13 @@ def generate_step3_execution(
     trade_date: date,
 ) -> Step3ExecutionResponse:
     """
-    Generate STEP-3 execution control & stock selection.
+    STEP-3 — Execution Control & Candidate Selection
 
-    Deterministic.
-    Idempotent.
-    Irreversible once generated.
+    LOCKED RULES:
+    - Backend is source of truth
+    - MANUAL-FIRST for candidates
+    - Never errors due to missing automation
+    - Idempotent
     """
 
     # -------------------------
@@ -98,7 +109,7 @@ def generate_step3_execution(
         raise ValueError("STEP-2 must be frozen before STEP-3")
 
     # -------------------------
-    # Idempotency check
+    # Idempotency
     # -------------------------
 
     existing = (
@@ -113,14 +124,16 @@ def generate_step3_execution(
         snapshot = Step3ExecutionSnapshot(
             trade_date=trade_date,
             execution_enabled=existing.execution_enabled,
+            candidates_mode=(
+                "AUTO" if len(candidates) > 0 else "MANUAL"
+            ),
             generated_at=existing.generated_at,
             candidates=candidates,
         )
-
         return Step3ExecutionResponse(snapshot=snapshot)
 
     # -------------------------
-    # Generate STEP-3
+    # STEP-3.1 — Execution Gate
     # -------------------------
 
     execution_enabled = step2.trade_allowed
@@ -135,9 +148,15 @@ def generate_step3_execution(
     db.add(execution_control)
 
     candidates: list[TradeCandidate] = []
+    candidates_mode = "MANUAL"
 
-    if execution_enabled:
+    # -------------------------
+    # STEP-3.2 — Candidate Mode
+    # -------------------------
+
+    if execution_enabled and _automation_available(trade_date):
         candidates = _generate_trade_candidates(trade_date)
+        candidates_mode = "AUTO"
 
         for c in candidates:
             db.add(
@@ -150,11 +169,17 @@ def generate_step3_execution(
                 )
             )
 
+    # MANUAL mode:
+    # - execution_enabled may be True
+    # - candidates empty
+    # - frontend must allow manual entry
+
     db.commit()
 
     snapshot = Step3ExecutionSnapshot(
         trade_date=trade_date,
         execution_enabled=execution_enabled,
+        candidates_mode=candidates_mode,
         generated_at=generated_at,
         candidates=candidates,
     )

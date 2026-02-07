@@ -1,22 +1,22 @@
 // src/types/step3.types.ts
 
-import { TradeDate, IsoTimestamp } from "./common.types";
+import type { TradeDate, IsoTimestamp } from "@/types/common.types";
 
 /**
- * STEP-3: Execution Control & Stock Selection
- * -------------------------------------------
- * Produces a deterministic, read-only list of trade candidates
- * based on STEP-1 and STEP-2 outcomes.
+ * STEP-3: Execution Control & Candidate Selection
+ * -----------------------------------------------
+ * Backend is authoritative.
+ * Frontend is read-only + assisted input (STEP-3.2).
  */
 
 /**
- * Allowed trade direction for a candidate.
+ * Allowed trade direction.
  */
 export type TradeDirection = "LONG" | "SHORT";
 
 /**
- * High-level classification of the setup.
- * (Used only for labeling / review, not execution logic)
+ * High-level setup classification.
+ * Purely descriptive.
  */
 export type SetupType =
   | "TREND_CONTINUATION"
@@ -26,57 +26,59 @@ export type SetupType =
   | "UNKNOWN";
 
 /**
- * A single eligible trade candidate.
+ * Candidate origin mode (BACKEND AUTHORITY).
+ */
+export type CandidatesMode = "AUTO" | "MANUAL";
+
+/**
+ * Trade candidate (AUTO = system, MANUAL = trader).
  */
 export interface TradeCandidate {
   symbol: string;
-
-  /**
-   * Direction allowed for the day.
-   * LONG or SHORT — never both.
-   */
   direction: TradeDirection;
-
-  /**
-   * Why this symbol is eligible today.
-   * Purely descriptive.
-   */
   setupType: SetupType;
-
-  /**
-   * Optional system notes (read-only).
-   */
   notes?: string;
 }
 
 /**
- * Core STEP-3 snapshot as returned by backend.
- * NOTE: STEP-3 is NOT frozen.
+ * STEP-3 execution snapshot.
+ *
+ * STEP-3.1 (System):
+ *  - executionEnabled
+ *
+ * STEP-3.2 (Backend decides):
+ *  - candidatesMode
+ *  - candidates list (may be empty)
  */
 export interface Step3ExecutionSnapshot {
   tradeDate: TradeDate;
 
   /**
-   * Whether execution is allowed.
-   * Depends on STEP-1 + STEP-2 being frozen
-   * and STEP-2.tradeAllowed === true.
+   * Hard gate derived from STEP-1 + STEP-2.
    */
   executionEnabled: boolean;
 
   /**
-   * Deterministic list of eligible trade candidates.
-   * Empty list is a valid outcome.
+   * Backend-declared candidate mode.
+   * AUTO   -> candidates preloaded
+   * MANUAL -> frontend must allow entry
+   */
+  candidatesMode: CandidatesMode;
+
+  /**
+   * Candidate list.
+   * Empty is a VALID state.
    */
   candidates: TradeCandidate[];
 
   /**
-   * When STEP-3 was generated.
+   * Generation timestamp.
    */
   generatedAt: IsoTimestamp;
 }
 
 /**
- * Response shape for STEP-3 execution API.
+ * STEP-3 execution API response.
  */
 export interface Step3ExecutionResponse {
   snapshot: Step3ExecutionSnapshot;
