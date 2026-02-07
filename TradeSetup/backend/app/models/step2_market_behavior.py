@@ -1,3 +1,4 @@
+#backend/app/models/step2_market_behavior.py
 from sqlalchemy import Column, String, Date, Boolean, DateTime
 from sqlalchemy.sql import func
 from backend.app.db.base import Base

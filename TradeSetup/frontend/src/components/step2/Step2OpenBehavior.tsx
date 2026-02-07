@@ -1,7 +1,7 @@
 // src/components/step2/Step2OpenBehavior.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useStep2 } from "@/hooks/useStep2";
 import type { TradeDate } from "@/types/common.types";
 import type {
@@ -19,7 +19,6 @@ export default function Step2OpenBehavior({
 }: Step2OpenBehaviorProps) {
   const {
     snapshot,
-    mode,
     isFrozen,
     tradeAllowed,
     loading,
@@ -28,20 +27,45 @@ export default function Step2OpenBehavior({
     freezeStep2,
   } = useStep2(tradeDate);
 
-  // Manual fallback state
+  // Manual entry state (used only when backend sends UNKNOWNs)
   const [indexOpenBehavior, setIndexOpenBehavior] =
     useState<IndexOpenBehavior>("UNKNOWN");
   const [earlyVolatility, setEarlyVolatility] =
     useState<EarlyVolatility>("UNKNOWN");
   const [marketParticipation, setMarketParticipation] =
     useState<MarketParticipation>("UNKNOWN");
-  const [manualTradeAllowed, setManualTradeAllowed] =
-    useState(false);
 
-  // Auto-load STEP-2 preview
+  // Load preview on mount
   useEffect(() => {
     previewStep2();
   }, [previewStep2]);
+
+  /**
+   * STEP-2 MODE DERIVATION (LOCKED)
+   * Backend is the source of truth.
+   * UNKNOWN values => MANUAL
+   * Concrete values => AUTO (read-only)
+   */
+  const isManual = useMemo(() => {
+    if (!snapshot) return true;
+
+    return (
+      snapshot.indexOpenBehavior === "UNKNOWN" ||
+      snapshot.earlyVolatility === "UNKNOWN" ||
+      snapshot.marketParticipation === "UNKNOWN"
+    );
+  }, [snapshot]);
+
+  const handleFreeze = () => {
+    if (!snapshot) return;
+
+    freezeStep2({
+      indexOpenBehavior,
+      earlyVolatility,
+      marketParticipation,
+      tradeAllowed, // echoed back, backend is authoritative
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -51,152 +75,86 @@ export default function Step2OpenBehavior({
         <span className="font-medium">{tradeDate}</span>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="text-sm text-gray-500">
           Loading STEP-2…
         </div>
       )}
 
-      {/* AUTO MODE (backend-driven) */}
-      {mode === "AUTO" && snapshot && (
+      {/* AUTO MODE — visible but locked */}
+      {!isManual && snapshot && (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded border p-4">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Index Open
-              </h3>
-              <div className="mt-2 text-sm">
-                {snapshot.indexOpenBehavior}
-              </div>
-            </div>
-
-            <div className="rounded border p-4">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Early Volatility
-              </h3>
-              <div className="mt-2 text-sm">
-                {snapshot.earlyVolatility}
-              </div>
-            </div>
-
-            <div className="rounded border p-4">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Market Participation
-              </h3>
-              <div className="mt-2 text-sm">
-                {snapshot.marketParticipation}
-              </div>
-            </div>
+            <ReadonlyField
+              label="Index Open"
+              value={snapshot.indexOpenBehavior}
+            />
+            <ReadonlyField
+              label="Early Volatility"
+              value={snapshot.earlyVolatility}
+            />
+            <ReadonlyField
+              label="Market Participation"
+              value={snapshot.marketParticipation}
+            />
           </div>
 
-          <div
-            className={`rounded border p-4 ${
-              tradeAllowed
-                ? "border-green-300 bg-green-50 text-green-700"
-                : "border-red-300 bg-red-50 text-red-700"
-            }`}
-          >
-            <div className="text-sm font-medium">
-              Trade Permission
-            </div>
-            <div className="mt-2 text-sm">
-              {tradeAllowed
-                ? "Trading is permitted based on STEP-2 evaluation."
-                : "Trading is NOT permitted for the day."}
-            </div>
-          </div>
+          <TradePermissionBanner tradeAllowed={tradeAllowed} />
         </>
       )}
 
-      {/* MANUAL MODE (DEV fallback) */}
-      {mode === "MANUAL" && !isFrozen && (
+      {/* MANUAL MODE — trader input */}
+      {isManual && !isFrozen && (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded border p-4">
-              <label className="text-sm font-semibold text-gray-700">
-                Index Open
-              </label>
-              <select
-                value={indexOpenBehavior}
-                onChange={(e) =>
-                  setIndexOpenBehavior(
-                    e.target.value as IndexOpenBehavior
-                  )
-                }
-                className="mt-2 w-full rounded border px-2 py-1 text-sm"
-              >
-                <option value="UNKNOWN">Unknown</option>
-                <option value="STRONG_UP">Strong Up</option>
-                <option value="WEAK_UP">Weak Up</option>
-                <option value="FLAT">Flat</option>
-                <option value="WEAK_DOWN">Weak Down</option>
-                <option value="STRONG_DOWN">Strong Down</option>
-              </select>
-            </div>
+            <SelectField
+              label="Index Open"
+              value={indexOpenBehavior}
+              onChange={setIndexOpenBehavior}
+              options={[
+                "UNKNOWN",
+                "STRONG_UP",
+                "WEAK_UP",
+                "FLAT",
+                "WEAK_DOWN",
+                "STRONG_DOWN",
+              ]}
+            />
 
-            <div className="rounded border p-4">
-              <label className="text-sm font-semibold text-gray-700">
-                Early Volatility
-              </label>
-              <select
-                value={earlyVolatility}
-                onChange={(e) =>
-                  setEarlyVolatility(
-                    e.target.value as EarlyVolatility
-                  )
-                }
-                className="mt-2 w-full rounded border px-2 py-1 text-sm"
-              >
-                <option value="UNKNOWN">Unknown</option>
-                <option value="EXPANDING">Expanding</option>
-                <option value="CONTRACTING">Contracting</option>
-                <option value="NORMAL">Normal</option>
-                <option value="CHAOTIC">Chaotic</option>
-              </select>
-            </div>
+            <SelectField
+              label="Early Volatility"
+              value={earlyVolatility}
+              onChange={setEarlyVolatility}
+              options={[
+                "UNKNOWN",
+                "EXPANDING",
+                "CONTRACTING",
+                "NORMAL",
+                "CHAOTIC",
+              ]}
+            />
 
-            <div className="rounded border p-4">
-              <label className="text-sm font-semibold text-gray-700">
-                Market Participation
-              </label>
-              <select
-                value={marketParticipation}
-                onChange={(e) =>
-                  setMarketParticipation(
-                    e.target.value as MarketParticipation
-                  )
-                }
-                className="mt-2 w-full rounded border px-2 py-1 text-sm"
-              >
-                <option value="UNKNOWN">Unknown</option>
-                <option value="BROAD">Broad</option>
-                <option value="NARROW">Narrow</option>
-                <option value="MIXED">Mixed</option>
-                <option value="THIN">Thin</option>
-              </select>
-            </div>
+            <SelectField
+              label="Market Participation"
+              value={marketParticipation}
+              onChange={setMarketParticipation}
+              options={[
+                "UNKNOWN",
+                "BROAD",
+                "NARROW",
+                "MIXED",
+                "THIN",
+              ]}
+            />
           </div>
 
-          <div className="rounded border p-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={manualTradeAllowed}
-                onChange={(e) =>
-                  setManualTradeAllowed(e.target.checked)
-                }
-              />
-              Trading is permitted today
-            </label>
-          </div>
+          <TradePermissionBanner tradeAllowed={tradeAllowed} />
         </>
       )}
 
-      {/* Freeze action / status */}
       {!isFrozen ? (
         <button
-          onClick={freezeStep2}
+          onClick={handleFreeze}
           disabled={loading}
           className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
         >
@@ -211,12 +169,90 @@ export default function Step2OpenBehavior({
         </div>
       )}
 
-      {/* Non-blocking error note */}
-      {error && mode === "MANUAL" && (
+      {error && (
         <div className="text-xs text-gray-400">
-          Backend unavailable — manual mode enabled
+          Non-blocking backend warning
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Small UI helpers ---------- */
+
+function ReadonlyField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded border p-4">
+      <label className="text-sm font-semibold text-gray-700">
+        {label}
+      </label>
+      <input
+        value={value}
+        readOnly
+        className="mt-2 w-full rounded border px-2 py-1 bg-gray-100 text-sm"
+      />
+    </div>
+  );
+}
+
+function SelectField<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: T[];
+}) {
+  return (
+    <div className="rounded border p-4">
+      <label className="text-sm font-semibold text-gray-700">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="mt-2 w-full rounded border px-2 py-1 text-sm"
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt.replace("_", " ")}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function TradePermissionBanner({
+  tradeAllowed,
+}: {
+  tradeAllowed: boolean;
+}) {
+  return (
+    <div
+      className={`rounded border p-4 ${
+        tradeAllowed
+          ? "border-green-300 bg-green-50 text-green-700"
+          : "border-red-300 bg-red-50 text-red-700"
+      }`}
+    >
+      <div className="text-sm font-medium">
+        Trade Permission
+      </div>
+      <div className="mt-2 text-sm">
+        {tradeAllowed
+          ? "Trading is permitted based on STEP-2 evaluation."
+          : "Trading is NOT permitted for the day."}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+# backend/app/api/step2.py
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -29,9 +31,12 @@ def preview_step2(
     db: Session = Depends(get_db),
 ):
     """
-    Preview STEP-2 market open behavior (read-only).
+    Preview STEP-2 Market Open Behavior.
 
-    Requires STEP-1 to be frozen.
+    CONTRACT:
+    - NEVER throws "data not found"
+    - Returns mode = AUTO | MANUAL
+    - UI decides editable vs readonly
     """
     try:
         return preview_step2_behavior(
@@ -39,13 +44,13 @@ def preview_step2(
             trade_date=request.trade_date,
         )
     except ValueError as e:
-        # Domain error (STEP-1 not frozen, invalid state)
+        # STEP-1 not frozen → domain violation
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
     except Exception:
-        # Infrastructure / unexpected error
+        # Infra failure only
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate STEP-2 preview",
@@ -62,21 +67,27 @@ def freeze_step2(
     db: Session = Depends(get_db),
 ):
     """
-    Freeze STEP-2 market open behavior (irreversible).
+    Freeze STEP-2 Market Open Behavior.
 
-    STEP-1 must already be frozen.
+    CONTRACT:
+    - Accepts ONLY raw/manual inputs
+    - trade_allowed is DERIVED by backend
+    - reason is REQUIRED
     """
     try:
         return freeze_step2_behavior(
             db=db,
             trade_date=request.trade_date,
+
+            # Raw observations (manual or API-fed later)
             index_open_behavior=request.index_open_behavior,
             early_volatility=request.early_volatility,
             market_participation=request.market_participation,
-            trade_allowed=request.trade_allowed,
+
+            # Mandatory manual reasoning
+            reason=request.reason,
         )
     except ValueError as e:
-        # Domain conflict (STEP-1 not frozen, STEP-2 already frozen)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),

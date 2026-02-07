@@ -1,5 +1,14 @@
+#backend/app/schemas/step2_schema.py
 from datetime import date, datetime
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field
+
+
+# =========================
+# Shared enums / flags
+# =========================
+
+StepMode = Literal["AUTO", "MANUAL"]
 
 
 # =========================
@@ -9,41 +18,39 @@ from pydantic import BaseModel, Field
 class Step2PreviewRequest(BaseModel):
     """
     Read-only request to preview STEP-2 context for a given trade_date.
+    Must NEVER fail due to missing OHLCV data.
     """
     trade_date: date
+
+
+class Step2CandleInput(BaseModel):
+    """
+    Raw 5-min OHLCV candle entered by trader (09:15–09:45).
+    """
+    timestamp: str = Field(..., description="HH:MM")
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
 
 
 class Step2FreezeRequest(BaseModel):
     """
-    Freeze request capturing observed market behavior
-    after market open.
+    Freeze request capturing ONLY raw observations.
+    All decisions are derived by backend.
     """
     trade_date: date
 
-    index_open_behavior: str = Field(
+    candles: List[Step2CandleInput] = Field(
         ...,
-        min_length=3,
-        max_length=32,
-        description="How the index opened (e.g. STRONG_UP, FLAT, WEAK_DOWN)"
+        description="5-minute OHLCV candles from 09:15 to 09:45"
     )
 
-    early_volatility: str = Field(
-        ...,
-        min_length=3,
-        max_length=32,
-        description="Early session volatility (e.g. HIGH, NORMAL, LOW)"
-    )
-
-    market_participation: str = Field(
-        ...,
-        min_length=3,
-        max_length=32,
-        description="Market breadth / participation (e.g. BROAD, SELECTIVE, THIN)"
-    )
-
-    trade_allowed: bool = Field(
-        ...,
-        description="Whether trading is permitted for the day"
+    reason: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="One factual sentence linking observation → decision"
     )
 
 
@@ -54,17 +61,28 @@ class Step2FreezeRequest(BaseModel):
 class Step2OpenBehaviorSnapshot(BaseModel):
     """
     Immutable STEP-2 snapshot.
-    Consumed by STEP-3 to determine execution eligibility.
+    Consumed by STEP-3.
     """
+
     trade_date: date
 
-    index_open_behavior: str
-    early_volatility: str
-    market_participation: str
+    # --- Mode control ---
+    mode: StepMode
+    manual_input_required: bool
 
-    trade_allowed: bool
+    # --- System baseline ---
+    avg_5m_range_prev_day: Optional[float] = None
 
-    frozen_at: datetime | None = None
+    # --- Derived observations ---
+    index_open_behavior: Optional[str] = None
+    early_volatility: Optional[str] = None
+    market_participation: Optional[str] = None
+
+    # --- FINAL SYSTEM DECISION ---
+    trade_allowed: Optional[bool] = None
+
+    # --- Audit ---
+    frozen_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -77,7 +95,9 @@ class Step2OpenBehaviorSnapshot(BaseModel):
 class Step2PreviewResponse(BaseModel):
     """
     Preview response for STEP-2.
-    can_freeze=false once the context is frozen.
+
+    - mode=MANUAL → UI must show editable OHLCV grid
+    - mode=AUTO   → UI shows computed values (read-only)
     """
     snapshot: Step2OpenBehaviorSnapshot
     can_freeze: bool

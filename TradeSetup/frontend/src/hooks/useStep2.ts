@@ -2,105 +2,100 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { ApiState, TradeDate } from "@/types/common.types";
+import type { TradeDate } from "@/types/common.types";
 import type {
   Step2OpenBehaviorSnapshot,
   Step2PreviewResponse,
   Step2FrozenResponse,
+  IndexOpenBehavior,
+  EarlyVolatility,
+  MarketParticipation,
 } from "@/types/step2.types";
 import {
   fetchStep2Preview,
   freezeStep2Behavior,
 } from "@/services/step2.api";
 
-type Step2Mode = "AUTO" | "MANUAL";
+export type Step2Mode = "AUTO" | "MANUAL";
 
-/**
- * STEP-2 hook
- * Handles preview + freeze lifecycle for market open behavior.
- * AUTO → backend data
- * MANUAL → user input fallback
- */
 export function useStep2(tradeDate: TradeDate) {
-  const [state, setState] = useState<
-    ApiState<Step2OpenBehaviorSnapshot>
-  >({
-    data: null,
-    loading: false,
-    error: null,
-  });
-
-  const [mode, setMode] = useState<Step2Mode>("AUTO");
+  const [snapshot, setSnapshot] =
+    useState<Step2OpenBehaviorSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
 
   /**
-   * Fetch STEP-2 preview snapshot
+   * Mode is DERIVED from snapshot values
+   * UNKNOWN → MANUAL
+   * Concrete → AUTO
+   */
+  const mode: Step2Mode =
+    snapshot &&
+    snapshot.indexOpenBehavior !== "UNKNOWN" &&
+    snapshot.earlyVolatility !== "UNKNOWN" &&
+    snapshot.marketParticipation !== "UNKNOWN"
+      ? "AUTO"
+      : "MANUAL";
+
+  /**
+   * Preview STEP-2
+   * Backend never errors for control flow
    */
   const previewStep2 = useCallback(async () => {
-    setState((prev) => ({
-      ...prev,
-      loading: true,
-      error: null,
-    }));
+    setLoading(true);
+    setError(null);
 
     try {
       const response: Step2PreviewResponse =
         await fetchStep2Preview(tradeDate);
 
-      setState({
-        data: response.snapshot,
-        loading: false,
-        error: null,
-      });
-
-      setMode("AUTO");
-    } catch (error: any) {
-      // Backend failed → MANUAL mode
-      setState({
-        data: null,
-        loading: false,
-        error,
-      });
-
-      setMode("MANUAL");
+      setSnapshot(response.snapshot);
+    } catch (err) {
+      // Defensive only — should not happen
+      setError(err);
+    } finally {
+      setLoading(false);
     }
   }, [tradeDate]);
 
   /**
-   * Freeze STEP-2 snapshot
-   * Works in both AUTO and MANUAL modes
+   * Freeze STEP-2
+   * Trader submits observed behavior
    */
-  const freezeStep2 = useCallback(async () => {
-    setState((prev) => ({
-      ...prev,
-      loading: true,
-      error: null,
-    }));
+  const freezeStep2 = useCallback(
+    async (params: {
+      indexOpenBehavior: IndexOpenBehavior;
+      earlyVolatility: EarlyVolatility;
+      marketParticipation: MarketParticipation;
+      tradeAllowed: boolean;
+    }) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const response: Step2FrozenResponse =
-        await freezeStep2Behavior(tradeDate);
+      try {
+        const response: Step2FrozenResponse =
+          await freezeStep2Behavior({
+            tradeDate,
+            ...params,
+          });
 
-      setState({
-        data: response.snapshot,
-        loading: false,
-        error: null,
-      });
-    } catch (error: any) {
-      setState((prev) => ({
-        data: prev.data,
-        loading: false,
-        error,
-      }));
-    }
-  }, [tradeDate]);
+        setSnapshot(response.snapshot);
+      } catch (err) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tradeDate]
+  );
 
   return {
-    snapshot: state.data,
+    snapshot,
     mode,
-    isFrozen: state.data?.freezeStatus === "FROZEN",
-    tradeAllowed: state.data?.tradeAllowed ?? false,
-    loading: state.loading,
-    error: state.error,
+    isFrozen: !!snapshot?.frozenAt,
+    tradeAllowed: snapshot?.tradeAllowed ?? false,
+    loading,
+    error,
 
     previewStep2,
     freezeStep2,
