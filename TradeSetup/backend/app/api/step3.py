@@ -1,8 +1,7 @@
-#backend/app/api/step3.py
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.app.db.session import get_db
 from backend.app.schemas.step3_schema import Step3ExecutionResponse
@@ -16,10 +15,15 @@ router = APIRouter(
 
 class Step3ExecuteRequest(BaseModel):
     """
-    Execution request for STEP-3.
-    System-driven, no user discretion.
+    STEP-3 execution request.
+
+    System-triggered.
+    No trader discretion.
     """
-    trade_date: date
+    trade_date: date = Field(
+        ...,
+        description="Trading date for STEP-3 execution"
+    )
 
 
 @router.post(
@@ -32,26 +36,30 @@ def execute_step3(
     db: Session = Depends(get_db),
 ):
     """
-    Generate STEP-3 execution control & stock selection.
+    STEP-3 — Execution Control & Candidate Selection
 
-    Deterministic.
-    Idempotent.
-    Irreversible once generated.
+    - Deterministic
+    - Idempotent
+    - Backend-authoritative
+    - Never fails due to missing automation
     """
+
     try:
         return generate_step3_execution(
             db=db,
             trade_date=request.trade_date,
         )
+
     except ValueError as e:
-        # Domain error: STEP-1 / STEP-2 not frozen
+        # Domain violation (STEP-1 / STEP-2 not frozen)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
-    except Exception:
+
+    except Exception as e:
         # Infrastructure / unexpected error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate STEP-3 execution control",
+            detail="Failed to execute STEP-3",
         )
