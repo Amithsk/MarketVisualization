@@ -1,5 +1,7 @@
+# backend/app/schemas/step1_schema.py
+
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -10,7 +12,7 @@ from pydantic import BaseModel, Field
 class Step1PreviewRequest(BaseModel):
     """
     Read-only request.
-    Returns a computed snapshot for the given trade_date.
+    Returns AUTO or MANUAL mode for the given trade_date.
     """
     trade_date: date
 
@@ -26,46 +28,32 @@ class Step1FreezeRequest(BaseModel):
         ...,
         min_length=3,
         max_length=32,
-        description="Trader's directional bias (e.g. BULLISH, BEARISH, NEUTRAL)"
+        description="Final market context (TREND_DAY, RANGE_UNCERTAIN_DAY, NO_TRADE_DAY)"
     )
 
     premarket_notes: Optional[str] = Field(
         None,
         max_length=2000,
-        description="Optional discretionary notes before market open"
+        description="Mandatory factual reasoning for STEP-1 decision"
     )
 
 
 # =========================
-# Snapshot (shared)
+# Snapshot (persisted STEP-1 only)
 # =========================
 
 class Step1ContextSnapshot(BaseModel):
     """
-    Unified snapshot returned by preview and freeze endpoints.
+    Snapshot of frozen STEP-1 context.
+    This reflects ONLY what is stored in DB.
     """
     trade_date: date
 
-    # --- System-derived market data ---
-    prev_close: float
-    prev_high: float
-    prev_low: float
-
-    day2_high: Optional[float] = None
-    day2_low: Optional[float] = None
-    preopen_price: Optional[float] = None
-
-    # --- Derived context ---
-    gap_pct: Optional[float] = None
-    gap_context: Optional[str] = None
-    range_context: Optional[str] = None
-
-    # --- Trader inputs ---
     market_bias: str
+    gap_context: Optional[str] = None
     premarket_notes: Optional[str] = None
 
-    # --- Freeze metadata ---
-    frozen_at: Optional[datetime] = None
+    frozen_at: datetime
 
     class Config:
         orm_mode = True
@@ -78,9 +66,16 @@ class Step1ContextSnapshot(BaseModel):
 class Step1PreviewResponse(BaseModel):
     """
     Preview response.
-    can_freeze=false when market is closed, holiday, or already frozen.
+
+    mode:
+    - AUTO   → STEP-1 already exists (read-only)
+    - MANUAL → Trader must input STEP-1 data
+
+    snapshot:
+    - Present only when mode = AUTO
     """
-    snapshot: Step1ContextSnapshot
+    mode: Literal["AUTO", "MANUAL"]
+    snapshot: Optional[Step1ContextSnapshot]
     can_freeze: bool
 
 

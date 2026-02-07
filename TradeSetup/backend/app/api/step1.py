@@ -1,3 +1,5 @@
+# backend/app/api/step1.py
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -31,22 +33,18 @@ def preview_step1(
     """
     Preview STEP-1 pre-market context (read-only).
 
-    Safe to call multiple times.
-    Does NOT mutate state.
+    Contract:
+    - MUST NOT error if data is missing
+    - MUST return mode = AUTO or MANUAL
+    - Safe to call multiple times
     """
     try:
         return preview_step1_context(
             db=db,
             trade_date=request.trade_date,
         )
-    except ValueError as e:
-        # Domain validation error
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-    except Exception as e:
-        # Infrastructure / unexpected error
+    except Exception:
+        # Only true infrastructure / unexpected failures reach here
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate STEP-1 preview",
@@ -80,7 +78,7 @@ def freeze_step1(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
-    except Exception as e:
+    except Exception:
         # Infrastructure / unexpected error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

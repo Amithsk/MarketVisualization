@@ -1,3 +1,5 @@
+# backend/app/models/step1_market_context.py
+
 from sqlalchemy import Column, String, Date, Float, DateTime, Text
 from sqlalchemy.sql import func
 from backend.app.db.base import Base
@@ -6,12 +8,11 @@ from backend.app.db.base import Base
 class Step1MarketContext(Base):
     """
     STEP-1: Pre-Market Context (Frozen)
-    -----------------------------------
-    Stores the trader's pre-market understanding of the day,
-    combined with system-derived market context.
 
+    Stores the FINAL trader decision for the day.
+    Manual-first by design.
     One row per trading day.
-    Becomes immutable once frozen_at is set.
+    Immutable once created.
     """
 
     __tablename__ = "step1_market_context"
@@ -19,70 +20,86 @@ class Step1MarketContext(Base):
     # =========================
     # Identity
     # =========================
-    trade_date = Column(Date, primary_key=True, index=True)
-
-    # =========================
-    # System-derived market data
-    # =========================
-    prev_close = Column(Float, nullable=False)
-    prev_high = Column(Float, nullable=False)
-    prev_low = Column(Float, nullable=False)
-
-    day2_high = Column(Float, nullable=True)
-    day2_low = Column(Float, nullable=True)
-
-    preopen_price = Column(Float, nullable=True)
-
-    # =========================
-    # Derived context
-    # =========================
-    gap_pct = Column(Float, nullable=True)
-    gap_context = Column(String(32), nullable=True)
-    range_context = Column(String(32), nullable=True)
-
-    # =========================
-    # Trader inputs (before freeze)
-    # =========================
-    market_bias = Column(
-        String(32),
-        nullable=False,
-        default="UNDEFINED"
+    trade_date = Column(
+        Date,
+        primary_key=True,
+        index=True,
+        comment="Trading date (one row per day)"
     )
 
-    premarket_notes = Column(Text, nullable=True)
+    # =========================
+    # Manual + derived fields
+    # =========================
+    preopen_price = Column(
+        Float,
+        nullable=True,
+        comment="Manual pre-open price entered by trader"
+    )
+
+    gap_pct = Column(
+        Float,
+        nullable=True,
+        comment="Derived gap percentage"
+    )
+
+    gap_class = Column(
+        String(32),
+        nullable=True,
+        comment="Derived gap classification"
+    )
+
+    prior_range_size = Column(
+        String(32),
+        nullable=True,
+        comment="Derived prior day range size"
+    )
+
+    prior_day_overlap = Column(
+        String(32),
+        nullable=True,
+        comment="Derived prior day overlap"
+    )
+
+    prior_structure_state = Column(
+        String(32),
+        nullable=True,
+        comment="Derived structural state"
+    )
 
     # =========================
-    # Freeze metadata
+    # Final trader decision
     # =========================
-    frozen_at = Column(DateTime, nullable=True)
+    final_market_context = Column(
+        String(32),
+        nullable=False,
+        comment="Final STEP-1 classification (TREND_DAY / RANGE / NO_TRADE)"
+    )
+
+    final_reason = Column(
+        Text,
+        nullable=False,
+        comment="Mandatory factual reasoning for final decision"
+    )
 
     # =========================
-    # Audit fields
+    # Audit
     # =========================
     created_at = Column(
         DateTime,
         server_default=func.now(),
-        nullable=False
-    )
-
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False
+        nullable=False,
+        comment="Timestamp when STEP-1 was frozen"
     )
 
     # =========================
-    # Debug / logging helper
+    # Debug helper
     # =========================
     def __repr__(self) -> str:
         return (
             f"<Step1MarketContext("
             f"trade_date={self.trade_date}, "
-            f"gap_pct={self.gap_pct}, "
-            f"gap_context={self.gap_context}, "
-            f"range_context={self.range_context}, "
-            f"market_bias={self.market_bias}, "
-            f"frozen_at={self.frozen_at}"
+            f"final_market_context={self.final_market_context}, "
+            f"gap_class={self.gap_class}, "
+            f"created_at={self.created_at}"
             f")>"
         )

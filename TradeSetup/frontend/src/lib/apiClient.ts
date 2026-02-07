@@ -1,11 +1,8 @@
-// src/lib/apiClient.ts
-
 import axios, { AxiosError, AxiosInstance } from "axios";
 import type { ApiError } from "@/types/common.types";
 
 /**
  * Shared Axios client for frontend → backend communication.
- * All API calls must go through this instance.
  */
 const apiClient: AxiosInstance = axios.create({
   baseURL: "http://localhost:8000/api",
@@ -17,7 +14,6 @@ const apiClient: AxiosInstance = axios.create({
 
 /**
  * Response interceptor
- * Normalizes backend + network errors into ApiError
  */
 apiClient.interceptors.response.use(
   (response) => response,
