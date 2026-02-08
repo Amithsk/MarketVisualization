@@ -10,53 +10,54 @@ from pydantic import BaseModel, Field
 # =========================
 
 class Step1PreviewRequest(BaseModel):
-    """
-    Read-only request.
-    Returns AUTO or MANUAL mode for the given trade_date.
-    """
     trade_date: date
 
 
 class Step1FreezeRequest(BaseModel):
-    """
-    Trader intent submission.
-    Only trader-controlled fields are accepted here.
-    """
     trade_date: date
 
+    # Trader inputs (MANUAL mode only)
     market_bias: str = Field(
         ...,
         min_length=3,
         max_length=32,
-        description="Final market context (TREND_DAY, RANGE_UNCERTAIN_DAY, NO_TRADE_DAY)"
+        description="Trader view of market bias"
+    )
+
+    gap_context: str = Field(
+        ...,
+        min_length=3,
+        max_length=32,
+        description="Gap up / gap down / flat"
     )
 
     premarket_notes: Optional[str] = Field(
         None,
-        max_length=2000,
-        description="Mandatory factual reasoning for STEP-1 decision"
+        max_length=1000
     )
 
 
 # =========================
-# Snapshot (persisted STEP-1 only)
+# Snapshot
 # =========================
 
 class Step1ContextSnapshot(BaseModel):
-    """
-    Snapshot of frozen STEP-1 context.
-    This reflects ONLY what is stored in DB.
-    """
     trade_date: date
 
-    market_bias: str
+    # SYSTEM DATA (read-only)
+    yesterday_close: Optional[float] = None
+    yesterday_high: Optional[float] = None
+    yesterday_low: Optional[float] = None
+
+    # DERIVED / TRADER
+    market_bias: Optional[str] = None
     gap_context: Optional[str] = None
     premarket_notes: Optional[str] = None
 
-    frozen_at: datetime
+    frozen_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # =========================
@@ -65,23 +66,14 @@ class Step1ContextSnapshot(BaseModel):
 
 class Step1PreviewResponse(BaseModel):
     """
-    Preview response.
-
-    mode:
-    - AUTO   → STEP-1 already exists (read-only)
-    - MANUAL → Trader must input STEP-1 data
-
-    snapshot:
-    - Present only when mode = AUTO
+    Backend is EXPLICIT about mode.
+    Frontend must NOT infer.
     """
     mode: Literal["AUTO", "MANUAL"]
-    snapshot: Optional[Step1ContextSnapshot]
+    snapshot: Step1ContextSnapshot
     can_freeze: bool
 
 
 class Step1FrozenResponse(BaseModel):
-    """
-    Immutable response after successful freeze.
-    """
     snapshot: Step1ContextSnapshot
     frozen: bool = True

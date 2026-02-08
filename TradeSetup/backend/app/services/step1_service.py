@@ -1,5 +1,6 @@
 # backend/app/services/step1_service.py
 
+import logging
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -10,22 +11,7 @@ from backend.app.schemas.step1_schema import (
     Step1ContextSnapshot,
 )
 
-
-# -------------------------------------------------
-# Helpers
-# -------------------------------------------------
-
-def _to_snapshot(ctx: Step1MarketContext) -> Step1ContextSnapshot:
-    """
-    Convert ORM object to API snapshot.
-    """
-    return Step1ContextSnapshot(
-        trade_date=ctx.trade_date,
-        market_bias=ctx.final_market_context,
-        gap_context=ctx.gap_class,
-        premarket_notes=ctx.final_reason,
-        frozen_at=ctx.created_at,
-    )
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------
@@ -37,13 +23,15 @@ def preview_step1_context(
     trade_date: date,
 ) -> Step1PreviewResponse:
     """
-    STEP-1 Preview
+    STEP-1 PREVIEW
 
-    Contract:
-    - MUST NOT throw if data is missing
-    - MUST indicate AUTO vs MANUAL
-    - No system fabrication
+    RULES (LOCKED):
+    - Preview NEVER errors due to missing data
+    - Backend explicitly decides AUTO vs MANUAL
+    - Frontend must rely ONLY on `mode`
     """
+
+    logger.info("[STEP-1][PREVIEW] trade_date=%s", trade_date)
 
     existing = (
         db.query(Step1MarketContext)
@@ -51,18 +39,42 @@ def preview_step1_context(
         .first()
     )
 
-    # AUTO mode — data already exists
-    if existing:
+    # -------------------------
+    # AUTO MODE
+    # -------------------------
+    if existing and existing.frozen_at:
+        logger.info("[STEP-1][PREVIEW] AUTO mode (already frozen)")
+
+        snapshot = Step1ContextSnapshot(
+            trade_date=existing.trade_date,
+            yesterday_close=existing.yesterday_close,
+            yesterday_high=existing.yesterday_high,
+            yesterday_low=existing.yesterday_low,
+            market_bias=existing.market_bias,
+            gap_context=existing.gap_context,
+            premarket_notes=existing.premarket_notes,
+            frozen_at=existing.frozen_at,
+        )
+
         return Step1PreviewResponse(
             mode="AUTO",
-            snapshot=_to_snapshot(existing),
+            snapshot=snapshot,
             can_freeze=False,
         )
 
-    # MANUAL mode — no data yet (expected state)
+    # -------------------------
+    # MANUAL MODE (DEFAULT)
+    # -------------------------
+    logger.info("[STEP-1][PREVIEW] MANUAL mode (no frozen data)")
+
+    snapshot = Step1ContextSnapshot(
+        trade_date=trade_date,
+        frozen_at=None,
+    )
+
     return Step1PreviewResponse(
         mode="MANUAL",
-        snapshot=None,
+        snapshot=snapshot,
         can_freeze=True,
     )
 
@@ -71,13 +83,18 @@ def freeze_step1_context(
     db: Session,
     trade_date: date,
     market_bias: str,
+    gap_context: str,
     premarket_notes: str | None,
 ) -> Step1FrozenResponse:
     """
-    Freeze STEP-1 context (irreversible).
+    STEP-1 FREEZE (irreversible)
 
-    Manual-only persistence.
+    RULES:
+    - Accept trader input
+    - Backend persists authoritative snapshot
     """
+
+    logger.info("[STEP-1][FREEZE] trade_date=%s", trade_date)
 
     existing = (
         db.query(Step1MarketContext)
@@ -85,20 +102,36 @@ def freeze_step1_context(
         .first()
     )
 
+    now = datetime.utcnow()
+
+    if existing and existing.frozen_at:
+        raise ValueError("STEP-1 is already frozen")
+
     if existing:
-        raise ValueError("STEP-1 context already frozen for this date")
+        context = existing
+    else:
+        context = Step1MarketContext(trade_date=trade_date)
+        db.add(context)
 
-    context = Step1MarketContext(
-        trade_date=trade_date,
-        final_market_context=market_bias.strip().upper(),
-        final_reason=premarket_notes or "",
-        created_at=datetime.utcnow(),
-    )
+    context.market_bias = market_bias.strip().upper()
+    context.gap_context = gap_context.strip().upper()
+    context.premarket_notes = premarket_notes
+    context.frozen_at = now
 
-    db.add(context)
     db.commit()
     db.refresh(context)
 
-    return Step1FrozenResponse(
-        snapshot=_to_snapshot(context)
+    snapshot = Step1ContextSnapshot(
+        trade_date=context.trade_date,
+        yesterday_close=context.yesterday_close,
+        yesterday_high=context.yesterday_high,
+        yesterday_low=context.yesterday_low,
+        market_bias=context.market_bias,
+        gap_context=context.gap_context,
+        premarket_notes=context.premarket_notes,
+        frozen_at=context.frozen_at,
     )
+
+    logger.info("[STEP-1][FREEZE] completed trade_date=%s", trade_date)
+
+    return Step1FrozenResponse(snapshot=snapshot)
