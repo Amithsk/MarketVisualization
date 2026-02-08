@@ -1,4 +1,3 @@
-// src/hooks/useStep2.ts
 "use client";
 
 import { useCallback, useState } from "react";
@@ -7,6 +6,7 @@ import type {
   Step2OpenBehaviorSnapshot,
   Step2PreviewResponse,
   Step2FrozenResponse,
+  Step2Mode,
   IndexOpenBehavior,
   EarlyVolatility,
   MarketParticipation,
@@ -16,31 +16,13 @@ import {
   freezeStep2Behavior,
 } from "@/services/step2.api";
 
-export type Step2Mode = "AUTO" | "MANUAL";
-
 export function useStep2(tradeDate: TradeDate) {
   const [snapshot, setSnapshot] =
     useState<Step2OpenBehaviorSnapshot | null>(null);
+  const [mode, setMode] = useState<Step2Mode>("MANUAL");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
 
-  /**
-   * Mode is DERIVED from snapshot values
-   * UNKNOWN → MANUAL
-   * Concrete → AUTO
-   */
-  const mode: Step2Mode =
-    snapshot &&
-    snapshot.indexOpenBehavior !== "UNKNOWN" &&
-    snapshot.earlyVolatility !== "UNKNOWN" &&
-    snapshot.marketParticipation !== "UNKNOWN"
-      ? "AUTO"
-      : "MANUAL";
-
-  /**
-   * Preview STEP-2
-   * Backend never errors for control flow
-   */
   const previewStep2 = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -50,24 +32,19 @@ export function useStep2(tradeDate: TradeDate) {
         await fetchStep2Preview(tradeDate);
 
       setSnapshot(response.snapshot);
+      setMode(response.mode); // ✅ BACKEND DECIDES
     } catch (err) {
-      // Defensive only — should not happen
       setError(err);
     } finally {
       setLoading(false);
     }
   }, [tradeDate]);
 
-  /**
-   * Freeze STEP-2
-   * Trader submits observed behavior
-   */
   const freezeStep2 = useCallback(
     async (params: {
       indexOpenBehavior: IndexOpenBehavior;
       earlyVolatility: EarlyVolatility;
       marketParticipation: MarketParticipation;
-      tradeAllowed: boolean;
     }) => {
       setLoading(true);
       setError(null);
@@ -80,6 +57,7 @@ export function useStep2(tradeDate: TradeDate) {
           });
 
         setSnapshot(response.snapshot);
+        setMode("AUTO"); // frozen → authoritative
       } catch (err) {
         setError(err);
       } finally {
@@ -96,7 +74,6 @@ export function useStep2(tradeDate: TradeDate) {
     tradeAllowed: snapshot?.tradeAllowed ?? false,
     loading,
     error,
-
     previewStep2,
     freezeStep2,
   };

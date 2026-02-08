@@ -29,6 +29,11 @@ export default function TradeDayClient({
     step4,
   } = useTradeDayState(tradeDate);
 
+  console.log("[DEBUG][GATE] tradeDate =", tradeDate);
+  console.log("[DEBUG][GATE] canAccessStep2 =", canAccessStep2);
+  console.log("[DEBUG][GATE] canAccessStep3 =", canAccessStep3);
+  console.log("[DEBUG][GATE] canAccessStep4 =", canAccessStep4);
+
   const { candidates } = step3;
 
   const {
@@ -67,7 +72,14 @@ export default function TradeDayClient({
         description="First reaction, volatility, and confirmation signals"
         disabled={!canAccessStep2}
       >
-        <Step2OpenBehavior tradeDate={tradeDate} />
+        {canAccessStep2 && (
+          <>
+            {console.log(
+              "[DEBUG][RENDER] STEP-2 rendered (STEP-1 is frozen)"
+            )}
+            <Step2OpenBehavior tradeDate={tradeDate} />
+          </>
+        )}
       </StepSection>
 
       {/* STEP 3 — Execution Control & Stock Selection */}
@@ -77,7 +89,14 @@ export default function TradeDayClient({
         description="System-selected candidates (read-only)"
         disabled={!canAccessStep3}
       >
-        <Step3ExecutionControl tradeDate={tradeDate} />
+        {canAccessStep3 && (
+          <>
+            {console.log(
+              "[DEBUG][RENDER] STEP-3 rendered (STEP-2 frozen & trade allowed)"
+            )}
+            <Step3ExecutionControl tradeDate={tradeDate} />
+          </>
+        )}
       </StepSection>
 
       {/* STEP 4 — Trade Construction */}
@@ -87,22 +106,29 @@ export default function TradeDayClient({
         description="Risk, position sizing, and final trade intent"
         disabled={!canAccessStep4}
       >
-        <div className="space-y-6">
-          <Step4TradePreview
-            tradeDate={tradeDate}
-            trade={trade}
-            isFrozen={isFrozen}
-          />
+        {canAccessStep4 && (
+          <>
+            {console.log(
+              "[DEBUG][RENDER] STEP-4 rendered (execution enabled)"
+            )}
+            <div className="space-y-6">
+              <Step4TradePreview
+                tradeDate={tradeDate}
+                trade={trade}
+                isFrozen={isFrozen}
+              />
 
-          <Step4TradeConstruct
-            tradeDate={tradeDate}
-            candidates={candidates}
-            freezeTrade={freezeTrade}
-            loading={step4Loading}
-            error={step4Error}
-            isFrozen={isFrozen}
-          />
-        </div>
+              <Step4TradeConstruct
+                tradeDate={tradeDate}
+                candidates={candidates}
+                freezeTrade={freezeTrade}
+                loading={step4Loading}
+                error={step4Error}
+                isFrozen={isFrozen}
+              />
+            </div>
+          </>
+        )}
       </StepSection>
     </main>
   );

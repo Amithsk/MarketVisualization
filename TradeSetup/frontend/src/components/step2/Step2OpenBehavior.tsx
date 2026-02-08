@@ -17,6 +17,11 @@ interface Step2OpenBehaviorProps {
 export default function Step2OpenBehavior({
   tradeDate,
 }: Step2OpenBehaviorProps) {
+  console.log(
+    "[DEBUG][STEP-2] Component RENDERED for tradeDate:",
+    tradeDate
+  );
+
   const {
     snapshot,
     isFrozen,
@@ -35,41 +40,65 @@ export default function Step2OpenBehavior({
   const [marketParticipation, setMarketParticipation] =
     useState<MarketParticipation>("UNKNOWN");
 
-  // Load preview on mount
+  /**
+   * STEP-2 PREVIEW (DEBUGGED)
+   */
   useEffect(() => {
+    console.log(
+      "[DEBUG][STEP-2] previewStep2() CALLED for tradeDate:",
+      tradeDate
+    );
+
     previewStep2();
-  }, [previewStep2]);
+  }, [previewStep2, tradeDate]);
 
   /**
    * STEP-2 MODE DERIVATION (LOCKED)
-   * Backend is the source of truth.
-   * UNKNOWN values => MANUAL
-   * Concrete values => AUTO (read-only)
    */
   const isManual = useMemo(() => {
-    if (!snapshot) return true;
+    if (!snapshot) {
+      console.log(
+        "[DEBUG][STEP-2] snapshot is NULL → MANUAL mode"
+      );
+      return true;
+    }
 
-    return (
+    const manual =
       snapshot.indexOpenBehavior === "UNKNOWN" ||
       snapshot.earlyVolatility === "UNKNOWN" ||
-      snapshot.marketParticipation === "UNKNOWN"
+      snapshot.marketParticipation === "UNKNOWN";
+
+    console.log(
+      "[DEBUG][STEP-2] snapshot received",
+      snapshot,
+      "→ isManual =",
+      manual
     );
+
+    return manual;
   }, [snapshot]);
 
   const handleFreeze = () => {
+    console.log(
+      "[DEBUG][STEP-2] Freeze clicked with values:",
+      {
+        indexOpenBehavior,
+        earlyVolatility,
+        marketParticipation,
+      }
+    );
+
     if (!snapshot) return;
 
     freezeStep2({
       indexOpenBehavior,
       earlyVolatility,
       marketParticipation,
-      tradeAllowed, // echoed back, backend is authoritative
     });
   };
 
   return (
     <div className="space-y-6">
-      {/* Meta */}
       <div className="text-sm text-gray-500">
         Market Open Behavior for{" "}
         <span className="font-medium">{tradeDate}</span>
@@ -81,7 +110,6 @@ export default function Step2OpenBehavior({
         </div>
       )}
 
-      {/* AUTO MODE — visible but locked */}
       {!isManual && snapshot && (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -103,7 +131,6 @@ export default function Step2OpenBehavior({
         </>
       )}
 
-      {/* MANUAL MODE — trader input */}
       {isManual && !isFrozen && (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

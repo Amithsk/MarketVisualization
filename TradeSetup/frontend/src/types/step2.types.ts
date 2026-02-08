@@ -1,20 +1,7 @@
-// src/types/step2.types.ts
+import type { FreezeMetadata, TradeDate } from "@/types/common.types";
 
-import type {
-  FreezeMetadata,
-  TradeDate,
-} from "@/types/common.types";
+export type Step2Mode = "AUTO" | "MANUAL";
 
-/**
- * STEP-2: Market Open Behavior
- * ----------------------------
- * Captures how the market actually behaved after open.
- * This step gates whether trading is allowed for the day.
- */
-
-/**
- * How the index opened relative to expectations / prior close.
- */
 export type IndexOpenBehavior =
   | "STRONG_UP"
   | "WEAK_UP"
@@ -23,9 +10,6 @@ export type IndexOpenBehavior =
   | "STRONG_DOWN"
   | "UNKNOWN";
 
-/**
- * Early-session volatility assessment.
- */
 export type EarlyVolatility =
   | "EXPANDING"
   | "CONTRACTING"
@@ -33,9 +17,6 @@ export type EarlyVolatility =
   | "CHAOTIC"
   | "UNKNOWN";
 
-/**
- * Broad market participation quality.
- */
 export type MarketParticipation =
   | "BROAD"
   | "NARROW"
@@ -43,10 +24,6 @@ export type MarketParticipation =
   | "THIN"
   | "UNKNOWN";
 
-/**
- * Core STEP-2 snapshot
- * Used in BOTH AUTO and MANUAL modes
- */
 export interface Step2OpenBehaviorSnapshot extends FreezeMetadata {
   tradeDate: TradeDate;
 
@@ -54,24 +31,15 @@ export interface Step2OpenBehaviorSnapshot extends FreezeMetadata {
   earlyVolatility: EarlyVolatility;
   marketParticipation: MarketParticipation;
 
-  /**
-   * Whether trading is permitted after evaluating STEP-2.
-   * This is a hard gate for STEP-3 and STEP-4.
-   */
   tradeAllowed: boolean;
 }
 
-/**
- * STEP-2 preview response
- */
 export interface Step2PreviewResponse {
+  mode: Step2Mode;           // ✅ BACKEND AUTHORITY
   snapshot: Step2OpenBehaviorSnapshot;
   canFreeze: boolean;
 }
 
-/**
- * STEP-2 freeze response
- */
 export interface Step2FrozenResponse {
   snapshot: Step2OpenBehaviorSnapshot;
   frozen: true;
