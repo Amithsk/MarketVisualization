@@ -13,7 +13,7 @@ export async function fetchStep3Execution(
 ): Promise<Step3ExecutionResponse> {
   const response = await apiClient.post<Step3ExecutionResponse>(
     "/step3/execute",
-    { tradeDate }
+    { trade_date: tradeDate, }
   );
 
   return response.data;

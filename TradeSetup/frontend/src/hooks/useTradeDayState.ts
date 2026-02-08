@@ -10,7 +10,7 @@ import { useStep4 } from "@/hooks/useStep4";
 
 /**
  * Aggregates STEP-1 → STEP-4 state and computes gating logic
- * This hook is the single source of truth for trade-day progression.
+ * Backend is the source of truth for progression.
  */
 export function useTradeDayState(tradeDate: TradeDate) {
   const step1 = useStep1(tradeDate);
@@ -21,21 +21,31 @@ export function useTradeDayState(tradeDate: TradeDate) {
   const gates = useMemo(() => {
     const step1Frozen = step1.isFrozen;
     const step2Frozen = step2.isFrozen;
+
     const tradeAllowed = step2.tradeAllowed === true;
+
+    // STEP-3.1 — backend gate
     const executionEnabled = step3.executionEnabled === true;
-    const hasCandidates = (step3.candidates?.length ?? 0) > 0;
+
+    // STEP-4 must NOT depend on candidates count
+    // MANUAL candidate entry is valid
     const tradeFrozen = step4.isFrozen;
 
     return {
       canAccessStep1: true,
+
       canAccessStep2: step1Frozen,
-      canAccessStep3: step1Frozen && step2Frozen && tradeAllowed,
+
+      canAccessStep3:
+        step1Frozen &&
+        step2Frozen &&
+        tradeAllowed,
+
       canAccessStep4:
         step1Frozen &&
         step2Frozen &&
         tradeAllowed &&
         executionEnabled &&
-        hasCandidates &&
         !tradeFrozen,
     };
   }, [
@@ -43,7 +53,6 @@ export function useTradeDayState(tradeDate: TradeDate) {
     step2.isFrozen,
     step2.tradeAllowed,
     step3.executionEnabled,
-    step3.candidates,
     step4.isFrozen,
   ]);
 
