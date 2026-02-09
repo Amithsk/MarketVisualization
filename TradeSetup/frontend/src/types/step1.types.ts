@@ -1,3 +1,4 @@
+//backend/src/types/step1.types.ts
 import type { TradeDate } from "@/types/common.types";
 
 /**
@@ -37,17 +38,28 @@ export type GapContext = typeof GAP_CONTEXT_VALUES[number];
  * ========================================================= */
 
 export interface Step1ContextSnapshot {
-  /* Identity */
+  /* ==============================
+   * Identity
+   * ============================== */
   tradeDate: TradeDate;
 
   /* ==============================
-   * SYSTEM MARKET DATA
+   * SYSTEM MARKET DATA (RAW)
+   * Editable ONLY when backend mode = MANUAL
    * ============================== */
   yesterdayClose?: number;
   yesterdayHigh?: number;
   yesterdayLow?: number;
   day2High?: number;
   day2Low?: number;
+
+  /**
+   * Last 5 completed trading-day ranges.
+   * Order: most recent → oldest
+   * Backend derived when automation exists,
+   * otherwise provided manually in MANUAL mode.
+   */
+  last5DayRanges?: number[];
 
   /* ==============================
    * PRE-OPEN
@@ -112,6 +124,24 @@ export function debugStep1Snapshot(
   snapshot: Step1ContextSnapshot | null
 ) {
   console.log(`[DEBUG][STEP-1][SNAPSHOT] ${label}`, {
-    snapshot,
+    tradeDate: snapshot?.tradeDate,
+    modeSensitiveFields: {
+      yesterdayClose: snapshot?.yesterdayClose,
+      yesterdayHigh: snapshot?.yesterdayHigh,
+      yesterdayLow: snapshot?.yesterdayLow,
+      day2High: snapshot?.day2High,
+      day2Low: snapshot?.day2Low,
+      last5DayRanges: snapshot?.last5DayRanges,
+    },
+    derived: {
+      gapPct: snapshot?.gapPct,
+      gapClass: snapshot?.gapClass,
+      rangeRatio: snapshot?.rangeRatio,
+      rangeSize: snapshot?.rangeSize,
+      overlapType: snapshot?.overlapType,
+      db2State: snapshot?.db2State,
+    },
+    frozenAt: snapshot?.frozenAt,
   });
 }
+

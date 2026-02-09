@@ -22,16 +22,20 @@ type SystemMarketData = {
   day2High?: number;
   day2Low?: number;
   preOpenPrice?: number;
+  last5DayRanges?: number[];
 };
 
 export default function Step1Context({ tradeDate }: Step1ContextProps) {
   const {
     snapshot,
     mode,
+    derivedContext,
+    suggestedMarketContext,
     isFrozen,
     loading,
     error,
     previewStep1,
+    computeStep1,
     freezeStep1,
   } = useStep1(tradeDate);
 
@@ -41,7 +45,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
     useState<GapContext>("UNKNOWN");
   const [notes, setNotes] = useState("");
 
-  // 🔒 System Market Data (captured in MANUAL mode)
   const [systemData, setSystemData] =
     useState<SystemMarketData>({});
 
@@ -49,43 +52,48 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
     previewStep1();
   }, [previewStep1]);
 
-  // Sync snapshot → local system data (AUTO or first MANUAL load)
   useEffect(() => {
-    if (snapshot) {
-      const next = {
-        yesterdayClose: snapshot.yesterdayClose,
-        yesterdayHigh: snapshot.yesterdayHigh,
-        yesterdayLow: snapshot.yesterdayLow,
-        day2High: snapshot.day2High,
-        day2Low: snapshot.day2Low,
-        preOpenPrice: snapshot.preOpenPrice,
-      };
+    if (!snapshot) return;
 
-      console.log("[DEBUG][STEP-1][SYSTEM-DATA] sync from snapshot", next);
-      setSystemData(next);
-    }
+    setSystemData({
+      yesterdayClose: snapshot.yesterdayClose,
+      yesterdayHigh: snapshot.yesterdayHigh,
+      yesterdayLow: snapshot.yesterdayLow,
+      day2High: snapshot.day2High,
+      day2Low: snapshot.day2Low,
+      last5DayRanges: snapshot.last5DayRanges ?? [],
+    });
   }, [snapshot]);
 
-  const handleFreeze = () => {
-    console.log("[DEBUG][STEP-1][FREEZE][UI] submitting", {
-      marketBias,
-      gapContext,
-      notes,
-      systemData,
-    });
+  useEffect(() => {
+    if (suggestedMarketContext) {
+      setMarketBias(suggestedMarketContext);
+    }
+  }, [suggestedMarketContext]);
 
+  useEffect(() => {
+    if (derivedContext?.gap_context) {
+      setGapContext(derivedContext.gap_context as GapContext);
+    }
+  }, [derivedContext]);
+
+  const handleCompute = () => {
+    computeStep1({
+      yesterdayClose: systemData.yesterdayClose!,
+      yesterdayHigh: systemData.yesterdayHigh!,
+      yesterdayLow: systemData.yesterdayLow!,
+      day2High: systemData.day2High!,
+      day2Low: systemData.day2Low!,
+      last5DayRanges: systemData.last5DayRanges!,
+      preOpenPrice: systemData.preOpenPrice!,
+    });
+  };
+
+  const handleFreeze = () => {
     freezeStep1({
       marketBias,
       gapContext,
       premarketNotes: notes,
-      preOpenPrice: systemData.preOpenPrice,
-      systemMarketData: {
-        yesterdayClose: systemData.yesterdayClose,
-        yesterdayHigh: systemData.yesterdayHigh,
-        yesterdayLow: systemData.yesterdayLow,
-        day2High: systemData.day2High,
-        day2Low: systemData.day2Low,
-      },
     });
   };
 
@@ -104,57 +112,39 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         <span className="font-medium">{tradeDate}</span>
       </div>
 
-      {/* ===================================================== */}
-      {/* 1️⃣ SYSTEM MARKET DATA — EDITABLE IN MANUAL */}
-      {/* ===================================================== */}
+      {/* 1️⃣ SYSTEM MARKET DATA */}
       <Section title="System Market Data">
         <Grid>
-          <Field
-            label="Yesterday Close"
-            value={systemData.yesterdayClose}
-            editable={mode === "MANUAL"}
-            onBlur={(v) =>
-              setSystemData((s) => ({ ...s, yesterdayClose: v }))
-            }
-          />
-          <Field
-            label="Yesterday High"
-            value={systemData.yesterdayHigh}
-            editable={mode === "MANUAL"}
-            onBlur={(v) =>
-              setSystemData((s) => ({ ...s, yesterdayHigh: v }))
-            }
-          />
-          <Field
-            label="Yesterday Low"
-            value={systemData.yesterdayLow}
-            editable={mode === "MANUAL"}
-            onBlur={(v) =>
-              setSystemData((s) => ({ ...s, yesterdayLow: v }))
-            }
-          />
-          <Field
-            label="Day-2 High"
-            value={systemData.day2High}
-            editable={mode === "MANUAL"}
-            onBlur={(v) =>
-              setSystemData((s) => ({ ...s, day2High: v }))
-            }
-          />
-          <Field
-            label="Day-2 Low"
-            value={systemData.day2Low}
-            editable={mode === "MANUAL"}
-            onBlur={(v) =>
-              setSystemData((s) => ({ ...s, day2Low: v }))
-            }
-          />
+          <Field label="Yesterday Close" value={systemData.yesterdayClose} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, yesterdayClose: v }))} />
+          <Field label="Yesterday High" value={systemData.yesterdayHigh} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, yesterdayHigh: v }))} />
+          <Field label="Yesterday Low" value={systemData.yesterdayLow} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, yesterdayLow: v }))} />
+          <Field label="Day-2 High" value={systemData.day2High} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, day2High: v }))} />
+          <Field label="Day-2 Low" value={systemData.day2Low} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, day2Low: v }))} />
         </Grid>
+
+        <div className="mt-4">
+          <label className="text-xs font-semibold">Last 5-Day Ranges</label>
+          {mode === "MANUAL" ? (
+            <input
+              defaultValue={systemData.last5DayRanges?.join(", ") ?? ""}
+              onBlur={(e) =>
+                setSystemData((s) => ({
+                  ...s,
+                  last5DayRanges: e.target.value
+                    .split(",")
+                    .map((v) => Number(v.trim()))
+                    .filter((v) => !Number.isNaN(v)),
+                }))
+              }
+              className="mt-1 w-full rounded border px-2 py-1"
+            />
+          ) : (
+            <Readonly value={systemData.last5DayRanges?.join(", ")} />
+          )}
+        </div>
       </Section>
 
-      {/* ===================================================== */}
       {/* 2️⃣ PRE-OPEN INPUT */}
-      {/* ===================================================== */}
       <Section title="Pre-Open Input">
         <Field
           label="Pre-Open Price"
@@ -166,72 +156,55 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         />
       </Section>
 
-      {/* ===================================================== */}
-      {/* 3️⃣ DERIVED CONTEXT (READ-ONLY) */}
-      {/* ===================================================== */}
-      <Section title="Derived Context (System)">
-        <Grid>
-          <Readonly label="Gap %" value={snapshot?.gapPct} />
-          <Readonly label="Gap Class" value={snapshot?.gapClass} />
-          <Readonly label="Range Ratio" value={snapshot?.rangeRatio} />
-          <Readonly label="Range Size" value={snapshot?.rangeSize} />
-          <Readonly label="Overlap Type" value={snapshot?.overlapType} />
-          <Readonly label="DB2 State" value={snapshot?.db2State} />
-        </Grid>
-      </Section>
+      {/* COMPUTE CTA */}
+      {mode === "MANUAL" && !derivedContext && (
+        <button
+          onClick={handleCompute}
+          className="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
+        >
+          Compute Market Context
+        </button>
+      )}
 
-      {/* ===================================================== */}
-      {/* 4️⃣ FINAL MARKET CONTEXT */}
-      {/* ===================================================== */}
-      <Section title="STEP-1 Final Market Context">
-        {mode === "AUTO" && snapshot ? (
+      {/* 3️⃣ DERIVED CONTEXT */}
+      <Section title="Derived Context (System)">
+        {derivedContext ? (
           <Grid>
-            <Readonly label="Market Bias" value={snapshot.marketBias} />
-            <Readonly label="Gap Context" value={snapshot.gapContext} />
-            <Readonly
-              label="Pre-Market Notes"
-              value={snapshot.premarketNotes}
-            />
+            {Object.entries(derivedContext).map(([k, v]) => (
+              <Readonly key={k} label={k} value={v} />
+            ))}
           </Grid>
         ) : (
-          !isFrozen && (
-            <Grid>
-              <Select
-                label="Market Bias"
-                value={marketBias}
-                onChange={setMarketBias}
-                options={MARKET_BIAS_VALUES}
-              />
-              <Select
-                label="Gap Context"
-                value={gapContext}
-                onChange={setGapContext}
-                options={GAP_CONTEXT_VALUES}
-              />
-              <TextArea
-                label="Pre-Market Notes"
-                value={notes}
-                onChange={setNotes}
-              />
-            </Grid>
-          )
+          <div className="text-sm text-gray-400">
+            Not computed yet
+          </div>
         )}
       </Section>
 
-      {/* ===================================================== */}
-      {/* ACTIONS */}
-      {/* ===================================================== */}
-      {!isFrozen ? (
+      {/* 4️⃣ FINAL MARKET CONTEXT */}
+      <Section title="STEP-1 Final Market Context">
+        {!isFrozen ? (
+          <Grid>
+            <Select label="Market Bias" value={marketBias} onChange={setMarketBias} options={MARKET_BIAS_VALUES} />
+            <Select label="Gap Context" value={gapContext} onChange={setGapContext} options={GAP_CONTEXT_VALUES} />
+            <TextArea label="Pre-Market Notes" value={notes} onChange={setNotes} />
+          </Grid>
+        ) : (
+          <Grid>
+            <Readonly label="Market Bias" value={snapshot?.marketBias} />
+            <Readonly label="Gap Context" value={snapshot?.gapContext} />
+            <Readonly label="Notes" value={snapshot?.premarketNotes} />
+          </Grid>
+        )}
+      </Section>
+
+      {!isFrozen && (
         <button
           onClick={handleFreeze}
           className="rounded bg-blue-600 px-4 py-2 text-sm text-white"
         >
           Freeze STEP-1 Context
         </button>
-      ) : (
-        <div className="rounded border border-green-300 bg-green-50 p-4 text-sm text-green-700">
-          STEP-1 frozen at {snapshot?.frozenAt}
-        </div>
       )}
 
       {error && (
@@ -243,17 +216,9 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
   );
 }
 
-/* ===================================================== */
-/* SHARED UI HELPERS                                     */
-/* ===================================================== */
+/* UI HELPERS */
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded border p-4">
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
@@ -270,59 +235,31 @@ function Grid({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Editable → uncontrolled + onBlur capture
- * Read-only → controlled
- */
-function Field({
-  label,
-  value,
-  editable = false,
-  onBlur,
-}: {
-  label: string;
-  value: any;
-  editable?: boolean;
-  onBlur?: (v: number | undefined) => void;
-}) {
+function Field({ label, value, editable = false, onBlur }: { label: string; value: any; editable?: boolean; onBlur?: (v: number | undefined) => void }) {
   return (
     <div>
       <label className="text-xs font-semibold">{label}</label>
-
       {editable ? (
         <input
           defaultValue={value ?? ""}
-          onBlur={(e) => {
-            const v =
-              e.target.value === ""
-                ? undefined
-                : Number(e.target.value);
-            console.log("[DEBUG][FIELD][BLUR]", label, v);
-            onBlur?.(v);
-          }}
+          onBlur={(e) =>
+            onBlur?.(
+              e.target.value === "" ? undefined : Number(e.target.value)
+            )
+          }
           className="mt-1 w-full rounded border px-2 py-1"
         />
       ) : (
-        <input
-          value={value ?? ""}
-          readOnly
-          className="mt-1 w-full rounded border bg-gray-100 px-2 py-1"
-        />
+        <Readonly value={value} />
       )}
     </div>
   );
 }
 
-function Readonly({
-  label,
-  value,
-}: {
-  label: string;
-  value: any;
-}) {
+function Readonly({ label, value }: { label?: string; value: any }) {
   return (
     <div>
-      <label className="text-xs font-semibold">{label}</label>
+      {label && <label className="text-xs font-semibold">{label}</label>}
       <div className="mt-1 rounded border bg-gray-100 px-2 py-1 text-sm">
         {value ?? "--"}
       </div>

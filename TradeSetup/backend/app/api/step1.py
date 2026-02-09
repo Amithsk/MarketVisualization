@@ -1,19 +1,24 @@
-# backend/app/api/step1.py
-
+#backend/app/api/step1.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import logging
 
 from backend.app.db.session import get_db
 from backend.app.schemas.step1_schema import (
     Step1PreviewRequest,
     Step1FreezeRequest,
+    Step1ComputeRequest,
     Step1PreviewResponse,
     Step1FrozenResponse,
+    Step1ComputeResponse,
 )
 from backend.app.services.step1_service import (
     preview_step1_context,
     freeze_step1_context,
+    compute_step1_context,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/step1",
@@ -31,23 +36,61 @@ def preview_step1(
     db: Session = Depends(get_db),
 ):
     """
-    Preview STEP-1 pre-market context (read-only).
+    STEP-1 Preview — Pre-Market Context
 
-    Contract:
-    - MUST NOT error if data is missing
-    - MUST return mode = AUTO or MANUAL
-    - Safe to call multiple times
+    LOCKED CONTRACT:
+    - Preview NEVER errors due to missing data
+    - Backend explicitly decides AUTO vs MANUAL
+    - Backend response is authoritative and immutable
     """
     try:
         return preview_step1_context(
             db=db,
             trade_date=request.trade_date,
         )
+
     except Exception:
-        # Only true infrastructure / unexpected failures reach here
+        logger.exception(
+            "[STEP-1][API][PREVIEW] unhandled exception"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate STEP-1 preview",
+        )
+
+
+@router.post(
+    "/compute",
+    response_model=Step1ComputeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def compute_step1(
+    request: Step1ComputeRequest,
+):
+    """
+    STEP-1 Compute — MANUAL MODE ONLY
+
+    - Accepts raw market inputs
+    - Computes system-derived context
+    - Suggests final market context
+    - DOES NOT persist anything
+    """
+    try:
+        return compute_step1_context(request)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+
+    except Exception:
+        logger.exception(
+            "[STEP-1][API][COMPUTE] unhandled exception"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compute STEP-1 context",
         )
 
 
@@ -61,25 +104,27 @@ def freeze_step1(
     db: Session = Depends(get_db),
 ):
     """
-    Freeze STEP-1 context (irreversible).
-
-    Once frozen, the context cannot be modified.
+    STEP-1 Freeze — Irreversible
     """
     try:
         return freeze_step1_context(
             db=db,
             trade_date=request.trade_date,
             market_bias=request.market_bias,
+            gap_context=request.gap_context,
             premarket_notes=request.premarket_notes,
         )
+
     except ValueError as e:
-        # Domain conflict (already frozen, invalid transition)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
+
     except Exception:
-        # Infrastructure / unexpected error
+        logger.exception(
+            "[STEP-1][API][FREEZE] unhandled exception"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to freeze STEP-1 context",

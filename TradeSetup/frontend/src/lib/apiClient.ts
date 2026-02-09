@@ -1,3 +1,4 @@
+//frontend/src/lib/apiClient.ts
 import axios, { AxiosError, AxiosInstance } from "axios";
 import type { ApiError } from "@/types/common.types";
 
@@ -14,6 +15,11 @@ const apiClient: AxiosInstance = axios.create({
 
 /**
  * Response interceptor
+ *
+ * IMPORTANT:
+ * - Never replace the thrown error
+ * - Always throw a real Error / AxiosError
+ * - Attach normalized data instead of discarding context
  */
 apiClient.interceptors.response.use(
   (response) => response,
@@ -28,7 +34,18 @@ apiClient.interceptors.response.use(
       raw: error.response?.data,
     };
 
-    return Promise.reject(normalizedError);
+    // 🔒 Preserve the original AxiosError
+    (error as any).normalized = normalizedError;
+
+    // Optional but very useful for debugging
+    console.error("[API][AXIOS][ERROR]", {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: normalizedError.status,
+      message: normalizedError.message,
+    });
+
+    return Promise.reject(error);
   }
 );
 
