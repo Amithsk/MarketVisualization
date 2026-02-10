@@ -1,6 +1,5 @@
-#backend/app/services/step1_service.py
 import logging
-from datetime import date, datetime
+from datetime import date
 from statistics import mean
 from sqlalchemy.orm import Session
 
@@ -17,18 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------
-# Public service methods
+# STEP-1 PREVIEW
 # -------------------------------------------------
 
 def preview_step1_context(
     db: Session,
     trade_date: date,
 ) -> Step1PreviewResponse:
-    """
-    STEP-1 PREVIEW
-    """
-
-    logger.info("[STEP-1][PREVIEW] start trade_date=%s", trade_date)
 
     existing = (
         db.query(Step1MarketContext)
@@ -36,19 +30,12 @@ def preview_step1_context(
         .first()
     )
 
-    if existing and existing.frozen_at:
-        logger.info("[STEP-1][PREVIEW] mode=AUTO")
-
+    if existing:
         snapshot = Step1ContextSnapshot(
             trade_date=existing.trade_date,
-            yesterday_close=existing.yesterday_close,
-            yesterday_high=existing.yesterday_high,
-            yesterday_low=existing.yesterday_low,
-            last_5_day_ranges=existing.last_5_day_ranges or [],
-            market_bias=existing.market_bias,
-            gap_context=existing.gap_context,
-            premarket_notes=existing.premarket_notes,
-            frozen_at=existing.frozen_at,
+            market_bias=existing.final_market_context,
+            premarket_notes=existing.final_reason,
+            frozen_at=existing.created_at,
         )
 
         return Step1PreviewResponse(
@@ -57,11 +44,8 @@ def preview_step1_context(
             can_freeze=False,
         )
 
-    logger.info("[STEP-1][PREVIEW] mode=MANUAL")
-
     snapshot = Step1ContextSnapshot(
         trade_date=trade_date,
-        last_5_day_ranges=[],
         frozen_at=None,
     )
 
@@ -72,12 +56,13 @@ def preview_step1_context(
     )
 
 
+# -------------------------------------------------
+# STEP-1 COMPUTE (NO PERSISTENCE)
+# -------------------------------------------------
+
 def compute_step1_context(
     request: Step1ComputeRequest,
 ) -> Step1ComputeResponse:
-    """
-    STEP-1 COMPUTE (MANUAL MODE)
-    """
 
     yc = request.yesterday_close
     yh = request.yesterday_high
@@ -90,17 +75,11 @@ def compute_step1_context(
     if yc <= 0:
         raise ValueError("Yesterday close must be > 0")
 
-    if not ranges_5d or len(ranges_5d) < 3:
+    if len(ranges_5d) < 3:
         raise ValueError("At least 3 recent daily ranges required")
 
-    # -------------------------
-    # GAP %
-    # -------------------------
     gap_pct = ((preopen - yc) / yc) * 100
 
-    # -------------------------
-    # GAP CLASS
-    # -------------------------
     abs_gap = abs(gap_pct)
     if abs_gap < 0.30:
         gap_class = "RANGE"
@@ -109,29 +88,12 @@ def compute_step1_context(
     elif abs_gap < 1.0:
         gap_class = "STRONG"
     else:
-        gap_class = "EVENT"
+        gap_class = "EVENT_CAUTION"
 
-    # -------------------------
-    # GAP CONTEXT (DIRECTIONAL)
-    # -------------------------
-    if gap_pct > 0.05:
-        gap_context = "GAP_UP"
-    elif gap_pct < -0.05:
-        gap_context = "GAP_DOWN"
-    else:
-        gap_context = "FLAT"
-
-    # -------------------------
-    # RANGE RATIO
-    # -------------------------
     yesterday_range = yh - yl
     avg_5d_range = mean(ranges_5d)
 
-    range_ratio = (
-        yesterday_range / avg_5d_range
-        if avg_5d_range > 0
-        else 0
-    )
+    range_ratio = yesterday_range / avg_5d_range
 
     if range_ratio < 0.8:
         range_size = "SMALL"
@@ -142,43 +104,35 @@ def compute_step1_context(
     else:
         range_size = "EXTREME"
 
-    # -------------------------
-    # OVERLAP TYPE
-    # -------------------------
     if yh <= d2h and yl >= d2l:
-        overlap_type = "FULL"
+        overlap_type = "FULL_OVERLAP"
     elif yh > d2h or yl < d2l:
-        overlap_type = "NO"
+        overlap_type = "NO_OVERLAP"
     else:
-        overlap_type = "PARTIAL"
+        overlap_type = "PARTIAL_OVERLAP"
 
-    # -------------------------
-    # DB2 STATE
-    # -------------------------
     if range_size == "EXTREME":
         db2_state = "NO_TRADE"
-    elif range_size == "SMALL" and overlap_type == "FULL":
+    elif range_size == "SMALL" and overlap_type == "FULL_OVERLAP":
         db2_state = "RANGE"
-    elif range_size == "LARGE" and overlap_type == "NO":
+    elif range_size == "LARGE" and overlap_type == "NO_OVERLAP":
         db2_state = "TREND_BIASED"
     else:
         db2_state = "UNCERTAIN"
 
-    # -------------------------
-    # SUGGESTED MARKET CONTEXT
-    # -------------------------
-    if db2_state == "TREND_BIASED":
-        suggested_context = "TREND_DAY"
-    elif db2_state == "NO_TRADE":
-        suggested_context = "NO_TRADE_DAY"
-    else:
-        suggested_context = "RANGE_UNCERTAIN_DAY"
+    suggested_context = (
+        "TREND_DAY"
+        if db2_state == "TREND_BIASED"
+        else "NO_TRADE_DAY"
+        if db2_state == "NO_TRADE"
+        else "RANGE_UNCERTAIN_DAY"
+    )
 
     return Step1ComputeResponse(
         derived_context={
             "gap_pct": round(gap_pct, 2),
             "gap_class": gap_class,
-            "gap_context": gap_context,
+            "gap_context": "GAP_UP" if gap_pct > 0.05 else "GAP_DOWN" if gap_pct < -0.05 else "FLAT",
             "range_ratio": round(range_ratio, 2),
             "range_size": range_size,
             "overlap_type": overlap_type,
@@ -188,54 +142,47 @@ def compute_step1_context(
     )
 
 
+# -------------------------------------------------
+# STEP-1 FREEZE (MAP TO EXISTING DB TABLE)
+# -------------------------------------------------
+
 def freeze_step1_context(
     db: Session,
     trade_date: date,
+    preopen_price: float,
+    derived_context: dict,
     market_bias: str,
-    gap_context: str,
+    gap_context: str,          # informational, NOT persisted
     premarket_notes: str | None,
 ) -> Step1FrozenResponse:
-    """
-    STEP-1 FREEZE
-    """
 
-    logger.info("[STEP-1][FREEZE] start trade_date=%s", trade_date)
-
-    existing = (
-        db.query(Step1MarketContext)
-        .filter(Step1MarketContext.trade_date == trade_date)
-        .first()
-    )
-
-    now = datetime.utcnow()
-
-    if existing and existing.frozen_at:
+    if db.query(Step1MarketContext).filter_by(trade_date=trade_date).first():
         raise ValueError("STEP-1 is already frozen")
 
-    if existing:
-        context = existing
-    else:
-        context = Step1MarketContext(trade_date=trade_date)
-        db.add(context)
+    context = Step1MarketContext(
+        trade_date=trade_date,
+        preopen_price=preopen_price,
+        gap_pct=derived_context["gap_pct"],
+        gap_class=derived_context["gap_class"],
+        prior_range_size=derived_context["range_size"],
+        prior_day_overlap=derived_context["overlap_type"],
+        prior_structure_state=derived_context["db2_state"],
+        final_market_context=market_bias.strip().upper(),
+        final_reason=(
+            premarket_notes
+            or f"System gap={derived_context['gap_context']}, structure={derived_context['db2_state']}"
+        ),
+    )
 
-    context.market_bias = market_bias.strip().upper()
-    context.gap_context = gap_context.strip().upper()
-    context.premarket_notes = premarket_notes
-    context.frozen_at = now
-
+    db.add(context)
     db.commit()
     db.refresh(context)
 
     snapshot = Step1ContextSnapshot(
         trade_date=context.trade_date,
-        yesterday_close=context.yesterday_close,
-        yesterday_high=context.yesterday_high,
-        yesterday_low=context.yesterday_low,
-        last_5_day_ranges=context.last_5_day_ranges or [],
-        market_bias=context.market_bias,
-        gap_context=context.gap_context,
-        premarket_notes=context.premarket_notes,
-        frozen_at=context.frozen_at,
+        market_bias=context.final_market_context,
+        premarket_notes=context.final_reason,
+        frozen_at=context.created_at,
     )
 
     return Step1FrozenResponse(snapshot=snapshot)

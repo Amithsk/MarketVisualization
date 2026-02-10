@@ -78,22 +78,65 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
   }, [derivedContext]);
 
   const handleCompute = () => {
+    if (
+      systemData.yesterdayClose == null ||
+      systemData.yesterdayHigh == null ||
+      systemData.yesterdayLow == null ||
+      systemData.day2High == null ||
+      systemData.day2Low == null ||
+      systemData.preOpenPrice == null ||
+      !systemData.last5DayRanges ||
+      systemData.last5DayRanges.length < 3
+    ) {
+      console.error(
+        "[STEP-1][UI][COMPUTE] Missing required inputs",
+        systemData
+      );
+      return;
+    }
+
     computeStep1({
-      yesterdayClose: systemData.yesterdayClose!,
-      yesterdayHigh: systemData.yesterdayHigh!,
-      yesterdayLow: systemData.yesterdayLow!,
-      day2High: systemData.day2High!,
-      day2Low: systemData.day2Low!,
-      last5DayRanges: systemData.last5DayRanges!,
-      preOpenPrice: systemData.preOpenPrice!,
+      yesterdayClose: systemData.yesterdayClose,
+      yesterdayHigh: systemData.yesterdayHigh,
+      yesterdayLow: systemData.yesterdayLow,
+      day2High: systemData.day2High,
+      day2Low: systemData.day2Low,
+      last5DayRanges: systemData.last5DayRanges,
+      preOpenPrice: systemData.preOpenPrice,
     });
   };
 
   const handleFreeze = () => {
+    if (
+      systemData.yesterdayClose == null ||
+      systemData.yesterdayHigh == null ||
+      systemData.yesterdayLow == null ||
+      systemData.day2High == null ||
+      systemData.day2Low == null ||
+      systemData.preOpenPrice == null ||
+      !systemData.last5DayRanges ||
+      systemData.last5DayRanges.length < 3
+    ) {
+      console.error(
+        "[STEP-1][UI][FREEZE] Missing required system market data",
+        systemData
+      );
+      return;
+    }
+
     freezeStep1({
       marketBias,
       gapContext,
       premarketNotes: notes,
+      systemMarketData: {
+        yesterdayClose: systemData.yesterdayClose,
+        yesterdayHigh: systemData.yesterdayHigh,
+        yesterdayLow: systemData.yesterdayLow,
+        day2High: systemData.day2High,
+        day2Low: systemData.day2Low,
+        preOpenPrice: systemData.preOpenPrice,
+        last5DayRanges: systemData.last5DayRanges,
+      },
     });
   };
 
@@ -112,7 +155,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         <span className="font-medium">{tradeDate}</span>
       </div>
 
-      {/* 1️⃣ SYSTEM MARKET DATA */}
       <Section title="System Market Data">
         <Grid>
           <Field label="Yesterday Close" value={systemData.yesterdayClose} editable={mode === "MANUAL"} onBlur={(v) => setSystemData((s) => ({ ...s, yesterdayClose: v }))} />
@@ -144,7 +186,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         </div>
       </Section>
 
-      {/* 2️⃣ PRE-OPEN INPUT */}
       <Section title="Pre-Open Input">
         <Field
           label="Pre-Open Price"
@@ -156,7 +197,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         />
       </Section>
 
-      {/* COMPUTE CTA */}
       {mode === "MANUAL" && !derivedContext && (
         <button
           onClick={handleCompute}
@@ -166,7 +206,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         </button>
       )}
 
-      {/* 3️⃣ DERIVED CONTEXT */}
       <Section title="Derived Context (System)">
         {derivedContext ? (
           <Grid>
@@ -181,7 +220,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         )}
       </Section>
 
-      {/* 4️⃣ FINAL MARKET CONTEXT */}
       <Section title="STEP-1 Final Market Context">
         {!isFrozen ? (
           <Grid>
@@ -192,7 +230,6 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         ) : (
           <Grid>
             <Readonly label="Market Bias" value={snapshot?.marketBias} />
-            <Readonly label="Gap Context" value={snapshot?.gapContext} />
             <Readonly label="Notes" value={snapshot?.premarketNotes} />
           </Grid>
         )}
@@ -207,7 +244,7 @@ export default function Step1Context({ tradeDate }: Step1ContextProps) {
         </button>
       )}
 
-      {error && (
+      {!!error && (
         <div className="text-xs text-gray-400">
           Backend unavailable — manual mode enabled
         </div>

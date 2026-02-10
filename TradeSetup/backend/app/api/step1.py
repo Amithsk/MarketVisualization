@@ -37,11 +37,6 @@ def preview_step1(
 ):
     """
     STEP-1 Preview — Pre-Market Context
-
-    LOCKED CONTRACT:
-    - Preview NEVER errors due to missing data
-    - Backend explicitly decides AUTO vs MANUAL
-    - Backend response is authoritative and immutable
     """
     try:
         return preview_step1_context(
@@ -69,11 +64,6 @@ def compute_step1(
 ):
     """
     STEP-1 Compute — MANUAL MODE ONLY
-
-    - Accepts raw market inputs
-    - Computes system-derived context
-    - Suggests final market context
-    - DOES NOT persist anything
     """
     try:
         return compute_step1_context(request)
@@ -105,11 +95,14 @@ def freeze_step1(
 ):
     """
     STEP-1 Freeze — Irreversible
+    AUTHORITATIVE SNAPSHOT
     """
     try:
         return freeze_step1_context(
             db=db,
             trade_date=request.trade_date,
+            preopen_price=request.preopen_price,
+            derived_context=request.derived_context,
             market_bias=request.market_bias,
             gap_context=request.gap_context,
             premarket_notes=request.premarket_notes,

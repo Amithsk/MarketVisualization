@@ -17,6 +17,10 @@ import {
 
 export type Step1Mode = "AUTO" | "MANUAL";
 
+/**
+ * STRICT system payload
+ * This MUST be complete before freeze
+ */
 type SystemMarketData = {
   yesterdayClose: number;
   yesterdayHigh: number;
@@ -38,7 +42,7 @@ export function useStep1(tradeDate: TradeDate) {
   const [suggestedMarketContext, setSuggestedMarketContext] =
     useState<MarketBias | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<unknown>(null);
 
   console.log("[DEBUG][STEP-1][HOOK][RENDER]", {
     tradeDate,
@@ -50,9 +54,9 @@ export function useStep1(tradeDate: TradeDate) {
     loading,
   });
 
-  /**
+  /* -------------------------------------------------
    * STEP-1 PREVIEW
-   */
+   * ------------------------------------------------- */
   const previewStep1 = useCallback(async () => {
     console.log("[DEBUG][STEP-1][PREVIEW][HOOK] start", {
       tradeDate,
@@ -65,27 +69,19 @@ export function useStep1(tradeDate: TradeDate) {
       const response: Step1PreviewResponse =
         await fetchStep1Preview(tradeDate);
 
-      console.log("[DEBUG][STEP-1][PREVIEW][HOOK] response", {
-        mode: response.mode,
-        snapshot: response.snapshot,
-      });
+      console.log("[DEBUG][STEP-1][PREVIEW][HOOK] response", response);
 
       setSnapshot(response.snapshot);
       setMode(response.mode);
 
+      // Reset derived state on preview
       setDerivedContext(null);
       setSuggestedMarketContext(null);
-
-      console.log("[DEBUG][STEP-1][PREVIEW][HOOK] state updated", {
-        mode: response.mode,
-        frozenAt: response.snapshot?.frozenAt,
-      });
     } catch (err) {
       console.error(
         "[DEBUG][STEP-1][PREVIEW][HOOK] failed → MANUAL fallback",
         err
       );
-
       setSnapshot(null);
       setMode("MANUAL");
       setError(err);
@@ -95,9 +91,9 @@ export function useStep1(tradeDate: TradeDate) {
     }
   }, [tradeDate]);
 
-  /**
+  /* -------------------------------------------------
    * STEP-1 COMPUTE (MANUAL MODE ONLY)
-   */
+   * ------------------------------------------------- */
   const computeStep1 = useCallback(
     async (systemMarketData: SystemMarketData) => {
       console.log("[DEBUG][STEP-1][COMPUTE][HOOK] start", {
@@ -114,24 +110,19 @@ export function useStep1(tradeDate: TradeDate) {
           yesterdayLow: systemMarketData.yesterdayLow,
           day2High: systemMarketData.day2High,
           day2Low: systemMarketData.day2Low,
-          last5DayRanges:
-            systemMarketData.last5DayRanges,
-          preOpenPrice:
-            systemMarketData.preOpenPrice,
+          last5DayRanges: systemMarketData.last5DayRanges,
+          preOpenPrice: systemMarketData.preOpenPrice,
         });
 
-        console.log("[DEBUG][STEP-1][COMPUTE][HOOK] response", response);
+        console.log(
+          "[DEBUG][STEP-1][COMPUTE][HOOK] response",
+          response
+        );
 
         setDerivedContext(response.derivedContext);
         setSuggestedMarketContext(
           response.suggestedMarketContext as MarketBias
         );
-
-        console.log("[DEBUG][STEP-1][COMPUTE][HOOK] state updated", {
-          derivedContext: response.derivedContext,
-          suggestedMarketContext:
-            response.suggestedMarketContext,
-        });
       } catch (err) {
         console.error(
           "[DEBUG][STEP-1][COMPUTE][HOOK] failed",
@@ -146,20 +137,28 @@ export function useStep1(tradeDate: TradeDate) {
     []
   );
 
-  /**
-   * STEP-1 FREEZE
-   */
+  /* -------------------------------------------------
+   * STEP-1 FREEZE (AUTHORITATIVE SNAPSHOT)
+   * ------------------------------------------------- */
   const freezeStep1 = useCallback(
     async (params: {
       marketBias: MarketBias;
-      gapContext?: string;
+      gapContext: string;
       premarketNotes?: string;
+      systemMarketData: SystemMarketData;
     }) => {
       console.log("[DEBUG][STEP-1][FREEZE][HOOK] start", {
         tradeDate,
         params,
         derivedContext,
       });
+
+      if (!derivedContext) {
+        console.error(
+          "[STEP-1][FREEZE][HOOK] blocked — derivedContext missing"
+        );
+        return;
+      }
 
       setLoading(true);
       setError(null);
@@ -171,22 +170,22 @@ export function useStep1(tradeDate: TradeDate) {
             marketBias: params.marketBias,
             gapContext: params.gapContext,
             preMarketNotes: params.premarketNotes,
+            preOpenPrice:
+              params.systemMarketData.preOpenPrice,
+            derivedContext,
           });
 
-        console.log("[DEBUG][STEP-1][FREEZE][HOOK] response", response);
+        console.log(
+          "[DEBUG][STEP-1][FREEZE][HOOK] response",
+          response
+        );
 
         setSnapshot(response.snapshot);
         setMode("AUTO");
 
+        // Clear transient state after freeze
         setDerivedContext(null);
         setSuggestedMarketContext(null);
-
-        console.log(
-          "[DEBUG][STEP-1][FREEZE][HOOK] state updated → AUTO",
-          {
-            frozenAt: response.snapshot.frozenAt,
-          }
-        );
       } catch (err) {
         console.error(
           "[DEBUG][STEP-1][FREEZE][HOOK] failed",

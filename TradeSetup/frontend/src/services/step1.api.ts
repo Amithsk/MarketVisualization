@@ -46,9 +46,6 @@ export async function fetchStep1Preview(
 
     console.log("[DEBUG][API][STEP-1][PREVIEW] success", {
       mode: response.data.mode,
-      hasSnapshot: !!response.data.snapshot,
-      last5DayRanges:
-        response.data.snapshot?.last5DayRanges,
     });
 
     return response.data;
@@ -62,7 +59,6 @@ export async function fetchStep1Preview(
 
 /**
  * Compute STEP-1 derived context (MANUAL mode only).
- * 🔑 snake_case → camelCase mapping happens HERE
  */
 export async function computeStep1Context(
   payload: Step1ComputePayload
@@ -83,11 +79,6 @@ export async function computeStep1Context(
     const response = await apiClient.post(
       "/step1/compute",
       requestBody
-    );
-
-    console.log(
-      "[DEBUG][API][STEP-1][COMPUTE] raw response",
-      response.data
     );
 
     const mapped: Step1ComputeResponse = {
@@ -111,24 +102,27 @@ export async function computeStep1Context(
 }
 
 /**
- * Freeze STEP-1 context.
+ * Freeze STEP-1 context (AUTHORITATIVE SNAPSHOT)
  */
 export async function freezeStep1Context(params: {
   tradeDate: TradeDate;
   marketBias: MarketBias;
-  gapContext?: string;
+  gapContext: string;
   preMarketNotes?: string;
+  preOpenPrice: number;
+  derivedContext: Record<string, number | string>;
 }): Promise<Step1FrozenResponse> {
   const payload = {
     trade_date: params.tradeDate,
     market_bias: params.marketBias,
-    gap_context: params.gapContext ?? null,
+    gap_context: params.gapContext,
     premarket_notes: params.preMarketNotes ?? null,
+
+    preopen_price: params.preOpenPrice,
+    derived_context: params.derivedContext,
   };
 
-  console.log("[DEBUG][API][STEP-1][FREEZE] start", {
-    trade_date: payload.trade_date,
-  });
+  console.log("[DEBUG][API][STEP-1][FREEZE] start", payload);
 
   try {
     const response = await apiClient.post<Step1FrozenResponse>(

@@ -1,3 +1,4 @@
+#backend/app/schemas/step1_schema.py
 import logging
 from datetime import date, datetime
 from typing import Optional, Literal, List, Dict
@@ -59,20 +60,31 @@ class Step1ComputeRequest(BaseModel):
 
 
 class Step1FreezeRequest(BaseModel):
+    """
+    AUTHORITATIVE SNAPSHOT (frontend owns computation)
+    """
+
     trade_date: date
 
+    # 🔹 REQUIRED DB FIELDS
+    preopen_price: float
+
+    derived_context: Dict[str, float | str] = Field(
+        ...,
+        description="System-computed context from /compute",
+    )
+
+    # 🔹 TRADER CONFIRMATION / OVERRIDE
     market_bias: str = Field(
         ...,
         min_length=3,
         max_length=32,
-        description="Trader view of market bias",
     )
 
     gap_context: str = Field(
         ...,
         min_length=3,
         max_length=32,
-        description="System or trader-confirmed gap direction",
     )
 
     premarket_notes: Optional[str] = Field(
@@ -83,11 +95,12 @@ class Step1FreezeRequest(BaseModel):
     @model_validator(mode="after")
     def log_freeze_request(self):
         logger.debug(
-            "[STEP-1][SCHEMA][FREEZE_REQUEST] trade_date=%s market_bias=%s gap_context=%s notes_present=%s",
+            "[STEP-1][SCHEMA][FREEZE_REQUEST] trade_date=%s preopen=%s bias=%s gap=%s derived_keys=%s",
             self.trade_date,
+            self.preopen_price,
             self.market_bias,
             self.gap_context,
-            self.premarket_notes is not None,
+            list(self.derived_context.keys()),
         )
         return self
 
@@ -114,13 +127,9 @@ class Step1ContextSnapshot(BaseModel):
     @model_validator(mode="after")
     def log_snapshot(self):
         logger.debug(
-            "[STEP-1][SCHEMA][SNAPSHOT] trade_date=%s frozen=%s yc=%s yh=%s yl=%s ranges=%s bias=%s gap=%s",
+            "[STEP-1][SCHEMA][SNAPSHOT] trade_date=%s frozen=%s bias=%s gap=%s",
             self.trade_date,
             self.frozen_at is not None,
-            self.yesterday_close,
-            self.yesterday_high,
-            self.yesterday_low,
-            self.last_5_day_ranges,
             self.market_bias,
             self.gap_context,
         )
@@ -139,16 +148,6 @@ class Step1PreviewResponse(BaseModel):
     snapshot: Step1ContextSnapshot
     can_freeze: bool
 
-    @model_validator(mode="after")
-    def log_preview_response(self):
-        logger.debug(
-            "[STEP-1][SCHEMA][PREVIEW_RESPONSE] mode=%s can_freeze=%s frozen=%s",
-            self.mode,
-            self.can_freeze,
-            self.snapshot.frozen_at is not None,
-        )
-        return self
-
 
 class Step1ComputeResponse(BaseModel):
     """
@@ -163,21 +162,10 @@ class Step1ComputeResponse(BaseModel):
     ]
 
     @model_validator(mode="after")
-    def validate_and_log_compute_response(self):
-        if "gap_context" not in self.derived_context:
-            logger.warning(
-                "[STEP-1][SCHEMA][COMPUTE_RESPONSE] gap_context MISSING in derived_context=%s",
-                self.derived_context,
-            )
-        else:
-            logger.debug(
-                "[STEP-1][SCHEMA][COMPUTE_RESPONSE] gap_context=%s",
-                self.derived_context.get("gap_context"),
-            )
-
+    def log_compute_response(self):
         logger.debug(
-            "[STEP-1][SCHEMA][COMPUTE_RESPONSE] derived=%s suggested_context=%s",
-            self.derived_context,
+            "[STEP-1][SCHEMA][COMPUTE_RESPONSE] derived_keys=%s suggested=%s",
+            list(self.derived_context.keys()),
             self.suggested_market_context,
         )
         return self
@@ -190,10 +178,8 @@ class Step1FrozenResponse(BaseModel):
     @model_validator(mode="after")
     def log_frozen_response(self):
         logger.debug(
-            "[STEP-1][SCHEMA][FROZEN_RESPONSE] trade_date=%s frozen=%s bias=%s gap=%s",
+            "[STEP-1][SCHEMA][FROZEN_RESPONSE] trade_date=%s frozen=%s",
             self.snapshot.trade_date,
             self.frozen,
-            self.snapshot.market_bias,
-            self.snapshot.gap_context,
         )
         return self
