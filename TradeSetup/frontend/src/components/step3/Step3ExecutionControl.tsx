@@ -1,15 +1,18 @@
+// src/components/step3/Step3ExecutionControl.tsx
 "use client";
 
 import { useEffect } from "react";
-import { useStep3 } from "@/hooks/useStep3";
 import type { TradeDate } from "@/types/common.types";
+import type { useStep3 } from "@/hooks/useStep3";
 
 interface Step3ExecutionControlProps {
   tradeDate: TradeDate;
+  step3: ReturnType<typeof useStep3>;
 }
 
 export default function Step3ExecutionControl({
   tradeDate,
+  step3,
 }: Step3ExecutionControlProps) {
   const {
     snapshot,
@@ -20,12 +23,13 @@ export default function Step3ExecutionControl({
     loading,
     error,
     executeStep3,
-  } = useStep3(tradeDate);
+  } = step3;
 
-  // Auto-run STEP-3 when component mounts
+  // Run STEP-3 only when execution is enabled
   useEffect(() => {
+    if (!executionEnabled) return;
     executeStep3();
-  }, [executeStep3]);
+  }, [executionEnabled, executeStep3]);
 
   return (
     <div className="space-y-6">
@@ -35,7 +39,6 @@ export default function Step3ExecutionControl({
         <span className="font-medium">{tradeDate}</span>
       </div>
 
-      {/* Preconditions */}
       {!executionEnabled && (
         <div className="rounded border border-dashed p-4 text-sm text-gray-500">
           STEP-3 becomes active only after STEP-1 and STEP-2 are frozen and
@@ -43,7 +46,6 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* Loading / Error */}
       {loading && (
         <div className="text-sm text-gray-500">
           Generating execution control…
@@ -56,7 +58,6 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* STEP-3.2 — Candidate Section */}
       {executionEnabled && snapshot && (
         <div className="rounded border">
           <div className="border-b px-4 py-3">
@@ -100,7 +101,6 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* Execution constraints */}
       <div className="rounded border p-4">
         <h3 className="text-sm font-semibold text-gray-700">
           Execution Constraints

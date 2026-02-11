@@ -29,6 +29,16 @@ export type Step1ComputeResponse = {
 };
 
 /**
+ * Normalize backend snapshot → frontend shape
+ */
+function normalizeSnapshot(raw: any) {
+  return {
+    ...raw,
+    frozenAt: raw.frozen_at ?? null,
+  };
+}
+
+/**
  * Fetch STEP-1 pre-market context preview.
  */
 export async function fetchStep1Preview(
@@ -48,7 +58,12 @@ export async function fetchStep1Preview(
       mode: response.data.mode,
     });
 
-    return response.data;
+    return {
+      ...response.data,
+      snapshot: response.data.snapshot
+        ? normalizeSnapshot(response.data.snapshot)
+        : null,
+    };
   } catch {
     console.error(
       "[DEBUG][API][STEP-1][PREVIEW] failed before response"
@@ -117,7 +132,6 @@ export async function freezeStep1Context(params: {
     market_bias: params.marketBias,
     gap_context: params.gapContext,
     premarket_notes: params.preMarketNotes ?? null,
-
     preopen_price: params.preOpenPrice,
     derived_context: params.derivedContext,
   };
@@ -130,11 +144,16 @@ export async function freezeStep1Context(params: {
       payload
     );
 
+    const normalized = {
+      ...response.data,
+      snapshot: normalizeSnapshot(response.data.snapshot),
+    };
+
     console.log("[DEBUG][API][STEP-1][FREEZE] success", {
-      frozenAt: response.data.snapshot.frozenAt,
+      frozenAt: normalized.snapshot.frozenAt,
     });
 
-    return response.data;
+    return normalized;
   } catch {
     console.error(
       "[DEBUG][API][STEP-1][FREEZE] failed before response"
