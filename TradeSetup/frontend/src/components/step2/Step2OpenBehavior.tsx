@@ -1,14 +1,10 @@
-// src/components/step2/Step2OpenBehavior.tsx
+// frontend/src/components/step2/Step2OpenBehavior.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { TradeDate } from "@/types/common.types";
 import type { useStep2 } from "@/hooks/useStep2";
-import type {
-  IndexOpenBehavior,
-  EarlyVolatility,
-  MarketParticipation,
-} from "@/types/step2.types";
+import type { Step2CandleInput } from "@/types/step2.types";
 
 interface Step2OpenBehaviorProps {
   tradeDate: TradeDate;
@@ -22,49 +18,99 @@ export default function Step2OpenBehavior({
   const {
     snapshot,
     isFrozen,
+    manualInputRequired,
     tradeAllowed,
     loading,
     error,
+    computeStep2,
     freezeStep2,
   } = step2;
 
-  console.log(
-    "[STEP-2] RENDER",
-    { tradeDate, isFrozen, tradeAllowed }
-  );
+  /* =====================================================
+     Candle Grid (09:15–09:45)
+     ===================================================== */
 
-  const [indexOpenBehavior, setIndexOpenBehavior] =
-    useState<IndexOpenBehavior>("UNKNOWN");
+  const initialCandles: Step2CandleInput[] = [
+    "09:15",
+    "09:20",
+    "09:25",
+    "09:30",
+    "09:35",
+    "09:40",
+    "09:45",
+  ].map((t) => ({
+    timestamp: t,
+    open: 0,
+    high: 0,
+    low: 0,
+    close: 0,
+    volume: 0,
+  }));
 
-  const [earlyVolatility, setEarlyVolatility] =
-    useState<EarlyVolatility>("UNKNOWN");
+  const [candles, setCandles] =
+    useState<Step2CandleInput[]>(initialCandles);
 
-  const [marketParticipation, setMarketParticipation] =
-    useState<MarketParticipation>("UNKNOWN");
+  const [reason, setReason] = useState("");
 
-  /**
-   * Detect Manual Mode
-   */
-  const isManual = useMemo(() => {
-    if (!snapshot) return true;
-
-    return (
-      snapshot.indexOpenBehavior === "UNKNOWN" ||
-      snapshot.earlyVolatility === "UNKNOWN" ||
-      snapshot.marketParticipation === "UNKNOWN"
-    );
-  }, [snapshot]);
-
-  const handleFreeze = () => {
-    freezeStep2({
-      indexOpenBehavior,
-      earlyVolatility,
-      marketParticipation,
+  const updateCandle = (
+    index: number,
+    field: keyof Step2CandleInput,
+    value: number
+  ) => {
+    setCandles((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+      return updated;
     });
   };
 
+  /* =====================================================
+     Validation
+     ===================================================== */
+
+  const candlesValid = useMemo(() => {
+    return candles.every(
+      (c) =>
+        c.open > 0 &&
+        c.high > 0 &&
+        c.low > 0 &&
+        c.close > 0 &&
+        c.volume > 0
+    );
+  }, [candles]);
+
+  const analyticsReady =
+    snapshot &&
+    snapshot.ir_high !== null &&
+    snapshot.ir_high !== undefined;
+
+  /* =====================================================
+     Actions
+     ===================================================== */
+
+  const handleCompute = () => {
+    if (!candlesValid) return;
+    computeStep2(candles);
+  };
+
+  const handleFreeze = () => {
+    if (!analyticsReady) return;
+
+    freezeStep2({
+      candles,
+      reason,
+    });
+  };
+
+  /* =====================================================
+     UI
+     ===================================================== */
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="text-sm text-gray-500">
         Market Open Behavior for{" "}
         <span className="font-medium">{tradeDate}</span>
@@ -72,150 +118,159 @@ export default function Step2OpenBehavior({
 
       {loading && (
         <div className="text-sm text-gray-500">
-          Loading STEP-2…
+          Processing…
         </div>
       )}
 
-      {!isManual && snapshot && (
-        <>
-          <ReadonlyField
-            label="Index Open"
-            value={snapshot.indexOpenBehavior}
-          />
-          <ReadonlyField
-            label="Early Volatility"
-            value={snapshot.earlyVolatility}
-          />
-          <ReadonlyField
-            label="Market Participation"
-            value={snapshot.marketParticipation}
-          />
-          <TradePermissionBanner tradeAllowed={tradeAllowed} />
-        </>
+      {/* =====================================================
+         MANUAL INPUT GRID
+         ===================================================== */}
+      {manualInputRequired && !isFrozen && (
+        <div className="rounded border p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">
+            5-Minute Candle Input (09:15–09:45)
+          </h3>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-2 border">Time</th>
+                  <th className="p-2 border">Open</th>
+                  <th className="p-2 border">High</th>
+                  <th className="p-2 border">Low</th>
+                  <th className="p-2 border">Close</th>
+                  <th className="p-2 border">Volume</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candles.map((c, i) => (
+                  <tr key={c.timestamp}>
+                    <td className="p-2 border">{c.timestamp}</td>
+
+                    {(
+                      ["open", "high", "low", "close", "volume"] as const
+                    ).map((field) => (
+                      <td key={field} className="p-2 border">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border px-1 py-0.5"
+                          value={c[field]}
+                          onChange={(e) =>
+                            updateCandle(
+                              i,
+                              field,
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <button
+            onClick={handleCompute}
+            disabled={!candlesValid || loading}
+            className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          >
+            Compute Analytical Breakdown
+          </button>
+        </div>
       )}
 
-      {isManual && !isFrozen && (
-        <>
-          <SelectField
-            label="Index Open"
-            value={indexOpenBehavior}
-            onChange={setIndexOpenBehavior}
-            options={[
-              "UNKNOWN",
-              "STRONG_UP",
-              "WEAK_UP",
-              "FLAT",
-              "WEAK_DOWN",
-              "STRONG_DOWN",
-            ]}
-          />
+      {/* =====================================================
+         ANALYTICAL BREAKDOWN
+         ===================================================== */}
+      {analyticsReady && (
+        <div className="rounded border p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Analytical Breakdown (Backend Derived)
+          </h3>
 
-          <SelectField
-            label="Early Volatility"
-            value={earlyVolatility}
-            onChange={setEarlyVolatility}
-            options={[
-              "UNKNOWN",
-              "EXPANDING",
-              "CONTRACTING",
-              "NORMAL",
-              "CHAOTIC",
-            ]}
-          />
+          <Metric label="IR High" value={snapshot.ir_high} />
+          <Metric label="IR Low" value={snapshot.ir_low} />
+          <Metric label="IR Range" value={snapshot.ir_range} />
+          <Metric label="IR Ratio" value={snapshot.ir_ratio} />
+          <Metric label="Volatility State" value={snapshot.volatility_state} />
+          <Metric label="VWAP Cross Count" value={snapshot.vwap_cross_count} />
+          <Metric label="VWAP State" value={snapshot.vwap_state} />
+          <Metric label="Range Hold Status" value={snapshot.range_hold_status} />
 
-          <SelectField
-            label="Market Participation"
-            value={marketParticipation}
-            onChange={setMarketParticipation}
-            options={[
-              "UNKNOWN",
-              "BROAD",
-              "NARROW",
-              "MIXED",
-              "THIN",
-            ]}
-          />
+          <hr />
+
+          <Metric label="Index Open Behavior" value={snapshot.index_open_behavior} />
+          <Metric label="Early Volatility" value={snapshot.early_volatility} />
+          <Metric label="Market Participation" value={snapshot.market_participation} />
 
           <TradePermissionBanner tradeAllowed={tradeAllowed} />
-        </>
+        </div>
       )}
 
-      {!isFrozen ? (
-        <button
-          onClick={handleFreeze}
-          disabled={loading}
-          className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-        >
-          Freeze STEP-2 Behavior
-        </button>
-      ) : (
+      {/* =====================================================
+         FREEZE SECTION
+         ===================================================== */}
+      {!isFrozen && analyticsReady && (
+        <div className="rounded border p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Freeze STEP-2
+          </h3>
+
+          <textarea
+            placeholder="One factual sentence linking observation → decision"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            className="w-full rounded border px-2 py-1 text-sm"
+          />
+
+          <button
+            onClick={handleFreeze}
+            disabled={loading || reason.trim().length === 0}
+            className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          >
+            Freeze STEP-2 Behavior
+          </button>
+        </div>
+      )}
+
+      {isFrozen && (
         <div className="rounded border border-green-300 bg-green-50 p-4 text-sm text-green-700">
           STEP-2 frozen at{" "}
           <span className="font-medium">
-            {snapshot?.frozenAt}
+            {snapshot?.frozen_at}
           </span>
         </div>
       )}
 
       {error && (
-        <div className="text-xs text-gray-400">
-          Non-blocking backend warning
+        <div className="text-xs text-red-500">
+          Backend error occurred.
         </div>
       )}
     </div>
   );
 }
 
-/* ---------- Small UI helpers ---------- */
+/* =====================================================
+   Small UI Helpers
+   ===================================================== */
 
-function ReadonlyField({
+function Metric({
   label,
   value,
 }: {
   label: string;
-  value: string;
+  value: any;
 }) {
   return (
-    <div className="rounded border p-4">
-      <label className="text-sm font-semibold text-gray-700">
-        {label}
-      </label>
-      <input
-        value={value}
-        readOnly
-        className="mt-2 w-full rounded border px-2 py-1 bg-gray-100 text-sm"
-      />
-    </div>
-  );
-}
-
-function SelectField<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: T;
-  onChange: (v: T) => void;
-  options: T[];
-}) {
-  return (
-    <div className="rounded border p-4">
-      <label className="text-sm font-semibold text-gray-700">
-        {label}
-      </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="mt-2 w-full rounded border px-2 py-1 text-sm"
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt.replace("_", " ")}
-          </option>
-        ))}
-      </select>
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium">{value ?? "--"}</span>
     </div>
   );
 }
@@ -238,8 +293,8 @@ function TradePermissionBanner({
       </div>
       <div className="mt-2 text-sm">
         {tradeAllowed
-          ? "Trading is permitted based on STEP-2 evaluation."
-          : "Trading is NOT permitted for the day."}
+          ? "Trading is permitted."
+          : "Trading is NOT permitted."}
       </div>
     </div>
   );

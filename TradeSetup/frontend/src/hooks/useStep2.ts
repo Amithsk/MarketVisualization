@@ -1,4 +1,4 @@
-//frontend/src/hooks/useStep2.ts
+// frontend/src/hooks/useStep2.ts
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -7,18 +7,17 @@ import type {
   Step2OpenBehaviorSnapshot,
   Step2PreviewResponse,
   Step2FrozenResponse,
-  Step2Mode,
-  IndexOpenBehavior,
-  EarlyVolatility,
-  MarketParticipation,
+  Step2ComputeResponse,
+  Step2CandleInput,
 } from "@/types/step2.types";
 import {
   fetchStep2Preview,
+  computeStep2Behavior,
   freezeStep2Behavior,
 } from "@/services/step2.api";
 
 interface UseStep2Options {
-  enabled?: boolean; // ← make optional (safe)
+  enabled?: boolean;
 }
 
 const DEBUG = true;
@@ -31,17 +30,19 @@ export function useStep2(
 
   const [snapshot, setSnapshot] =
     useState<Step2OpenBehaviorSnapshot | null>(null);
-  const [mode, setMode] = useState<Step2Mode>("MANUAL");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
 
+  /* =====================================================
+     PREVIEW
+     ===================================================== */
   const previewStep2 = useCallback(async () => {
-    if (DEBUG)
-      console.log(
-        "%c[STEP2] PREVIEW START",
-        "color:#00cc66;font-weight:bold",
-        { tradeDate }
-      );
+    if (!enabled) return;
+
+    if (DEBUG) {
+      console.log("[STEP2] PREVIEW START", { tradeDate });
+    }
 
     setLoading(true);
     setError(null);
@@ -50,68 +51,74 @@ export function useStep2(
       const response: Step2PreviewResponse =
         await fetchStep2Preview(tradeDate);
 
-      if (DEBUG)
-        console.log(
-          "%c[STEP2] PREVIEW RESPONSE",
-          "color:#00cc66",
-          response
-        );
+      if (DEBUG) {
+        console.log("[STEP2] PREVIEW RESPONSE", response);
+      }
 
-      setSnapshot(response.snapshot);
-      setMode(response.mode);
+      setSnapshot(response.snapshot ?? null);
     } catch (err) {
       console.error("[STEP2] PREVIEW FAILED", err);
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [tradeDate]);
+  }, [tradeDate, enabled]);
 
   /**
-   * 🔑 Deterministic trigger
+   * Only auto-preview when:
+   * - step is enabled
+   * - snapshot not already loaded
    */
   useEffect(() => {
     if (!enabled) return;
     if (snapshot) return;
 
-    if (DEBUG)
-      console.log(
-        "%c[STEP2] PREVIEW TRIGGERED",
-        "color:#00cc66;font-weight:bold"
-      );
-
     previewStep2();
   }, [enabled, snapshot, previewStep2]);
 
-  /**
-   * Debug state updates (after React commit)
-   */
-  useEffect(() => {
-    if (!DEBUG) return;
+  /* =====================================================
+     COMPUTE (Option B — Analytical Breakdown)
+     ===================================================== */
+  const computeStep2 = useCallback(
+    async (candles: Step2CandleInput[]) => {
+      if (!enabled) return;
+      if (snapshot?.frozen_at) return; // safety guard
 
-    console.log(
-      "%c[STEP2 STATE UPDATE]",
-      "color:#00aa55",
-      {
-        enabled,
-        mode,
-        frozenAt: snapshot?.frozenAt ?? null,
-        tradeAllowed: snapshot?.tradeAllowed ?? null,
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response: Step2ComputeResponse =
+          await computeStep2Behavior({
+            tradeDate,
+            candles,
+          });
+
+        if (DEBUG) {
+          console.log("[STEP2] COMPUTE SUCCESS", response);
+        }
+
+        setSnapshot(response.snapshot);
+      } catch (err) {
+        console.error("[STEP2] COMPUTE FAILED", err);
+        setError(err);
+      } finally {
+        setLoading(false);
       }
-    );
-  }, [enabled, mode, snapshot]);
+    },
+    [tradeDate, enabled, snapshot]
+  );
 
+  /* =====================================================
+     FREEZE
+     ===================================================== */
   const freezeStep2 = useCallback(
     async (params: {
-      indexOpenBehavior: IndexOpenBehavior;
-      earlyVolatility: EarlyVolatility;
-      marketParticipation: MarketParticipation;
+      candles: Step2CandleInput[];
+      reason?: string;
     }) => {
-      if (DEBUG)
-        console.log(
-          "%c[STEP2] FREEZE START",
-          "color:#ff8800;font-weight:bold"
-        );
+      if (!enabled) return;
+      if (snapshot?.frozen_at) return;
 
       setLoading(true);
       setError(null);
@@ -120,18 +127,15 @@ export function useStep2(
         const response: Step2FrozenResponse =
           await freezeStep2Behavior({
             tradeDate,
-            ...params,
+            candles: params.candles,
+            reason: params.reason,
           });
 
-        if (DEBUG)
-          console.log(
-            "%c[STEP2] FREEZE SUCCESS",
-            "color:#ff8800",
-            response
-          );
+        if (DEBUG) {
+          console.log("[STEP2] FREEZE SUCCESS", response);
+        }
 
         setSnapshot(response.snapshot);
-        setMode("AUTO");
       } catch (err) {
         console.error("[STEP2] FREEZE FAILED", err);
         setError(err);
@@ -139,17 +143,23 @@ export function useStep2(
         setLoading(false);
       }
     },
-    [tradeDate]
+    [tradeDate, enabled, snapshot]
   );
 
   return {
     snapshot,
-    mode,
-    isFrozen: !!snapshot?.frozenAt,
-    tradeAllowed: snapshot?.tradeAllowed ?? false,
+
+    // Derived state (backend authority)
+    mode: snapshot?.mode ?? "MANUAL",
+    manualInputRequired: snapshot?.manual_input_required ?? true,
+    isFrozen: !!snapshot?.frozen_at,
+    tradeAllowed: snapshot?.trade_allowed ?? false,
+
     loading,
     error,
+
     previewStep2,
+    computeStep2,
     freezeStep2,
   };
 }
