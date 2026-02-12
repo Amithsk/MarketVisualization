@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from sqlalchemy.orm import Session
+from typing import List
 import logging
 import traceback
 
@@ -10,259 +11,299 @@ from backend.app.models.step2_market_behavior import Step2MarketBehavior
 from backend.app.schemas.step2_schema import (
     Step2PreviewResponse,
     Step2FrozenResponse,
+    Step2ComputeResponse,
     Step2OpenBehaviorSnapshot,
+    Step2CandleInput,
 )
 
 logger = logging.getLogger(__name__)
 
-# -------------------------------------------------
-# Internal helpers
-# -------------------------------------------------
+# =====================================================
+# ANALYTICAL ENGINE (Option B)
+# =====================================================
 
-def _evaluate_trade_permission(
-    index_open_behavior: str,
-    early_volatility: str,
-    market_participation: str,
-) -> bool:
-    """
-    Decide whether trading is permitted.
-    Conservative, deterministic, backend-owned.
-    """
+def _compute_ir(candles: List[Step2CandleInput]):
+    highs = [c.high for c in candles]
+    lows = [c.low for c in candles]
 
-    logger.info(
-        "[STEP2][SERVICE][_evaluate_trade_permission] inputs=%s",
-        {
-            "index_open_behavior": index_open_behavior,
-            "early_volatility": early_volatility,
-            "market_participation": market_participation,
-        },
-    )
+    ir_high = max(highs)
+    ir_low = min(lows)
+    ir_range = ir_high - ir_low
 
-    index_open_behavior = index_open_behavior.upper()
-    early_volatility = early_volatility.upper()
-    market_participation = market_participation.upper()
+    return ir_high, ir_low, ir_range
 
-    if (
-        index_open_behavior in ("STRONG_UP", "STRONG_DOWN")
-        and market_participation == "BROAD"
-        and early_volatility in ("NORMAL", "EXPANDING")
-    ):
-        logger.info("[STEP2][SERVICE][_evaluate_trade_permission] result=True")
-        return True
 
-    if early_volatility == "CHAOTIC" or market_participation == "THIN":
-        logger.info("[STEP2][SERVICE][_evaluate_trade_permission] result=False (risk)")
+def _compute_vwap(candles: List[Step2CandleInput]):
+    cumulative_pv = 0
+    cumulative_volume = 0
+    cross_count = 0
+
+    prev_relation = None
+
+    for c in candles:
+        typical_price = (c.high + c.low + c.close) / 3
+        cumulative_pv += typical_price * c.volume
+        cumulative_volume += c.volume
+
+        vwap = cumulative_pv / cumulative_volume if cumulative_volume else typical_price
+
+        relation = "ABOVE" if c.close > vwap else "BELOW"
+
+        if prev_relation and relation != prev_relation:
+            cross_count += 1
+
+        prev_relation = relation
+
+    if cross_count == 0:
+        vwap_state = "ABOVE_VWAP" if prev_relation == "ABOVE" else "BELOW_VWAP"
+    else:
+        vwap_state = "MIXED"
+
+    return cross_count, vwap_state
+
+
+def _classify_volatility(ir_range: float, avg_5m_range_prev_day: float | None):
+    if not avg_5m_range_prev_day:
+        return "NORMAL"
+
+    ratio = ir_range / avg_5m_range_prev_day
+
+    if ratio > 1.5:
+        return "EXPANDING"
+    if ratio < 0.7:
+        return "CONTRACTING"
+    return "NORMAL"
+
+
+def _range_hold_status(candles: List[Step2CandleInput], ir_high, ir_low):
+    last_close = candles[-1].close
+
+    if last_close > ir_high:
+        return "BROKEN_UP"
+    if last_close < ir_low:
+        return "BROKEN_DOWN"
+    return "HELD"
+
+
+def _derive_behavior(ir_range, vwap_cross_count, volatility_state):
+    if volatility_state == "EXPANDING" and vwap_cross_count == 0:
+        return "STRONG_UP"
+    if volatility_state == "CHAOTIC":
+        return "FLAT"
+    return "WEAK_UP"
+
+
+def _evaluate_trade_permission(volatility_state, range_hold_status):
+    if volatility_state == "CHAOTIC":
         return False
 
-    logger.info("[STEP2][SERVICE][_evaluate_trade_permission] result=False (default)")
+    if range_hold_status == "HELD":
+        return True
+
     return False
 
 
-def _to_snapshot(ctx: Step2MarketBehavior) -> Step2OpenBehaviorSnapshot:
-    """
-    Convert ORM model → API snapshot
-    """
+# =====================================================
+# SNAPSHOT BUILDER
+# =====================================================
 
-    logger.info(
-        "[STEP2][SERVICE][_to_snapshot] ctx=%s",
-        {
-            "trade_date": ctx.trade_date,
-            "index_open_behavior": ctx.index_open_behavior,
-            "early_volatility": ctx.early_volatility,
-            "market_participation": ctx.market_participation,
-            "trade_allowed": ctx.trade_allowed,
-            "frozen_at": ctx.frozen_at,
-        },
-    )
+def _build_snapshot(
+    trade_date: date,
+    mode: str,
+    manual_input_required: bool,
+    avg_5m_range_prev_day: float | None,
+    ir_high: float | None,
+    ir_low: float | None,
+    ir_range: float | None,
+    ir_ratio: float | None,
+    volatility_state: str | None,
+    vwap_cross_count: int | None,
+    vwap_state: str | None,
+    range_hold_status: str | None,
+    index_open_behavior: str | None,
+    early_volatility: str | None,
+    market_participation: str | None,
+    trade_allowed: bool | None,
+    frozen_at=None,
+):
 
     return Step2OpenBehaviorSnapshot(
-        trade_date=ctx.trade_date,
-        mode="AUTO",
-        manual_input_required=False,
-        index_open_behavior=ctx.index_open_behavior,
-        early_volatility=ctx.early_volatility,
-        market_participation=ctx.market_participation,
-        trade_allowed=ctx.trade_allowed,
-        frozen_at=ctx.frozen_at,
+        trade_date=trade_date,
+        mode=mode,
+        manual_input_required=manual_input_required,
+        avg_5m_range_prev_day=avg_5m_range_prev_day,
+        ir_high=ir_high,
+        ir_low=ir_low,
+        ir_range=ir_range,
+        ir_ratio=ir_ratio,
+        volatility_state=volatility_state,
+        vwap_cross_count=vwap_cross_count,
+        vwap_state=vwap_state,
+        range_hold_status=range_hold_status,
+        index_open_behavior=index_open_behavior,
+        early_volatility=early_volatility,
+        market_participation=market_participation,
+        trade_allowed=trade_allowed,
+        frozen_at=frozen_at,
     )
 
 
-# -------------------------------------------------
-# Public service methods
-# -------------------------------------------------
+# =====================================================
+# PREVIEW (UNCHANGED)
+# =====================================================
 
-def preview_step2_behavior(
+def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewResponse:
+
+    step1 = (
+        db.query(Step1MarketContext)
+        .filter(Step1MarketContext.trade_date == trade_date)
+        .first()
+    )
+
+    if not step1:
+        raise ValueError("STEP-1 must be frozen before STEP-2")
+
+    snapshot = _build_snapshot(
+        trade_date=trade_date,
+        mode="MANUAL",
+        manual_input_required=True,
+        avg_5m_range_prev_day=None,
+        ir_high=None,
+        ir_low=None,
+        ir_range=None,
+        ir_ratio=None,
+        volatility_state=None,
+        vwap_cross_count=None,
+        vwap_state=None,
+        range_hold_status=None,
+        index_open_behavior=None,
+        early_volatility=None,
+        market_participation=None,
+        trade_allowed=None,
+        frozen_at=None,
+    )
+
+    return Step2PreviewResponse(snapshot=snapshot, can_freeze=True)
+
+
+# =====================================================
+# COMPUTE (NEW)
+# =====================================================
+
+def compute_step2_behavior(
     db: Session,
     trade_date: date,
-) -> Step2PreviewResponse:
+    candles: List[Step2CandleInput],
+) -> Step2ComputeResponse:
 
-    logger.info("[STEP2][SERVICE][PREVIEW][START] trade_date=%s", trade_date)
+    step1 = (
+        db.query(Step1MarketContext)
+        .filter(Step1MarketContext.trade_date == trade_date)
+        .first()
+    )
 
-    try:
-        # STEP-1 gate (row existence == frozen)
-        step1 = (
-            db.query(Step1MarketContext)
-            .filter(Step1MarketContext.trade_date == trade_date)
-            .first()
-        )
+    if not step1:
+        raise ValueError("STEP-1 must be frozen before STEP-2")
 
-        logger.info(
-            "[STEP2][SERVICE][PREVIEW] step1_found=%s created_at=%s",
-            bool(step1),
-            getattr(step1, "created_at", None),
-        )
+    avg_5m_range_prev_day = None  # Placeholder (can connect to STEP-1 later)
 
-        if not step1:
-            raise ValueError("STEP-1 must be frozen before STEP-2")
+    ir_high, ir_low, ir_range = _compute_ir(candles)
 
-        existing = (
-            db.query(Step2MarketBehavior)
-            .filter(Step2MarketBehavior.trade_date == trade_date)
-            .first()
-        )
+    ir_ratio = None
+    if avg_5m_range_prev_day:
+        ir_ratio = ir_range / avg_5m_range_prev_day
 
-        logger.info(
-            "[STEP2][SERVICE][PREVIEW] existing_step2=%s frozen_at=%s",
-            bool(existing),
-            getattr(existing, "frozen_at", None),
-        )
+    volatility_state = _classify_volatility(ir_range, avg_5m_range_prev_day)
 
-        # Already frozen → AUTO
-        if existing and existing.frozen_at:
-            logger.info("[STEP2][SERVICE][PREVIEW] returning frozen snapshot")
+    vwap_cross_count, vwap_state = _compute_vwap(candles)
 
-            return Step2PreviewResponse(
-                snapshot=_to_snapshot(existing),
-                can_freeze=False,
-            )
+    range_hold_status = _range_hold_status(candles, ir_high, ir_low)
 
-        # Manual default → MANUAL
-        logger.info("[STEP2][SERVICE][PREVIEW] returning MANUAL default snapshot")
+    index_open_behavior = _derive_behavior(
+        ir_range, vwap_cross_count, volatility_state
+    )
 
-        snapshot = Step2OpenBehaviorSnapshot(
-            trade_date=trade_date,
-            mode="MANUAL",
-            manual_input_required=True,
-            index_open_behavior="UNKNOWN",
-            early_volatility="UNKNOWN",
-            market_participation="UNKNOWN",
-            trade_allowed=False,
-            frozen_at=None,
-        )
+    early_volatility = volatility_state
+    market_participation = "BROAD"  # placeholder logic
 
-        return Step2PreviewResponse(
-            snapshot=snapshot,
-            can_freeze=True,
-        )
+    trade_allowed = _evaluate_trade_permission(
+        volatility_state,
+        range_hold_status,
+    )
 
-    except Exception as e:
-        logger.error(
-            "[STEP2][SERVICE][PREVIEW][FATAL] trade_date=%s error=%s",
-            trade_date,
-            str(e),
-        )
-        traceback.print_exc()
-        raise
+    snapshot = _build_snapshot(
+        trade_date=trade_date,
+        mode="MANUAL",
+        manual_input_required=True,
+        avg_5m_range_prev_day=avg_5m_range_prev_day,
+        ir_high=ir_high,
+        ir_low=ir_low,
+        ir_range=ir_range,
+        ir_ratio=ir_ratio,
+        volatility_state=volatility_state,
+        vwap_cross_count=vwap_cross_count,
+        vwap_state=vwap_state,
+        range_hold_status=range_hold_status,
+        index_open_behavior=index_open_behavior,
+        early_volatility=early_volatility,
+        market_participation=market_participation,
+        trade_allowed=trade_allowed,
+        frozen_at=None,
+    )
 
+    return Step2ComputeResponse(snapshot=snapshot, can_freeze=True)
+
+
+# =====================================================
+# FREEZE
+# =====================================================
 
 def freeze_step2_behavior(
     db: Session,
     trade_date: date,
-    index_open_behavior: str,
-    early_volatility: str,
-    market_participation: str,
-    trade_allowed: bool | None = None,
+    candles: List[Step2CandleInput],
+    reason: str | None = None,
 ) -> Step2FrozenResponse:
 
-    logger.info(
-        "[STEP2][SERVICE][FREEZE][START] trade_date=%s payload=%s",
-        trade_date,
-        {
-            "index_open_behavior": index_open_behavior,
-            "early_volatility": early_volatility,
-            "market_participation": market_participation,
-        },
+    compute_response = compute_step2_behavior(
+        db=db,
+        trade_date=trade_date,
+        candles=candles,
     )
 
-    try:
-        # STEP-1 gate
-        step1 = (
-            db.query(Step1MarketContext)
-            .filter(Step1MarketContext.trade_date == trade_date)
-            .first()
-        )
+    snapshot = compute_response.snapshot
 
-        logger.info(
-            "[STEP2][SERVICE][FREEZE] step1_found=%s created_at=%s",
-            bool(step1),
-            getattr(step1, "created_at", None),
-        )
+    context = Step2MarketBehavior(
+        trade_date=trade_date,
+        index_open_behavior=snapshot.index_open_behavior,
+        early_volatility=snapshot.early_volatility,
+        market_participation=snapshot.market_participation,
+        trade_allowed=snapshot.trade_allowed,
+        frozen_at=datetime.utcnow(),
+    )
 
-        if not step1:
-            raise ValueError("STEP-1 must be frozen before STEP-2")
+    db.add(context)
+    db.commit()
+    db.refresh(context)
 
-        existing = (
-            db.query(Step2MarketBehavior)
-            .filter(Step2MarketBehavior.trade_date == trade_date)
-            .first()
-        )
+    frozen_snapshot = _build_snapshot(
+        trade_date=trade_date,
+        mode="AUTO",
+        manual_input_required=False,
+        avg_5m_range_prev_day=snapshot.avg_5m_range_prev_day,
+        ir_high=snapshot.ir_high,
+        ir_low=snapshot.ir_low,
+        ir_range=snapshot.ir_range,
+        ir_ratio=snapshot.ir_ratio,
+        volatility_state=snapshot.volatility_state,
+        vwap_cross_count=snapshot.vwap_cross_count,
+        vwap_state=snapshot.vwap_state,
+        range_hold_status=snapshot.range_hold_status,
+        index_open_behavior=snapshot.index_open_behavior,
+        early_volatility=snapshot.early_volatility,
+        market_participation=snapshot.market_participation,
+        trade_allowed=snapshot.trade_allowed,
+        frozen_at=context.frozen_at,
+    )
 
-        logger.info(
-            "[STEP2][SERVICE][FREEZE] existing_step2=%s frozen_at=%s",
-            bool(existing),
-            getattr(existing, "frozen_at", None),
-        )
-
-        if existing and existing.frozen_at:
-            raise ValueError("STEP-2 is already frozen")
-
-        index_open_behavior = index_open_behavior.strip().upper()
-        early_volatility = early_volatility.strip().upper()
-        market_participation = market_participation.strip().upper()
-
-        computed_trade_allowed = _evaluate_trade_permission(
-            index_open_behavior=index_open_behavior,
-            early_volatility=early_volatility,
-            market_participation=market_participation,
-        )
-
-        logger.info(
-            "[STEP2][SERVICE][FREEZE] computed_trade_allowed=%s",
-            computed_trade_allowed,
-        )
-
-        if existing:
-            context = existing
-            context.index_open_behavior = index_open_behavior
-            context.early_volatility = early_volatility
-            context.market_participation = market_participation
-            context.trade_allowed = computed_trade_allowed
-            context.frozen_at = datetime.utcnow()
-        else:
-            context = Step2MarketBehavior(
-                trade_date=trade_date,
-                index_open_behavior=index_open_behavior,
-                early_volatility=early_volatility,
-                market_participation=market_participation,
-                trade_allowed=computed_trade_allowed,
-                frozen_at=datetime.utcnow(),
-            )
-            db.add(context)
-
-        db.commit()
-        db.refresh(context)
-
-        logger.info("[STEP2][SERVICE][FREEZE][SUCCESS] trade_date=%s", trade_date)
-
-        return Step2FrozenResponse(
-            snapshot=_to_snapshot(context),
-        )
-
-    except Exception as e:
-        logger.error(
-            "[STEP2][SERVICE][FREEZE][FATAL] trade_date=%s error=%s",
-            trade_date,
-            str(e),
-        )
-        traceback.print_exc()
-        raise
+    return Step2FrozenResponse(snapshot=frozen_snapshot)

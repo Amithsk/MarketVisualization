@@ -9,12 +9,15 @@ from backend.app.db.session import get_db
 from backend.app.schemas.step2_schema import (
     Step2PreviewRequest,
     Step2FreezeRequest,
+    Step2ComputeRequest,
     Step2PreviewResponse,
     Step2FrozenResponse,
+    Step2ComputeResponse,
 )
 from backend.app.services.step2_service import (
     preview_step2_behavior,
     freeze_step2_behavior,
+    compute_step2_behavior,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +27,9 @@ router = APIRouter(
     tags=["STEP-2"],
 )
 
+# =====================================================
+# PREVIEW
+# =====================================================
 
 @router.post(
     "/preview",
@@ -34,14 +40,6 @@ def preview_step2(
     request: Step2PreviewRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Preview STEP-2 Market Open Behavior.
-
-    CONTRACT:
-    - NEVER throws "data not found"
-    - Returns mode = AUTO | MANUAL
-    - UI decides editable vs readonly
-    """
 
     logger.info(
         "[STEP2][API][PREVIEW][START] trade_date=%s",
@@ -55,15 +53,13 @@ def preview_step2(
         )
 
         logger.info(
-            "[STEP2][API][PREVIEW][SUCCESS] trade_date=%s result=%s",
+            "[STEP2][API][PREVIEW][SUCCESS] trade_date=%s",
             request.trade_date,
-            result,
         )
 
         return result
 
     except ValueError as e:
-        # Domain violation (ex: STEP-1 not frozen)
 
         logger.warning(
             "[STEP2][API][PREVIEW][DOMAIN_ERROR] trade_date=%s error=%s",
@@ -77,7 +73,6 @@ def preview_step2(
         )
 
     except Exception as e:
-        # Infra / coding failure
 
         logger.error(
             "[STEP2][API][PREVIEW][FATAL] trade_date=%s exception=%s",
@@ -93,6 +88,73 @@ def preview_step2(
         )
 
 
+# =====================================================
+# COMPUTE (NEW)
+# =====================================================
+
+@router.post(
+    "/compute",
+    response_model=Step2ComputeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def compute_step2(
+    request: Step2ComputeRequest,
+    db: Session = Depends(get_db),
+):
+
+    logger.info(
+        "[STEP2][API][COMPUTE][START] trade_date=%s candles=%s",
+        request.trade_date,
+        len(request.candles),
+    )
+
+    try:
+        result = compute_step2_behavior(
+            db=db,
+            trade_date=request.trade_date,
+            candles=request.candles,
+        )
+
+        logger.info(
+            "[STEP2][API][COMPUTE][SUCCESS] trade_date=%s",
+            request.trade_date,
+        )
+
+        return result
+
+    except ValueError as e:
+
+        logger.warning(
+            "[STEP2][API][COMPUTE][DOMAIN_ERROR] trade_date=%s error=%s",
+            request.trade_date,
+            str(e),
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+
+    except Exception as e:
+
+        logger.error(
+            "[STEP2][API][COMPUTE][FATAL] trade_date=%s exception=%s",
+            request.trade_date,
+            str(e),
+        )
+
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compute STEP-2 behavior",
+        )
+
+
+# =====================================================
+# FREEZE (UPDATED)
+# =====================================================
+
 @router.post(
     "/freeze",
     response_model=Step2FrozenResponse,
@@ -102,44 +164,30 @@ def freeze_step2(
     request: Step2FreezeRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Freeze STEP-2 Market Open Behavior.
-
-    CONTRACT:
-    - Accepts ONLY raw/manual inputs
-    - trade_allowed is DERIVED by backend
-    - reason is REQUIRED
-    """
 
     logger.info(
-        "[STEP2][API][FREEZE][START] trade_date=%s payload=%s",
+        "[STEP2][API][FREEZE][START] trade_date=%s candles=%s",
         request.trade_date,
-        request.dict(),
+        len(request.candles),
     )
 
     try:
         result = freeze_step2_behavior(
             db=db,
             trade_date=request.trade_date,
-
-            # Raw observations
-            index_open_behavior=request.index_open_behavior,
-            early_volatility=request.early_volatility,
-            market_participation=request.market_participation,
-
-            # Mandatory manual reasoning
+            candles=request.candles,
             reason=request.reason,
         )
 
         logger.info(
-            "[STEP2][API][FREEZE][SUCCESS] trade_date=%s result=%s",
+            "[STEP2][API][FREEZE][SUCCESS] trade_date=%s",
             request.trade_date,
-            result,
         )
 
         return result
 
     except ValueError as e:
+
         logger.warning(
             "[STEP2][API][FREEZE][DOMAIN_ERROR] trade_date=%s error=%s",
             request.trade_date,
@@ -152,6 +200,7 @@ def freeze_step2(
         )
 
     except Exception as e:
+
         logger.error(
             "[STEP2][API][FREEZE][FATAL] trade_date=%s exception=%s",
             request.trade_date,

@@ -1,4 +1,5 @@
-#backend/app/schemas/step2_schema.py
+# backend/app/schemas/step2_schema.py
+
 from datetime import date, datetime
 from typing import Optional, Literal, List
 from pydantic import BaseModel, Field
@@ -9,6 +10,25 @@ from pydantic import BaseModel, Field
 # =========================
 
 StepMode = Literal["AUTO", "MANUAL"]
+
+VolatilityState = Literal[
+    "EXPANDING",
+    "CONTRACTING",
+    "NORMAL",
+    "CHAOTIC",
+]
+
+VWAPState = Literal[
+    "ABOVE_VWAP",
+    "BELOW_VWAP",
+    "MIXED",
+]
+
+RangeHoldStatus = Literal[
+    "HELD",
+    "BROKEN_UP",
+    "BROKEN_DOWN",
+]
 
 
 # =========================
@@ -35,10 +55,24 @@ class Step2CandleInput(BaseModel):
     volume: float
 
 
+# 🔹 NEW — COMPUTE REQUEST
+class Step2ComputeRequest(BaseModel):
+    """
+    Compute analytical STEP-2 metrics from 5-min candles.
+    This does NOT freeze.
+    """
+    trade_date: date
+
+    candles: List[Step2CandleInput] = Field(
+        ...,
+        description="5-minute OHLCV candles from 09:15 to 09:45"
+    )
+
+
 class Step2FreezeRequest(BaseModel):
     """
     Freeze request capturing ONLY raw observations.
-    All decisions are derived by backend.
+    All analytical values must already be computed.
     """
     trade_date: date
 
@@ -62,6 +96,7 @@ class Step2OpenBehaviorSnapshot(BaseModel):
     """
     Immutable STEP-2 snapshot.
     Consumed by STEP-3.
+    Backend is the ONLY source of truth.
     """
 
     trade_date: date
@@ -73,7 +108,30 @@ class Step2OpenBehaviorSnapshot(BaseModel):
     # --- System baseline ---
     avg_5m_range_prev_day: Optional[float] = None
 
-    # --- Derived observations ---
+    # =====================================================
+    # 🔍 FULL ANALYTICAL BREAKDOWN (Option B)
+    # =====================================================
+
+    # --- Initial Range (IR) ---
+    ir_high: Optional[float] = None
+    ir_low: Optional[float] = None
+    ir_range: Optional[float] = None
+    ir_ratio: Optional[float] = None
+
+    # --- Volatility ---
+    volatility_state: Optional[VolatilityState] = None
+
+    # --- VWAP ---
+    vwap_cross_count: Optional[int] = None
+    vwap_state: Optional[VWAPState] = None
+
+    # --- Range Integrity ---
+    range_hold_status: Optional[RangeHoldStatus] = None
+
+    # =====================================================
+    # 🔎 Derived Behavioral Classification
+    # =====================================================
+
     index_open_behavior: Optional[str] = None
     early_volatility: Optional[str] = None
     market_participation: Optional[str] = None
@@ -98,6 +156,16 @@ class Step2PreviewResponse(BaseModel):
 
     - mode=MANUAL → UI must show editable OHLCV grid
     - mode=AUTO   → UI shows computed values (read-only)
+    """
+    snapshot: Step2OpenBehaviorSnapshot
+    can_freeze: bool
+
+
+# 🔹 NEW — COMPUTE RESPONSE
+class Step2ComputeResponse(BaseModel):
+    """
+    Analytical response after compute.
+    Does NOT freeze.
     """
     snapshot: Step2OpenBehaviorSnapshot
     can_freeze: bool
