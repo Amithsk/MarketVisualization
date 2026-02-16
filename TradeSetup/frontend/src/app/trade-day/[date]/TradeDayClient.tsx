@@ -1,5 +1,4 @@
-
-// frontend/src/app/trade-day/[date]/TradeDayClient.tsx"use client";
+// frontend/src/app/trade-day/[date]/TradeDayClient.tsx
 "use client";
 
 import StepSection from "@/components/layout/StepSection";
@@ -45,19 +44,34 @@ export default function TradeDayClient({
         <Step1Context tradeDate={tradeDate} step1={step1} />
       </StepSection>
 
-      <StepSection step={2} title="Market Open Behavior" disabled={!canAccessStep2}>
+      <StepSection
+        step={2}
+        title="Market Open Behavior"
+        disabled={!canAccessStep2}
+      >
         {canAccessStep2 && (
           <Step2OpenBehavior tradeDate={tradeDate} step2={step2} />
         )}
       </StepSection>
 
-      <StepSection step={3} title="Execution Control" disabled={!canAccessStep3}>
+      <StepSection
+        step={3}
+        title="Execution Control"
+        disabled={!canAccessStep3}
+      >
         {canAccessStep3 && (
-          <Step3ExecutionControl tradeDate={tradeDate} step3={step3} />
+          <Step3ExecutionControl
+            tradeDate={tradeDate}
+            step3={step3}
+          />
         )}
       </StepSection>
 
-      <StepSection step={4} title="Trade Construction" disabled={!canAccessStep4}>
+      <StepSection
+        step={4}
+        title="Trade Construction"
+        disabled={!canAccessStep4}
+      >
         {canAccessStep4 && (
           <>
             <Step4TradePreview

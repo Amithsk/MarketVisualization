@@ -1,29 +1,27 @@
-// src/types/step3.types.ts
+// frontend/src/types/step3.types.ts
 
 import type { TradeDate, IsoTimestamp } from "@/types/common.types";
 
 /**
- * STEP-3: Execution Control & Candidate Selection
- * -----------------------------------------------
+ * STEP-3: Execution Control & Stock Selection
+ * -------------------------------------------
  * Backend is authoritative.
- * Frontend is read-only + assisted input (STEP-3.2).
+ * Frontend is display + assisted manual entry only.
  */
 
+
 /**
- * Allowed trade direction.
+ * Allowed trade direction (Layer-2 derived).
  */
 export type TradeDirection = "LONG" | "SHORT";
 
 /**
- * High-level setup classification.
- * Purely descriptive.
+ * Strategy assigned in Layer-3.
  */
-export type SetupType =
-  | "TREND_CONTINUATION"
-  | "MEAN_REVERSION"
-  | "BREAKOUT"
-  | "REVERSAL"
-  | "UNKNOWN";
+export type StrategyUsed =
+  | "GAP_FOLLOW"
+  | "MOMENTUM"
+  | "NO_TRADE";
 
 /**
  * Candidate origin mode (BACKEND AUTHORITY).
@@ -31,32 +29,54 @@ export type SetupType =
 export type CandidatesMode = "AUTO" | "MANUAL";
 
 /**
- * Trade candidate (AUTO = system, MANUAL = trader).
+ * Final per-stock output from STEP-3B.
+ * Deterministic and backend-derived.
  */
 export interface TradeCandidate {
   symbol: string;
   direction: TradeDirection;
-  setupType: SetupType;
-  notes?: string;
+  strategyUsed: StrategyUsed;
+  reason: string;
 }
 
 /**
  * STEP-3 execution snapshot.
  *
- * STEP-3.1 (System):
+ * STEP-3A:
+ *  - allowedStrategies
+ *  - maxTradesAllowed
  *  - executionEnabled
  *
- * STEP-3.2 (Backend decides):
+ * STEP-3B:
  *  - candidatesMode
- *  - candidates list (may be empty)
+ *  - candidates list (AUTO or MANUAL)
  */
 export interface Step3ExecutionSnapshot {
   tradeDate: TradeDate;
 
+  // -------------------------
+  // STEP-3A — Index Level
+  // -------------------------
+
   /**
-   * Hard gate derived from STEP-1 + STEP-2.
+   * Allowed strategies for the day.
+   * Empty array is valid (NO_TRADE).
+   */
+  allowedStrategies: string[];
+
+  /**
+   * Maximum trades permitted today.
+   */
+  maxTradesAllowed: number;
+
+  /**
+   * Derived as maxTradesAllowed > 0.
    */
   executionEnabled: boolean;
+
+  // -------------------------
+  // STEP-3B — Stock Funnel
+  // -------------------------
 
   /**
    * Backend-declared candidate mode.
@@ -78,7 +98,7 @@ export interface Step3ExecutionSnapshot {
 }
 
 /**
- * STEP-3 execution API response.
+ * STEP-3 preview API response.
  */
 export interface Step3ExecutionResponse {
   snapshot: Step3ExecutionSnapshot;

@@ -1,4 +1,4 @@
-// src/components/step3/Step3ExecutionControl.tsx
+// frontend/src/components/step3/Step3ExecutionControl.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -16,20 +16,20 @@ export default function Step3ExecutionControl({
 }: Step3ExecutionControlProps) {
   const {
     snapshot,
+    allowedStrategies,
+    maxTradesAllowed,
     executionEnabled,
     candidates,
     candidatesMode,
     generatedAt,
     loading,
     error,
-    executeStep3,
+    previewStep3,
   } = step3;
 
-  // Run STEP-3 only when execution is enabled
   useEffect(() => {
-    if (!executionEnabled) return;
-    executeStep3();
-  }, [executionEnabled, executeStep3]);
+    previewStep3();
+  }, [previewStep3]);
 
   return (
     <div className="space-y-6">
@@ -39,16 +39,9 @@ export default function Step3ExecutionControl({
         <span className="font-medium">{tradeDate}</span>
       </div>
 
-      {!executionEnabled && (
-        <div className="rounded border border-dashed p-4 text-sm text-gray-500">
-          STEP-3 becomes active only after STEP-1 and STEP-2 are frozen and
-          trading is permitted.
-        </div>
-      )}
-
       {loading && (
         <div className="text-sm text-gray-500">
-          Generating execution control…
+          Generating STEP-3 snapshot…
         </div>
       )}
 
@@ -58,16 +51,59 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {executionEnabled && snapshot && (
+      {/* STEP-3A — Always Visible After Preview */}
+      {snapshot && (
         <div className="rounded border">
           <div className="border-b px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-700">
-              Trade Candidates
+              STEP-3A — Strategy & Risk Control
+            </h3>
+          </div>
+
+          <div className="p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Allowed Strategies</span>
+              <span className="font-medium">
+                {allowedStrategies.length > 0
+                  ? allowedStrategies.join(", ")
+                  : "NO_TRADE"}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-500">Max Trades Allowed</span>
+              <span className="font-medium">
+                {maxTradesAllowed}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-500">Execution Enabled</span>
+              <span
+                className={`font-semibold ${
+                  executionEnabled
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {executionEnabled ? "YES" : "NO"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP-3B — Always Activated After Freeze */}
+      {snapshot && (
+        <div className="rounded border">
+          <div className="border-b px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-700">
+              STEP-3B — Stock Selection Funnel
             </h3>
             <p className="text-xs text-gray-500">
               {candidatesMode === "AUTO"
                 ? "System-generated • Read-only"
-                : "Manual entry required • No automation available"}
+                : "Manual entry required • Automation unavailable"}
             </p>
           </div>
 
@@ -76,7 +112,7 @@ export default function Step3ExecutionControl({
               <div className="text-sm text-gray-400 italic">
                 {candidatesMode === "AUTO"
                   ? "No candidates generated for today"
-                  : "Please add trade candidates manually"}
+                  : "Manual candidate entry UI should be enabled here"}
               </div>
             ) : (
               candidates.map((c) => (
@@ -85,9 +121,14 @@ export default function Step3ExecutionControl({
                   className="flex items-center justify-between rounded border px-3 py-2 text-sm"
                 >
                   <div>
-                    <div className="font-medium">{c.symbol}</div>
+                    <div className="font-medium">
+                      {c.symbol}
+                    </div>
                     <div className="text-xs text-gray-500">
-                      {c.setupType}
+                      {c.strategyUsed}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {c.reason}
                     </div>
                   </div>
 
@@ -101,13 +142,14 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
+      {/* Constraints */}
       <div className="rounded border p-4">
         <h3 className="text-sm font-semibold text-gray-700">
           Execution Constraints
         </h3>
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-500 space-y-1">
           <li>Execution permission is system-controlled</li>
-          <li>Candidate automation may or may not be available</li>
+          <li>Candidate mode is backend-controlled</li>
           <li>No quantity or risk decisions at this step</li>
         </ul>
 

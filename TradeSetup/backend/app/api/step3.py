@@ -1,3 +1,5 @@
+# backend/app/api/step3.py
+
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -13,35 +15,37 @@ router = APIRouter(
 )
 
 
-class Step3ExecuteRequest(BaseModel):
+class Step3PreviewRequest(BaseModel):
     """
-    STEP-3 execution request.
+    STEP-3 preview request.
 
     System-triggered.
     No trader discretion.
     """
     trade_date: date = Field(
         ...,
-        description="Trading date for STEP-3 execution"
+        description="Trading date for STEP-3 preview"
     )
 
 
 @router.post(
-    "/execute",
+    "/preview",
     response_model=Step3ExecutionResponse,
     status_code=status.HTTP_200_OK,
 )
-def execute_step3(
-    request: Step3ExecuteRequest,
+def preview_step3(
+    request: Step3PreviewRequest,
     db: Session = Depends(get_db),
 ):
     """
-    STEP-3 — Execution Control & Candidate Selection
+    STEP-3 — Execution Control & Stock Selection
 
-    - Deterministic
-    - Idempotent
-    - Backend-authoritative
+    LOCKED RULES:
+    - Backend is source of truth
+    - STEP-3A always computed
+    - STEP-3B always activated after STEP-1 & STEP-2 freeze
     - Never fails due to missing automation
+    - Idempotent
     """
 
     try:
@@ -51,15 +55,13 @@ def execute_step3(
         )
 
     except ValueError as e:
-        # Domain violation (STEP-1 / STEP-2 not frozen)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
 
-    except Exception as e:
-        # Infrastructure / unexpected error
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to execute STEP-3",
+            detail="Failed to preview STEP-3",
         )

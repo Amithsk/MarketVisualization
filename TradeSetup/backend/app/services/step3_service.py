@@ -15,33 +15,78 @@ from backend.app.schemas.step3_schema import (
 
 
 # -------------------------------------------------
-# Internal helpers
+# STEP-3A — Deterministic Matrix (FROZEN)
+# -------------------------------------------------
+
+def _derive_step3a(step1_context: str, trade_permission: str):
+    """
+    Derives:
+    - allowed_strategies
+    - max_trades_allowed
+    - execution_enabled
+    """
+
+    allowed: list[str] = []
+    max_trades = 0
+
+    if step1_context == "TREND" and trade_permission == "YES":
+        allowed = ["GAP_FOLLOW", "MOMENTUM"]
+        max_trades = 3
+
+    elif step1_context == "TREND" and trade_permission == "LIMITED":
+        allowed = ["MOMENTUM"]
+        max_trades = 1
+
+    elif step1_context == "RANGE" and trade_permission == "YES":
+        allowed = ["MOMENTUM"]
+        max_trades = 1
+
+    elif step1_context == "RANGE" and trade_permission == "LIMITED":
+        allowed = []
+        max_trades = 0
+
+    elif trade_permission == "NO":
+        allowed = []
+        max_trades = 0
+
+    elif step1_context == "NO_TRADE":
+        allowed = []
+        max_trades = 0
+
+    execution_enabled = max_trades > 0
+
+    return allowed, max_trades, execution_enabled
+
+
+# -------------------------------------------------
+# Automation Stubs (MANUAL-FIRST)
 # -------------------------------------------------
 
 def _automation_available(trade_date: date) -> bool:
     """
-    Stub for candidate automation availability.
-    MANUAL-FIRST by default.
+    MANUAL-FIRST.
+    Replace when automation pipeline is ready.
     """
     return False
 
 
 def _generate_trade_candidates(trade_date: date) -> list[TradeCandidate]:
     """
-    Deterministic AUTO candidate generation.
+    Deterministic AUTO candidate generation stub.
+    Must comply with final schema.
     """
     return [
         TradeCandidate(
             symbol="RELIANCE",
             direction="LONG",
-            setup_type="TREND_CONTINUATION",
-            notes="Strong relative strength",
+            strategy_used="MOMENTUM",
+            reason="Relative strength aligned and structure intact.",
         ),
         TradeCandidate(
             symbol="TCS",
             direction="SHORT",
-            setup_type="MEAN_REVERSION",
-            notes="Extended opening range",
+            strategy_used="GAP_FOLLOW",
+            reason="Gap aligned with direction and holding above structure.",
         ),
     ]
 
@@ -50,9 +95,7 @@ def _load_persisted_candidates(
     db: Session,
     trade_date: date,
 ) -> list[TradeCandidate]:
-    """
-    Load already persisted STEP-3 candidates.
-    """
+
     rows = (
         db.query(Step3StockSelection)
         .filter(Step3StockSelection.trade_date == trade_date)
@@ -63,15 +106,15 @@ def _load_persisted_candidates(
         TradeCandidate(
             symbol=r.symbol,
             direction=r.direction,
-            setup_type=r.setup_type,
-            notes=r.notes,
+            strategy_used=r.strategy_used,
+            reason=r.reason,
         )
         for r in rows
     ]
 
 
 # -------------------------------------------------
-# Public service
+# Public Service
 # -------------------------------------------------
 
 def generate_step3_execution(
@@ -79,11 +122,13 @@ def generate_step3_execution(
     trade_date: date,
 ) -> Step3ExecutionResponse:
     """
-    STEP-3 — Execution Control & Candidate Selection
+    STEP-3 — Execution Control & Stock Selection
 
     LOCKED RULES:
     - Backend is source of truth
-    - MANUAL-FIRST for candidates
+    - STEP-3A always computed
+    - STEP-3B always activated after freeze
+    - MANUAL mode if automation unavailable
     - Never errors due to missing automation
     - Idempotent
     """
@@ -109,6 +154,17 @@ def generate_step3_execution(
         raise ValueError("STEP-2 must be frozen before STEP-3")
 
     # -------------------------
+    # STEP-3A — Always Derived
+    # -------------------------
+
+    allowed_strategies, max_trades_allowed, execution_enabled = _derive_step3a(
+        step1_context=step1.market_context,
+        trade_permission=step2.trade_permission,
+    )
+
+    generated_at = datetime.utcnow()
+
+    # -------------------------
     # Idempotency
     # -------------------------
 
@@ -123,21 +179,21 @@ def generate_step3_execution(
 
         snapshot = Step3ExecutionSnapshot(
             trade_date=trade_date,
-            execution_enabled=existing.execution_enabled,
+            allowed_strategies=allowed_strategies,
+            max_trades_allowed=max_trades_allowed,
+            execution_enabled=execution_enabled,
             candidates_mode=(
                 "AUTO" if len(candidates) > 0 else "MANUAL"
             ),
-            generated_at=existing.generated_at,
             candidates=candidates,
+            generated_at=existing.generated_at,
         )
+
         return Step3ExecutionResponse(snapshot=snapshot)
 
     # -------------------------
-    # STEP-3.1 — Execution Gate
+    # Persist Execution Control
     # -------------------------
-
-    execution_enabled = step2.trade_allowed
-    generated_at = datetime.utcnow()
 
     execution_control = Step3ExecutionControl(
         trade_date=trade_date,
@@ -145,16 +201,17 @@ def generate_step3_execution(
         generated_at=generated_at,
         frozen_at=generated_at,
     )
+
     db.add(execution_control)
+
+    # -------------------------
+    # STEP-3B — Candidate Mode
+    # -------------------------
 
     candidates: list[TradeCandidate] = []
     candidates_mode = "MANUAL"
 
-    # -------------------------
-    # STEP-3.2 — Candidate Mode
-    # -------------------------
-
-    if execution_enabled and _automation_available(trade_date):
+    if _automation_available(trade_date):
         candidates = _generate_trade_candidates(trade_date)
         candidates_mode = "AUTO"
 
@@ -164,24 +221,21 @@ def generate_step3_execution(
                     trade_date=trade_date,
                     symbol=c.symbol,
                     direction=c.direction,
-                    setup_type=c.setup_type,
-                    notes=c.notes,
+                    strategy_used=c.strategy_used,
+                    reason=c.reason,
                 )
             )
-
-    # MANUAL mode:
-    # - execution_enabled may be True
-    # - candidates empty
-    # - frontend must allow manual entry
 
     db.commit()
 
     snapshot = Step3ExecutionSnapshot(
         trade_date=trade_date,
+        allowed_strategies=allowed_strategies,
+        max_trades_allowed=max_trades_allowed,
         execution_enabled=execution_enabled,
         candidates_mode=candidates_mode,
-        generated_at=generated_at,
         candidates=candidates,
+        generated_at=generated_at,
     )
 
     return Step3ExecutionResponse(snapshot=snapshot)
