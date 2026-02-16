@@ -53,11 +53,10 @@ export function useTradeDayState(tradeDate: TradeDate) {
       // STEP-2 unlocked only after STEP-1 freeze
       canAccessStep2: step1Frozen,
 
-      // STEP-3 unlocked only after STEP-2 freeze + trade allowed
+      // STEP-3 unlocked after STEP-2 freeze (independent of tradeAllowed)
       canAccessStep3:
         step1Frozen &&
-        step2Frozen &&
-        tradeAllowed,
+        step2Frozen,
 
       // STEP-4 unlocked only after execution is enabled
       canAccessStep4:

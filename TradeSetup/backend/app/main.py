@@ -1,11 +1,24 @@
+# backend/app/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+# -------------------------------
+# IMPORTANT: Import ALL models
+# Ensures SQLAlchemy registers them
+# -------------------------------
+from backend.app.models.step1_market_context import Step1MarketContext
+from backend.app.models.step2_market_behavior import Step2MarketBehavior
+from backend.app.models.step2_market_open_behavior import Step2MarketOpenBehavior
+from backend.app.models.step3_execution_control import Step3ExecutionControl
+from backend.app.models.step3_stock_selection import Step3StockSelection
+from backend.app.models.step4_trade import Step4Trade
 
 from backend.app.api.step1 import router as step1_router
 from backend.app.api.step2 import router as step2_router
 from backend.app.api.step3 import router as step3_router
 from backend.app.api.step4 import router as step4_router
-import logging
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,8 +29,6 @@ app = FastAPI(title="TradeSetup Backend")
 
 # -------------------------------------------------
 # CORS (required for Next.js frontend)
-# IMPORTANT:
-# Allow BOTH localhost and 127.0.0.1
 # -------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
@@ -32,9 +43,6 @@ app.add_middleware(
 
 # -------------------------------------------------
 # API Routers
-# IMPORTANT:
-# Routers ALREADY define their own prefixes
-# DO NOT re-prefix them here
 # -------------------------------------------------
 app.include_router(step1_router)
 app.include_router(step2_router)

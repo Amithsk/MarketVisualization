@@ -4,10 +4,10 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 from typing import List
 import logging
-import traceback
 
 from backend.app.models.step1_market_context import Step1MarketContext
 from backend.app.models.step2_market_behavior import Step2MarketBehavior
+from backend.app.models.step2_market_open_behavior import Step2MarketOpenBehavior
 from backend.app.schemas.step2_schema import (
     Step2PreviewResponse,
     Step2FrozenResponse,
@@ -19,7 +19,7 @@ from backend.app.schemas.step2_schema import (
 logger = logging.getLogger(__name__)
 
 # =====================================================
-# ANALYTICAL ENGINE (Option B)
+# ANALYTICAL ENGINE
 # =====================================================
 
 def _compute_ir(candles: List[Step2CandleInput]):
@@ -88,18 +88,12 @@ def _range_hold_status(candles: List[Step2CandleInput], ir_high, ir_low):
 def _derive_behavior(ir_range, vwap_cross_count, volatility_state):
     if volatility_state == "EXPANDING" and vwap_cross_count == 0:
         return "STRONG_UP"
-    if volatility_state == "CHAOTIC":
-        return "FLAT"
     return "WEAK_UP"
 
 
 def _evaluate_trade_permission(volatility_state, range_hold_status):
-    if volatility_state == "CHAOTIC":
-        return False
-
     if range_hold_status == "HELD":
         return True
-
     return False
 
 
@@ -149,7 +143,7 @@ def _build_snapshot(
 
 
 # =====================================================
-# PREVIEW (UNCHANGED)
+# PREVIEW
 # =====================================================
 
 def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewResponse:
@@ -187,7 +181,7 @@ def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewRespons
 
 
 # =====================================================
-# COMPUTE (NEW)
+# COMPUTE
 # =====================================================
 
 def compute_step2_behavior(
@@ -205,7 +199,7 @@ def compute_step2_behavior(
     if not step1:
         raise ValueError("STEP-1 must be frozen before STEP-2")
 
-    avg_5m_range_prev_day = None  # Placeholder (can connect to STEP-1 later)
+    avg_5m_range_prev_day = None
 
     ir_high, ir_low, ir_range = _compute_ir(candles)
 
@@ -224,7 +218,7 @@ def compute_step2_behavior(
     )
 
     early_volatility = volatility_state
-    market_participation = "BROAD"  # placeholder logic
+    market_participation = "BROAD"
 
     trade_allowed = _evaluate_trade_permission(
         volatility_state,
@@ -255,7 +249,7 @@ def compute_step2_behavior(
 
 
 # =====================================================
-# FREEZE
+# FREEZE (DUAL TABLE PERSISTENCE)
 # =====================================================
 
 def freeze_step2_behavior(
@@ -273,18 +267,61 @@ def freeze_step2_behavior(
 
     snapshot = compute_response.snapshot
 
-    context = Step2MarketBehavior(
-        trade_date=trade_date,
-        index_open_behavior=snapshot.index_open_behavior,
-        early_volatility=snapshot.early_volatility,
-        market_participation=snapshot.market_participation,
-        trade_allowed=snapshot.trade_allowed,
-        frozen_at=datetime.utcnow(),
-    )
+    volatility_map = {
+        "NORMAL": "NORMAL",
+        "EXPANDING": "EXCESSIVE",
+        "CONTRACTING": "LOW",
+    }
 
-    db.add(context)
+    vwap_map = {
+        "ABOVE_VWAP": "CLEAN",
+        "BELOW_VWAP": "CAUTION",
+        "MIXED": "CHOPPY",
+    }
+
+    range_map = {
+        "HELD": "VALID",
+        "BROKEN_UP": "FAILED",
+        "BROKEN_DOWN": "FAILED",
+    }
+
+    trade_permission = "YES" if snapshot.trade_allowed else "NO"
+
+    open_row = db.query(Step2MarketOpenBehavior).filter(
+        Step2MarketOpenBehavior.trade_date == trade_date
+    ).first()
+
+    if not open_row:
+        open_row = Step2MarketOpenBehavior(trade_date=trade_date)
+        db.add(open_row)
+
+    open_row.ir_high = snapshot.ir_high or 0.0
+    open_row.ir_low = snapshot.ir_low or 0.0
+    open_row.ir_range = snapshot.ir_range or 0.0
+    open_row.ir_ratio = snapshot.ir_ratio or 0.0
+    open_row.volatility_state = volatility_map.get(snapshot.volatility_state, "NORMAL")
+    open_row.vwap_cross_count = snapshot.vwap_cross_count or 0
+    open_row.vwap_state = vwap_map.get(snapshot.vwap_state, "CAUTION")
+    open_row.range_hold_status = range_map.get(snapshot.range_hold_status, "NONE")
+    open_row.trade_permission = trade_permission
+    open_row.reason = reason or "System derived"
+    open_row.decision_locked_at = datetime.utcnow()
+
+    behavior_row = db.query(Step2MarketBehavior).filter(
+        Step2MarketBehavior.trade_date == trade_date
+    ).first()
+
+    if not behavior_row:
+        behavior_row = Step2MarketBehavior(trade_date=trade_date)
+        db.add(behavior_row)
+
+    behavior_row.index_open_behavior = snapshot.index_open_behavior
+    behavior_row.early_volatility = snapshot.early_volatility
+    behavior_row.market_participation = snapshot.market_participation
+    behavior_row.trade_allowed = snapshot.trade_allowed
+    behavior_row.frozen_at = datetime.utcnow()
+
     db.commit()
-    db.refresh(context)
 
     frozen_snapshot = _build_snapshot(
         trade_date=trade_date,
@@ -303,7 +340,7 @@ def freeze_step2_behavior(
         early_volatility=snapshot.early_volatility,
         market_participation=snapshot.market_participation,
         trade_allowed=snapshot.trade_allowed,
-        frozen_at=context.frozen_at,
+        frozen_at=datetime.utcnow(),
     )
 
     return Step2FrozenResponse(snapshot=frozen_snapshot)

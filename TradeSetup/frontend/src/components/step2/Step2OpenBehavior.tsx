@@ -123,6 +123,23 @@ export default function Step2OpenBehavior({
       )}
 
       {/* =====================================================
+         PREVIOUS DAY BASELINE (SYSTEM)
+         ===================================================== */}
+      {snapshot?.avg_5m_range_prev_day !== null &&
+        snapshot?.avg_5m_range_prev_day !== undefined && (
+          <div className="rounded border p-4 space-y-2">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Previous Day Baseline (System)
+            </h3>
+
+            <Metric
+              label="Avg 5-min Range (Prev Day)"
+              value={snapshot.avg_5m_range_prev_day}
+            />
+          </div>
+        )}
+
+      {/* =====================================================
          MANUAL INPUT GRID
          ===================================================== */}
       {manualInputRequired && !isFrozen && (
