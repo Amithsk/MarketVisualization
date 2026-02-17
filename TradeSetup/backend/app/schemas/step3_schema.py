@@ -1,7 +1,6 @@
 # backend/app/schemas/step3_schema.py
-
 from datetime import date, datetime
-from typing import List, Optional, Literal
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
 
@@ -55,6 +54,8 @@ class Step3ExecutionSnapshot(BaseModel):
     Immutable STEP-3 Snapshot
 
     STEP-3A:
+        - Market Context (from STEP-1)
+        - Trade Permission (from STEP-2)
         - How much trading is allowed today (system-derived)
 
     STEP-3B:
@@ -67,6 +68,16 @@ class Step3ExecutionSnapshot(BaseModel):
     # =========================
     # STEP-3A — Strategy & Risk Control (Index Level)
     # =========================
+
+    market_context: str = Field(
+        ...,
+        description="Final market context derived from STEP-1"
+    )
+
+    trade_permission: str = Field(
+        ...,
+        description="Trade permission derived from STEP-2 open behavior"
+    )
 
     allowed_strategies: List[str] = Field(
         default_factory=list,
@@ -105,7 +116,8 @@ class Step3ExecutionSnapshot(BaseModel):
     generated_at: datetime
 
     class Config:
-        orm_mode = True
+        # ✅ Pydantic v2 compliant
+        from_attributes = True
 
 
 # =========================

@@ -1,4 +1,7 @@
-// frontend/src/hooks/useStep3.ts
+// =========================================================
+// File: frontend/src/hooks/useStep3.ts
+// =========================================================
+
 "use client";
 
 import { useCallback, useState } from "react";
@@ -52,17 +55,20 @@ export function useStep3(tradeDate: TradeDate) {
   return {
     snapshot,
 
-    // -------------------------
+    // =========================
     // STEP-3A — Index Level
-    // -------------------------
+    // =========================
+
+    marketContext: snapshot?.marketContext ?? null,
+    tradePermission: snapshot?.tradePermission ?? null,
 
     allowedStrategies: snapshot?.allowedStrategies ?? [],
     maxTradesAllowed: snapshot?.maxTradesAllowed ?? 0,
     executionEnabled: snapshot?.executionEnabled ?? false,
 
-    // -------------------------
+    // =========================
     // STEP-3B — Stock Funnel
-    // -------------------------
+    // =========================
 
     candidatesMode: snapshot?.candidatesMode ?? "MANUAL",
     candidates: snapshot?.candidates ?? [],

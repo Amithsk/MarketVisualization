@@ -1,4 +1,6 @@
-// frontend/src/types/step3.types.ts
+// =========================================================
+// File: frontend/src/types/step3.types.ts
+// =========================================================
 
 import type { TradeDate, IsoTimestamp } from "@/types/common.types";
 
@@ -6,7 +8,7 @@ import type { TradeDate, IsoTimestamp } from "@/types/common.types";
  * STEP-3: Execution Control & Stock Selection
  * -------------------------------------------
  * Backend is authoritative.
- * Frontend is display + assisted manual entry only.
+ * Frontend is display only.
  */
 
 
@@ -42,14 +44,7 @@ export interface TradeCandidate {
 /**
  * STEP-3 execution snapshot.
  *
- * STEP-3A:
- *  - allowedStrategies
- *  - maxTradesAllowed
- *  - executionEnabled
- *
- * STEP-3B:
- *  - candidatesMode
- *  - candidates list (AUTO or MANUAL)
+ * MUST match backend Step3ExecutionSnapshot exactly.
  */
 export interface Step3ExecutionSnapshot {
   tradeDate: TradeDate;
@@ -57,6 +52,18 @@ export interface Step3ExecutionSnapshot {
   // -------------------------
   // STEP-3A — Index Level
   // -------------------------
+
+  /**
+   * Market context derived from STEP-1
+   * Example: TREND_DAY | RANGE_UNCERTAIN_DAY | NO_TRADE_DAY
+   */
+  marketContext: string;
+
+  /**
+   * Trade permission derived from STEP-2
+   * Example: YES | LIMITED | NO
+   */
+  tradePermission: string;
 
   /**
    * Allowed strategies for the day.
@@ -87,7 +94,7 @@ export interface Step3ExecutionSnapshot {
 
   /**
    * Candidate list.
-   * Empty is a VALID state.
+   * Empty is VALID state.
    */
   candidates: TradeCandidate[];
 

@@ -1,7 +1,9 @@
-// frontend/src/components/step3/Step3ExecutionControl.tsx
+// =========================================================
+// File: frontend/src/components/step3/Step3ExecutionControl.tsx
+// =========================================================
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { TradeDate } from "@/types/common.types";
 import type { useStep3 } from "@/hooks/useStep3";
 
@@ -27,8 +29,16 @@ export default function Step3ExecutionControl({
     previewStep3,
   } = step3;
 
+  /**
+   * Prevent double preview call in React StrictMode
+   */
+  const hasPreviewed = useRef(false);
+
   useEffect(() => {
-    previewStep3();
+    if (!hasPreviewed.current) {
+      previewStep3();
+      hasPreviewed.current = true;
+    }
   }, [previewStep3]);
 
   return (
@@ -51,7 +61,9 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* STEP-3A — Always Visible After Preview */}
+      {/* ===================================================== */}
+      {/* STEP-3A — Strategy & Risk Control                    */}
+      {/* ===================================================== */}
       {snapshot && (
         <div className="rounded border">
           <div className="border-b px-4 py-3">
@@ -61,6 +73,23 @@ export default function Step3ExecutionControl({
           </div>
 
           <div className="p-4 space-y-2 text-sm">
+            {/* 🔹 Market Context */}
+            <div className="flex justify-between">
+              <span className="text-gray-500">Market Context</span>
+              <span className="font-medium">
+                {snapshot.marketContext}
+              </span>
+            </div>
+
+            {/* 🔹 Trade Permission */}
+            <div className="flex justify-between">
+              <span className="text-gray-500">Trade Permission</span>
+              <span className="font-medium">
+                {snapshot.tradePermission}
+              </span>
+            </div>
+
+            {/* 🔹 Allowed Strategies */}
             <div className="flex justify-between">
               <span className="text-gray-500">Allowed Strategies</span>
               <span className="font-medium">
@@ -70,6 +99,7 @@ export default function Step3ExecutionControl({
               </span>
             </div>
 
+            {/* 🔹 Max Trades */}
             <div className="flex justify-between">
               <span className="text-gray-500">Max Trades Allowed</span>
               <span className="font-medium">
@@ -77,6 +107,7 @@ export default function Step3ExecutionControl({
               </span>
             </div>
 
+            {/* 🔹 Execution Enabled */}
             <div className="flex justify-between">
               <span className="text-gray-500">Execution Enabled</span>
               <span
@@ -93,7 +124,9 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* STEP-3B — Always Activated After Freeze */}
+      {/* ===================================================== */}
+      {/* STEP-3B — Stock Selection Funnel                     */}
+      {/* ===================================================== */}
       {snapshot && (
         <div className="rounded border">
           <div className="border-b px-4 py-3">
@@ -142,7 +175,9 @@ export default function Step3ExecutionControl({
         </div>
       )}
 
-      {/* Constraints */}
+      {/* ===================================================== */}
+      {/* Execution Constraints                                 */}
+      {/* ===================================================== */}
       <div className="rounded border p-4">
         <h3 className="text-sm font-semibold text-gray-700">
           Execution Constraints

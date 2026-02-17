@@ -1,4 +1,6 @@
-# backend/app/services/step3_service.py
+# =========================================================
+# File: backend/app/services/step3_service.py
+# =========================================================
 
 from datetime import date, datetime
 from sqlalchemy.orm import Session
@@ -119,7 +121,10 @@ def generate_step3_execution(
     )
 
     if not step2_open:
-        logger.error("[STEP3][ERROR] STEP-2 open decision missing trade_date=%s", trade_date)
+        logger.error(
+            "[STEP3][ERROR] STEP-2 open decision missing trade_date=%s",
+            trade_date,
+        )
         raise ValueError("STEP-2 open decision missing")
 
     # -------------------------
@@ -165,6 +170,8 @@ def generate_step3_execution(
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
                 trade_date=trade_date,
+                market_context=existing.market_context,
+                trade_permission=existing.trade_permission,
                 allowed_strategies=allowed_strategies,
                 max_trades_allowed=max_trades_allowed,
                 execution_enabled=execution_allowed,
@@ -186,7 +193,7 @@ def generate_step3_execution(
         trade_permission=step2_open.trade_permission,
         allowed_strategies=",".join(allowed_strategies),
         max_trades_allowed=max_trades_allowed,
-        execution_allowed=execution_allowed,
+        execution_allowed=int(execution_allowed),
         decided_at=decided_at,
     )
 
@@ -209,9 +216,11 @@ def generate_step3_execution(
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
                 trade_date=trade_date,
+                market_context=existing.market_context,
+                trade_permission=existing.trade_permission,
                 allowed_strategies=allowed_strategies,
                 max_trades_allowed=max_trades_allowed,
-                execution_enabled=execution_allowed,
+                execution_enabled=bool(existing.execution_allowed),
                 candidates_mode="MANUAL",
                 candidates=[],
                 generated_at=existing.decided_at,
@@ -227,6 +236,8 @@ def generate_step3_execution(
     return Step3ExecutionResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
+            market_context=step1.final_market_context,
+            trade_permission=step2_open.trade_permission,
             allowed_strategies=allowed_strategies,
             max_trades_allowed=max_trades_allowed,
             execution_enabled=execution_allowed,
