@@ -1,7 +1,7 @@
-// src/hooks/useTradeDayState.ts
+// frontend/src/hooks/useTradeDayState.ts
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import type { TradeDate } from "@/types/common.types";
 
 import { useStep1 } from "@/hooks/useStep1";
@@ -43,7 +43,6 @@ export function useTradeDayState(tradeDate: TradeDate) {
   const gates = useMemo(() => {
     const step1Frozen = step1.isFrozen;
     const step2Frozen = step2.isFrozen;
-    const tradeAllowed = step2.tradeAllowed === true;
     const executionEnabled = step3.executionEnabled === true;
     const tradeFrozen = step4.isFrozen;
 
@@ -53,43 +52,60 @@ export function useTradeDayState(tradeDate: TradeDate) {
       // STEP-2 unlocked only after STEP-1 freeze
       canAccessStep2: step1Frozen,
 
-      // STEP-3 unlocked after STEP-2 freeze (independent of tradeAllowed)
+      // STEP-3 unlocked after STEP-2 freeze
       canAccessStep3:
         step1Frozen &&
         step2Frozen,
 
-      // STEP-4 unlocked only after execution is enabled
+      // STEP-4 unlocked only after STEP-3 allows execution
       canAccessStep4:
         step1Frozen &&
         step2Frozen &&
-        tradeAllowed &&
         executionEnabled &&
         !tradeFrozen,
     };
   }, [
     step1.isFrozen,
     step2.isFrozen,
-    step2.tradeAllowed,
     step3.executionEnabled,
     step4.isFrozen,
   ]);
 
-  if (DEBUG) {
-    console.log(
-      "%c[GATE STATE]",
-      "color:#00aaff;font-weight:bold",
-      {
-        tradeDate,
-        step1Frozen: step1.isFrozen,
-        step2Frozen: step2.isFrozen,
-        tradeAllowed: step2.tradeAllowed,
-        executionEnabled: step3.executionEnabled,
-        canAccessStep2: gates.canAccessStep2,
-        canAccessStep3: gates.canAccessStep3,
-        canAccessStep4: gates.canAccessStep4,
-      }
-    );
-  }
+  /**
+   * Controlled Debug Logging
+   * Logs ONLY when gate state changes
+   */
+  const prevGateRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!DEBUG) return;
+
+    const snapshot = JSON.stringify(gates);
+
+    if (prevGateRef.current !== snapshot) {
+      console.log(
+        "%c[GATE STATE]",
+        "color:#00aaff;font-weight:bold",
+        {
+          tradeDate,
+          step1Frozen: step1.isFrozen,
+          step2Frozen: step2.isFrozen,
+          executionEnabled: step3.executionEnabled,
+          canAccessStep2: gates.canAccessStep2,
+          canAccessStep3: gates.canAccessStep3,
+          canAccessStep4: gates.canAccessStep4,
+        }
+      );
+
+      prevGateRef.current = snapshot;
+    }
+  }, [
+    gates,
+    tradeDate,
+    step1.isFrozen,
+    step2.isFrozen,
+    step3.executionEnabled,
+  ]);
 
   return {
     tradeDate,

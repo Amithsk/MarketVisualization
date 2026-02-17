@@ -2,9 +2,12 @@
 
 from datetime import date, datetime
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+import logging
 
 from backend.app.models.step1_market_context import Step1MarketContext
 from backend.app.models.step2_market_behavior import Step2MarketBehavior
+from backend.app.models.step2_market_open_behavior import Step2MarketOpenBehavior
 from backend.app.models.step3_execution_control import Step3ExecutionControl
 from backend.app.models.step3_stock_selection import Step3StockSelection
 from backend.app.schemas.step3_schema import (
@@ -13,35 +16,36 @@ from backend.app.schemas.step3_schema import (
     TradeCandidate,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # -------------------------------------------------
-# STEP-3A — Deterministic Matrix (FROZEN)
+# STEP-3A — Deterministic Matrix (DB ALIGNED)
 # -------------------------------------------------
 
-def _derive_step3a(step1_context: str, trade_permission: str):
-    """
-    Derives:
-    - allowed_strategies
-    - max_trades_allowed
-    - execution_enabled
-    """
+def _derive_step3a(market_context: str, trade_permission: str):
+    logger.info(
+        "[STEP3][DERIVE][INPUT] context=%s permission=%s",
+        market_context,
+        trade_permission,
+    )
 
     allowed: list[str] = []
     max_trades = 0
 
-    if step1_context == "TREND" and trade_permission == "YES":
+    if market_context == "TREND_DAY" and trade_permission == "YES":
         allowed = ["GAP_FOLLOW", "MOMENTUM"]
         max_trades = 3
 
-    elif step1_context == "TREND" and trade_permission == "LIMITED":
+    elif market_context == "TREND_DAY" and trade_permission == "LIMITED":
         allowed = ["MOMENTUM"]
         max_trades = 1
 
-    elif step1_context == "RANGE" and trade_permission == "YES":
+    elif market_context == "RANGE_UNCERTAIN_DAY" and trade_permission == "YES":
         allowed = ["MOMENTUM"]
         max_trades = 1
 
-    elif step1_context == "RANGE" and trade_permission == "LIMITED":
+    elif market_context == "RANGE_UNCERTAIN_DAY" and trade_permission == "LIMITED":
         allowed = []
         max_trades = 0
 
@@ -49,68 +53,20 @@ def _derive_step3a(step1_context: str, trade_permission: str):
         allowed = []
         max_trades = 0
 
-    elif step1_context == "NO_TRADE":
+    elif market_context == "NO_TRADE_DAY":
         allowed = []
         max_trades = 0
 
-    execution_enabled = max_trades > 0
+    execution_allowed = max_trades > 0
 
-    return allowed, max_trades, execution_enabled
-
-
-# -------------------------------------------------
-# Automation Stubs (MANUAL-FIRST)
-# -------------------------------------------------
-
-def _automation_available(trade_date: date) -> bool:
-    """
-    MANUAL-FIRST.
-    Replace when automation pipeline is ready.
-    """
-    return False
-
-
-def _generate_trade_candidates(trade_date: date) -> list[TradeCandidate]:
-    """
-    Deterministic AUTO candidate generation stub.
-    Must comply with final schema.
-    """
-    return [
-        TradeCandidate(
-            symbol="RELIANCE",
-            direction="LONG",
-            strategy_used="MOMENTUM",
-            reason="Relative strength aligned and structure intact.",
-        ),
-        TradeCandidate(
-            symbol="TCS",
-            direction="SHORT",
-            strategy_used="GAP_FOLLOW",
-            reason="Gap aligned with direction and holding above structure.",
-        ),
-    ]
-
-
-def _load_persisted_candidates(
-    db: Session,
-    trade_date: date,
-) -> list[TradeCandidate]:
-
-    rows = (
-        db.query(Step3StockSelection)
-        .filter(Step3StockSelection.trade_date == trade_date)
-        .all()
+    logger.info(
+        "[STEP3][DERIVE][RESULT] allowed=%s max_trades=%s execution_allowed=%s",
+        allowed,
+        max_trades,
+        execution_allowed,
     )
 
-    return [
-        TradeCandidate(
-            symbol=r.symbol,
-            direction=r.direction,
-            strategy_used=r.strategy_used,
-            reason=r.reason,
-        )
-        for r in rows
-    ]
+    return allowed, max_trades, execution_allowed
 
 
 # -------------------------------------------------
@@ -121,20 +77,11 @@ def generate_step3_execution(
     db: Session,
     trade_date: date,
 ) -> Step3ExecutionResponse:
-    """
-    STEP-3 — Execution Control & Stock Selection
 
-    LOCKED RULES:
-    - Backend is source of truth
-    - STEP-3A always computed
-    - STEP-3B always activated after freeze
-    - MANUAL mode if automation unavailable
-    - Never errors due to missing automation
-    - Idempotent
-    """
+    logger.info("[STEP3][START] trade_date=%s", trade_date)
 
     # -------------------------
-    # Preconditions
+    # STEP-1 must exist
     # -------------------------
 
     step1 = (
@@ -142,30 +89,52 @@ def generate_step3_execution(
         .filter(Step1MarketContext.trade_date == trade_date)
         .first()
     )
-    if not step1 or not step1.frozen_at:
+
+    if not step1:
+        logger.error("[STEP3][ERROR] STEP-1 missing trade_date=%s", trade_date)
         raise ValueError("STEP-1 must be frozen before STEP-3")
 
-    step2 = (
+    # -------------------------
+    # STEP-2 freeze check
+    # -------------------------
+
+    step2_behavior = (
         db.query(Step2MarketBehavior)
         .filter(Step2MarketBehavior.trade_date == trade_date)
         .first()
     )
-    if not step2 or not step2.frozen_at:
+
+    if not step2_behavior or not step2_behavior.frozen_at:
+        logger.error("[STEP3][ERROR] STEP-2 not frozen trade_date=%s", trade_date)
         raise ValueError("STEP-2 must be frozen before STEP-3")
 
     # -------------------------
-    # STEP-3A — Always Derived
+    # STEP-2 open decision
     # -------------------------
 
-    allowed_strategies, max_trades_allowed, execution_enabled = _derive_step3a(
-        step1_context=step1.market_context,
-        trade_permission=step2.trade_permission,
+    step2_open = (
+        db.query(Step2MarketOpenBehavior)
+        .filter(Step2MarketOpenBehavior.trade_date == trade_date)
+        .first()
     )
 
-    generated_at = datetime.utcnow()
+    if not step2_open:
+        logger.error("[STEP3][ERROR] STEP-2 open decision missing trade_date=%s", trade_date)
+        raise ValueError("STEP-2 open decision missing")
 
     # -------------------------
-    # Idempotency
+    # STEP-3A Derivation
+    # -------------------------
+
+    allowed_strategies, max_trades_allowed, execution_allowed = _derive_step3a(
+        market_context=step1.final_market_context,
+        trade_permission=step2_open.trade_permission,
+    )
+
+    decided_at = datetime.utcnow()
+
+    # -------------------------
+    # Idempotency Check
     # -------------------------
 
     existing = (
@@ -174,68 +143,95 @@ def generate_step3_execution(
         .first()
     )
 
-    if existing and existing.frozen_at:
-        candidates = _load_persisted_candidates(db, trade_date)
+    if existing:
+        logger.info("[STEP3][IDEMPOTENT] trade_date=%s", trade_date)
 
-        snapshot = Step3ExecutionSnapshot(
+        rows = (
+            db.query(Step3StockSelection)
+            .filter(Step3StockSelection.trade_date == trade_date)
+            .all()
+        )
+
+        candidates = [
+            TradeCandidate(
+                symbol=r.symbol,
+                direction=r.direction,
+                strategy_used=r.strategy_used,
+                reason=r.reason,
+            )
+            for r in rows
+        ]
+
+        return Step3ExecutionResponse(
+            snapshot=Step3ExecutionSnapshot(
+                trade_date=trade_date,
+                allowed_strategies=allowed_strategies,
+                max_trades_allowed=max_trades_allowed,
+                execution_enabled=execution_allowed,
+                candidates_mode="AUTO" if len(candidates) > 0 else "MANUAL",
+                candidates=candidates,
+                generated_at=existing.decided_at,
+            )
+        )
+
+    # -------------------------
+    # Persist STEP-3 Decision (Race-Safe)
+    # -------------------------
+
+    logger.info("[STEP3][DB][INSERT] trade_date=%s", trade_date)
+
+    execution_row = Step3ExecutionControl(
+        trade_date=trade_date,
+        market_context=step1.final_market_context,
+        trade_permission=step2_open.trade_permission,
+        allowed_strategies=",".join(allowed_strategies),
+        max_trades_allowed=max_trades_allowed,
+        execution_allowed=execution_allowed,
+        decided_at=decided_at,
+    )
+
+    try:
+        db.add(execution_row)
+        db.commit()
+    except IntegrityError:
+        logger.warning(
+            "[STEP3][DB][RACE] Duplicate insert detected trade_date=%s",
+            trade_date,
+        )
+        db.rollback()
+
+        existing = (
+            db.query(Step3ExecutionControl)
+            .filter(Step3ExecutionControl.trade_date == trade_date)
+            .first()
+        )
+
+        return Step3ExecutionResponse(
+            snapshot=Step3ExecutionSnapshot(
+                trade_date=trade_date,
+                allowed_strategies=allowed_strategies,
+                max_trades_allowed=max_trades_allowed,
+                execution_enabled=execution_allowed,
+                candidates_mode="MANUAL",
+                candidates=[],
+                generated_at=existing.decided_at,
+            )
+        )
+
+    logger.info(
+        "[STEP3][SUCCESS] trade_date=%s execution_allowed=%s",
+        trade_date,
+        execution_allowed,
+    )
+
+    return Step3ExecutionResponse(
+        snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
             allowed_strategies=allowed_strategies,
             max_trades_allowed=max_trades_allowed,
-            execution_enabled=execution_enabled,
-            candidates_mode=(
-                "AUTO" if len(candidates) > 0 else "MANUAL"
-            ),
-            candidates=candidates,
-            generated_at=existing.generated_at,
+            execution_enabled=execution_allowed,
+            candidates_mode="MANUAL",
+            candidates=[],
+            generated_at=decided_at,
         )
-
-        return Step3ExecutionResponse(snapshot=snapshot)
-
-    # -------------------------
-    # Persist Execution Control
-    # -------------------------
-
-    execution_control = Step3ExecutionControl(
-        trade_date=trade_date,
-        execution_enabled=execution_enabled,
-        generated_at=generated_at,
-        frozen_at=generated_at,
     )
-
-    db.add(execution_control)
-
-    # -------------------------
-    # STEP-3B — Candidate Mode
-    # -------------------------
-
-    candidates: list[TradeCandidate] = []
-    candidates_mode = "MANUAL"
-
-    if _automation_available(trade_date):
-        candidates = _generate_trade_candidates(trade_date)
-        candidates_mode = "AUTO"
-
-        for c in candidates:
-            db.add(
-                Step3StockSelection(
-                    trade_date=trade_date,
-                    symbol=c.symbol,
-                    direction=c.direction,
-                    strategy_used=c.strategy_used,
-                    reason=c.reason,
-                )
-            )
-
-    db.commit()
-
-    snapshot = Step3ExecutionSnapshot(
-        trade_date=trade_date,
-        allowed_strategies=allowed_strategies,
-        max_trades_allowed=max_trades_allowed,
-        execution_enabled=execution_enabled,
-        candidates_mode=candidates_mode,
-        candidates=candidates,
-        generated_at=generated_at,
-    )
-
-    return Step3ExecutionResponse(snapshot=snapshot)
