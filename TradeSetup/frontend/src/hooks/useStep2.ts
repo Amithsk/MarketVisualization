@@ -22,6 +22,18 @@ interface UseStep2Options {
 
 const DEBUG = true;
 
+/**
+ * STEP-2 Hook
+ *
+ * Hybrid Manual Mode (Automation Ready)
+ *
+ * Phase-1:
+ *   - avg5mRangePrevDay manually entered from UI
+ *
+ * Future Automation:
+ *   - backend will auto-derive baseline
+ *   - this hook will not need structural change
+ */
 export function useStep2(
   tradeDate: TradeDate,
   options?: UseStep2Options
@@ -64,11 +76,6 @@ export function useStep2(
     }
   }, [tradeDate, enabled]);
 
-  /**
-   * Only auto-preview when:
-   * - step is enabled
-   * - snapshot not already loaded
-   */
   useEffect(() => {
     if (!enabled) return;
     if (snapshot) return;
@@ -77,12 +84,15 @@ export function useStep2(
   }, [enabled, snapshot, previewStep2]);
 
   /* =====================================================
-     COMPUTE (Option B — Analytical Breakdown)
+     COMPUTE
      ===================================================== */
   const computeStep2 = useCallback(
-    async (candles: Step2CandleInput[]) => {
+    async (params: {
+      candles: Step2CandleInput[];
+      avg5mRangePrevDay: number;
+    }) => {
       if (!enabled) return;
-      if (snapshot?.frozen_at) return; // safety guard
+      if (snapshot?.frozen_at) return;
 
       setLoading(true);
       setError(null);
@@ -91,7 +101,8 @@ export function useStep2(
         const response: Step2ComputeResponse =
           await computeStep2Behavior({
             tradeDate,
-            candles,
+            candles: params.candles,
+            avg5mRangePrevDay: params.avg5mRangePrevDay,
           });
 
         if (DEBUG) {
@@ -115,6 +126,7 @@ export function useStep2(
   const freezeStep2 = useCallback(
     async (params: {
       candles: Step2CandleInput[];
+      avg5mRangePrevDay: number;
       reason?: string;
     }) => {
       if (!enabled) return;
@@ -128,6 +140,7 @@ export function useStep2(
           await freezeStep2Behavior({
             tradeDate,
             candles: params.candles,
+            avg5mRangePrevDay: params.avg5mRangePrevDay,
             reason: params.reason,
           });
 
@@ -149,7 +162,7 @@ export function useStep2(
   return {
     snapshot,
 
-    // Derived state (backend authority)
+    // Backend authoritative derived state
     mode: snapshot?.mode ?? "MANUAL",
     manualInputRequired: snapshot?.manual_input_required ?? true,
     isFrozen: !!snapshot?.frozen_at,

@@ -3,14 +3,17 @@
 // =========================================================
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TradeDate } from "@/types/common.types";
 import type { useStep3 } from "@/hooks/useStep3";
+import type { Step3StockContext } from "@/types/step3.types";
 
 interface Step3ExecutionControlProps {
   tradeDate: TradeDate;
   step3: ReturnType<typeof useStep3>;
 }
+
+interface ManualStockRow extends Step3StockContext {}
 
 export default function Step3ExecutionControl({
   tradeDate,
@@ -27,12 +30,28 @@ export default function Step3ExecutionControl({
     loading,
     error,
     previewStep3,
+    computeStep3Candidates,
+    freezeStep3Candidates,
   } = step3;
 
-  /**
-   * Prevent double preview call in React StrictMode
-   */
   const hasPreviewed = useRef(false);
+
+  const [stocks, setStocks] = useState<ManualStockRow[]>([
+    {
+      symbol: "",
+      avgTradedValue20d: 0,
+      atrPct: 0,
+      abnormalCandle: false,
+      stockOpen0915: 0,
+      stockCurrentPrice: 0,
+      niftyOpen0915: 0,
+      niftyCurrentPrice: 0,
+      gapPct: 0,
+      gapHold: false,
+      priceVsVwap: "ABOVE",
+      structureValid: false,
+    },
+  ]);
 
   useEffect(() => {
     if (!hasPreviewed.current) {
@@ -41,159 +60,201 @@ export default function Step3ExecutionControl({
     }
   }, [previewStep3]);
 
+  const updateField = (
+    index: number,
+    field: keyof ManualStockRow,
+    value: any
+  ) => {
+    const updated = [...stocks];
+    updated[index] = { ...updated[index], [field]: value };
+    setStocks(updated);
+  };
+
+  const addRow = () => {
+    setStocks((prev) => [
+      ...prev,
+      {
+        symbol: "",
+        avgTradedValue20d: 0,
+        atrPct: 0,
+        abnormalCandle: false,
+        stockOpen0915: 0,
+        stockCurrentPrice: 0,
+        niftyOpen0915: 0,
+        niftyCurrentPrice: 0,
+        gapPct: 0,
+        gapHold: false,
+        priceVsVwap: "ABOVE",
+        structureValid: false,
+      },
+    ]);
+  };
+
+  const removeRow = (index: number) => {
+    setStocks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCompute = () => {
+    const validStocks = stocks.filter(
+      (s) => s.symbol.trim().length > 0
+    );
+    if (validStocks.length === 0) return;
+    computeStep3Candidates(validStocks);
+  };
+
+  const handleFreeze = () => {
+    if (!snapshot || candidates.length === 0) return;
+    freezeStep3Candidates(candidates);
+  };
+
+  const isFrozen = candidatesMode === "AUTO" && candidates.length > 0;
+
   return (
     <div className="space-y-6">
-      {/* Meta */}
-      <div className="text-sm text-gray-500">
-        Execution Control for{" "}
-        <span className="font-medium">{tradeDate}</span>
-      </div>
-
-      {loading && (
-        <div className="text-sm text-gray-500">
-          Generating STEP-3 snapshot…
-        </div>
-      )}
-
-      {error && (
-        <div className="text-sm text-red-600">
-          {error.message}
-        </div>
-      )}
-
-      {/* ===================================================== */}
-      {/* STEP-3A — Strategy & Risk Control                    */}
-      {/* ===================================================== */}
       {snapshot && (
-        <div className="rounded border">
-          <div className="border-b px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-700">
-              STEP-3A — Strategy & Risk Control
-            </h3>
+        <div className="rounded border p-4 text-sm">
+          <div className="flex justify-between">
+            <span>Market Context</span>
+            <span>{snapshot.marketContext}</span>
           </div>
-
-          <div className="p-4 space-y-2 text-sm">
-            {/* 🔹 Market Context */}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Market Context</span>
-              <span className="font-medium">
-                {snapshot.marketContext}
-              </span>
-            </div>
-
-            {/* 🔹 Trade Permission */}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Trade Permission</span>
-              <span className="font-medium">
-                {snapshot.tradePermission}
-              </span>
-            </div>
-
-            {/* 🔹 Allowed Strategies */}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Allowed Strategies</span>
-              <span className="font-medium">
-                {allowedStrategies.length > 0
-                  ? allowedStrategies.join(", ")
-                  : "NO_TRADE"}
-              </span>
-            </div>
-
-            {/* 🔹 Max Trades */}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Max Trades Allowed</span>
-              <span className="font-medium">
-                {maxTradesAllowed}
-              </span>
-            </div>
-
-            {/* 🔹 Execution Enabled */}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Execution Enabled</span>
-              <span
-                className={`font-semibold ${
-                  executionEnabled
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {executionEnabled ? "YES" : "NO"}
-              </span>
-            </div>
+          <div className="flex justify-between">
+            <span>Allowed Strategies</span>
+            <span>
+              {allowedStrategies.length
+                ? allowedStrategies.join(", ")
+                : "NO_TRADE"}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Execution Enabled</span>
+            <span
+              className={
+                executionEnabled
+                  ? "text-green-600"
+                  : "text-red-600"
+              }
+            >
+              {executionEnabled ? "YES" : "NO"}
+            </span>
           </div>
         </div>
       )}
 
-      {/* ===================================================== */}
-      {/* STEP-3B — Stock Selection Funnel                     */}
-      {/* ===================================================== */}
-      {snapshot && (
-        <div className="rounded border">
-          <div className="border-b px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-700">
-              STEP-3B — Stock Selection Funnel
-            </h3>
-            <p className="text-xs text-gray-500">
-              {candidatesMode === "AUTO"
-                ? "System-generated • Read-only"
-                : "Manual entry required • Automation unavailable"}
-            </p>
-          </div>
+      {/* ================= INPUT SECTION ================= */}
+      {!isFrozen && (
+        <div className="rounded border p-4 space-y-4">
+          {stocks.map((row, index) => (
+            <div key={index} className="border p-3 rounded space-y-2">
+              <input
+                type="text"
+                placeholder="Symbol"
+                value={row.symbol}
+                onChange={(e) =>
+                  updateField(index, "symbol", e.target.value.toUpperCase())
+                }
+                className="border px-2 py-1 text-sm w-32"
+              />
 
-          <div className="p-4 space-y-3">
-            {candidates.length === 0 ? (
-              <div className="text-sm text-gray-400 italic">
-                {candidatesMode === "AUTO"
-                  ? "No candidates generated for today"
-                  : "Manual candidate entry UI should be enabled here"}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <input type="number" placeholder="Avg Value (Cr)"
+                  onChange={(e)=>updateField(index,"avgTradedValue20d",Number(e.target.value))} />
+                <input type="number" placeholder="ATR %"
+                  onChange={(e)=>updateField(index,"atrPct",Number(e.target.value))} />
+                <input type="number" placeholder="Gap %"
+                  onChange={(e)=>updateField(index,"gapPct",Number(e.target.value))} />
+                <input type="number" placeholder="Stock Open"
+                  onChange={(e)=>updateField(index,"stockOpen0915",Number(e.target.value))} />
+                <input type="number" placeholder="Stock Current"
+                  onChange={(e)=>updateField(index,"stockCurrentPrice",Number(e.target.value))} />
+                <input type="number" placeholder="Nifty Open"
+                  onChange={(e)=>updateField(index,"niftyOpen0915",Number(e.target.value))} />
+                <input type="number" placeholder="Nifty Current"
+                  onChange={(e)=>updateField(index,"niftyCurrentPrice",Number(e.target.value))} />
               </div>
-            ) : (
-              candidates.map((c) => (
-                <div
-                  key={c.symbol}
-                  className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-                >
-                  <div>
-                    <div className="font-medium">
-                      {c.symbol}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {c.strategyUsed}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {c.reason}
-                    </div>
-                  </div>
 
-                  <div className="font-semibold">
-                    {c.direction}
+              <div className="flex gap-4 text-xs">
+                <label>
+                  <input type="checkbox"
+                    onChange={(e)=>updateField(index,"abnormalCandle",e.target.checked)} />
+                  Abnormal
+                </label>
+                <label>
+                  <input type="checkbox"
+                    onChange={(e)=>updateField(index,"gapHold",e.target.checked)} />
+                  Gap Hold
+                </label>
+                <label>
+                  <input type="checkbox"
+                    onChange={(e)=>updateField(index,"structureValid",e.target.checked)} />
+                  Structure Valid
+                </label>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex gap-4">
+            <button onClick={addRow} className="text-xs text-blue-600">
+              + Add Stock
+            </button>
+            <button onClick={handleCompute} className="text-xs text-green-600 font-semibold">
+              Compute
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= RESULT SECTION ================= */}
+      {candidates.length > 0 && (
+        <div className="rounded border p-4 space-y-3">
+          {candidates.map((c) => {
+            const isPass = c.strategyUsed !== "NO_TRADE";
+
+            return (
+              <div key={c.symbol} className="border rounded p-3 text-sm">
+                <div className="flex justify-between">
+                  <div className="font-semibold">{c.symbol}</div>
+                  <div
+                    className={
+                      isPass
+                        ? "text-green-600 font-semibold"
+                        : "text-red-600 font-semibold"
+                    }
+                  >
+                    {isPass ? "PASS" : "REJECTED"}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+
+                <div className="text-xs mt-1">
+                  Direction: {c.direction}
+                </div>
+
+                <div className="text-xs">
+                  Strategy: {c.strategyUsed}
+                </div>
+
+                <div className="text-xs text-gray-500 mt-1">
+                  {c.reason}
+                </div>
+              </div>
+            );
+          })}
+
+          {!isFrozen && (
+            <button
+              onClick={handleFreeze}
+              className="text-xs text-purple-600 font-semibold"
+            >
+              Freeze Candidates
+            </button>
+          )}
         </div>
       )}
 
-      {/* ===================================================== */}
-      {/* Execution Constraints                                 */}
-      {/* ===================================================== */}
-      <div className="rounded border p-4">
-        <h3 className="text-sm font-semibold text-gray-700">
-          Execution Constraints
-        </h3>
-        <ul className="mt-2 list-disc pl-5 text-sm text-gray-500 space-y-1">
-          <li>Execution permission is system-controlled</li>
-          <li>Candidate mode is backend-controlled</li>
-          <li>No quantity or risk decisions at this step</li>
-        </ul>
-
-        {generatedAt && (
-          <div className="mt-3 text-xs text-gray-400">
-            Generated at {generatedAt}
-          </div>
-        )}
-      </div>
+      {generatedAt && (
+        <div className="text-xs text-gray-400">
+          Generated at {generatedAt}
+        </div>
+      )}
     </div>
   );
 }

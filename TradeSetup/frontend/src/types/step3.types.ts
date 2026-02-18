@@ -9,31 +9,75 @@ import type { TradeDate, IsoTimestamp } from "@/types/common.types";
  * -------------------------------------------
  * Backend is authoritative.
  * Frontend is display only.
+ *
+ * ARCHITECTURE NOTE (Hybrid Manual Mode)
+ * ---------------------------------------
+ * Phase-1:
+ *   - UI supplies full Step3StockContext inputs manually.
+ *   - Backend evaluates deterministically.
+ *
+ * Future Automation Mode:
+ *   - Step3StockContext will be built from stock data pipeline.
+ *   - Manual UI inputs will be removed.
+ *   - Evaluation engine will remain unchanged.
  */
 
 
-/**
- * Allowed trade direction (Layer-2 derived).
- */
+// =========================================================
+// Layer-3 Strategy Types
+// =========================================================
+
 export type TradeDirection = "LONG" | "SHORT";
 
-/**
- * Strategy assigned in Layer-3.
- */
 export type StrategyUsed =
   | "GAP_FOLLOW"
   | "MOMENTUM"
   | "NO_TRADE";
 
-/**
- * Candidate origin mode (BACKEND AUTHORITY).
- */
 export type CandidatesMode = "AUTO" | "MANUAL";
 
-/**
- * Final per-stock output from STEP-3B.
- * Deterministic and backend-derived.
- */
+
+// =========================================================
+// Canonical Input Model (Hybrid Mode)
+// MUST match backend Step3StockContext exactly
+// =========================================================
+
+export interface Step3StockContext {
+  symbol: string;
+
+  // -------------------------
+  // Layer 1 — Tradability
+  // -------------------------
+
+  avgTradedValue20d: number;
+  atrPct: number;
+  abnormalCandle: boolean;
+
+  // -------------------------
+  // Layer 2 — RS vs NIFTY
+  // -------------------------
+
+  stockOpen0915: number;
+  stockCurrentPrice: number;
+
+  niftyOpen0915: number;
+  niftyCurrentPrice: number;
+
+  // -------------------------
+  // Layer 3 — Strategy Fit
+  // -------------------------
+
+  gapPct: number;
+  gapHold: boolean;
+  priceVsVwap: "ABOVE" | "BELOW";
+  structureValid: boolean;
+}
+
+
+// =========================================================
+// Final Per-Stock Output (Backend Derived)
+// =========================================================
+
 export interface TradeCandidate {
   symbol: string;
   direction: TradeDirection;
@@ -41,11 +85,12 @@ export interface TradeCandidate {
   reason: string;
 }
 
-/**
- * STEP-3 execution snapshot.
- *
- * MUST match backend Step3ExecutionSnapshot exactly.
- */
+
+// =========================================================
+// STEP-3 Execution Snapshot
+// MUST match backend Step3ExecutionSnapshot
+// =========================================================
+
 export interface Step3ExecutionSnapshot {
   tradeDate: TradeDate;
 
@@ -53,60 +98,28 @@ export interface Step3ExecutionSnapshot {
   // STEP-3A — Index Level
   // -------------------------
 
-  /**
-   * Market context derived from STEP-1
-   * Example: TREND_DAY | RANGE_UNCERTAIN_DAY | NO_TRADE_DAY
-   */
   marketContext: string;
-
-  /**
-   * Trade permission derived from STEP-2
-   * Example: YES | LIMITED | NO
-   */
   tradePermission: string;
 
-  /**
-   * Allowed strategies for the day.
-   * Empty array is valid (NO_TRADE).
-   */
   allowedStrategies: string[];
-
-  /**
-   * Maximum trades permitted today.
-   */
   maxTradesAllowed: number;
-
-  /**
-   * Derived as maxTradesAllowed > 0.
-   */
   executionEnabled: boolean;
 
   // -------------------------
   // STEP-3B — Stock Funnel
   // -------------------------
 
-  /**
-   * Backend-declared candidate mode.
-   * AUTO   -> candidates preloaded
-   * MANUAL -> frontend must allow entry
-   */
   candidatesMode: CandidatesMode;
-
-  /**
-   * Candidate list.
-   * Empty is VALID state.
-   */
   candidates: TradeCandidate[];
 
-  /**
-   * Generation timestamp.
-   */
   generatedAt: IsoTimestamp;
 }
 
-/**
- * STEP-3 preview API response.
- */
+
+// =========================================================
+// API Response Types
+// =========================================================
+
 export interface Step3ExecutionResponse {
   snapshot: Step3ExecutionSnapshot;
 }

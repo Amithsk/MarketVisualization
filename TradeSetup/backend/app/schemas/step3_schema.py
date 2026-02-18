@@ -1,41 +1,134 @@
-# backend/app/schemas/step3_schema.py
+# =========================================================
+# File: backend/app/schemas/step3_schema.py
+# =========================================================
+"""
+STEP-3 Schema — Hybrid Manual Mode (Automation-Ready)
+
+IMPORTANT ARCHITECTURAL NOTE
+----------------------------
+
+STEP-3 is being developed in PHASE-1 (Hybrid Manual Mode).
+
+In this phase:
+- Trader manually provides Layer-1 / Layer-2 / Layer-3 inputs.
+- Backend runs deterministic evaluation engine.
+- Freeze persists ONLY final evaluated output.
+
+FUTURE AUTOMATION MIGRATION PLAN
+---------------------------------
+When stock data pipeline is implemented:
+
+1. Step3StockContext will be constructed internally from pipeline.
+2. Manual input fields will be removed from UI.
+3. The evaluation engine will remain unchanged.
+4. Compute endpoint will stop accepting manual metrics.
+5. No change required to TradeCandidate or Snapshot model.
+
+This ensures:
+- Zero rewrite of engine logic
+- Clean switch to automation
+- Deterministic and ML-traceable architecture
+"""
+
 from datetime import date, datetime
 from typing import List, Literal
 from pydantic import BaseModel, Field
 
 
-# =========================
-# Trade Candidate (Per Stock Output)
-# =========================
+# =========================================================
+# Canonical Input Model (Engine Input)
+# =========================================================
+
+class Step3StockContext(BaseModel):
+    """
+    Canonical per-stock evaluation input.
+
+    In Hybrid Mode:
+        Values come from manual UI entry.
+
+    In Future Automation Mode:
+        Values will be constructed from stock data pipeline.
+
+    The deterministic evaluation engine MUST ONLY depend on this model.
+    """
+
+    symbol: str = Field(..., min_length=1, max_length=32)
+
+    # -------------------------
+    # Layer 1 — Tradability
+    # -------------------------
+
+    avg_traded_value_20d: float = Field(
+        ...,
+        description="20-day average traded value in Crores"
+    )
+
+    atr_pct: float = Field(
+        ...,
+        description="ATR percentage of stock"
+    )
+
+    abnormal_candle: bool = Field(
+        ...,
+        description="True if abnormal rejection candle detected"
+    )
+
+    # -------------------------
+    # Layer 2 — RS vs NIFTY
+    # -------------------------
+
+    stock_open_0915: float
+    stock_current_price: float
+
+    nifty_open_0915: float
+    nifty_current_price: float
+
+    # -------------------------
+    # Layer 3 — Strategy Fit Inputs
+    # -------------------------
+
+    gap_pct: float
+
+    gap_hold: bool = Field(
+        ...,
+        description="True if gap hold condition satisfied"
+    )
+
+    price_vs_vwap: Literal["ABOVE", "BELOW"]
+
+    structure_valid: bool = Field(
+        ...,
+        description="True if HH/HL or LH/LL structure intact"
+    )
+
+
+# =========================================================
+# Trade Candidate (Final Evaluated Output)
+# =========================================================
 
 class TradeCandidate(BaseModel):
     """
-    STEP-3B Final Per-Stock Output (Deterministic, Read-Only)
+    STEP-3B Final Per-Stock Output (Deterministic)
 
-    This represents the result AFTER:
+    This represents the FINAL evaluation result AFTER:
     - Layer 1 (Tradability)
     - Layer 2 (RS Alignment)
     - Layer 3 (Strategy Fit)
 
-    It is NOT an execution order.
+    IMPORTANT:
+    Only these values are persisted on freeze.
+    Manual metrics are NOT persisted.
     """
 
     symbol: str = Field(
         ...,
         min_length=1,
         max_length=32,
-        description="Trading symbol (e.g. RELIANCE)"
     )
 
-    direction: Literal["LONG", "SHORT"] = Field(
-        ...,
-        description="Direction derived from RS alignment"
-    )
+    direction: Literal["LONG", "SHORT"]
 
-    strategy_used: Literal["GAP_FOLLOW", "MOMENTUM", "NO_TRADE"] = Field(
-        ...,
-        description="Final assigned strategy after Layer-3 evaluation"
-    )
+    strategy_used: Literal["GAP_FOLLOW", "MOMENTUM", "NO_TRADE"]
 
     reason: str = Field(
         ...,
@@ -45,87 +138,103 @@ class TradeCandidate(BaseModel):
     )
 
 
-# =========================
-# STEP-3 Snapshot
-# =========================
+# =========================================================
+# STEP-3 Snapshot (Immutable View Model)
+# =========================================================
 
 class Step3ExecutionSnapshot(BaseModel):
     """
     Immutable STEP-3 Snapshot
 
-    STEP-3A:
-        - Market Context (from STEP-1)
-        - Trade Permission (from STEP-2)
-        - How much trading is allowed today (system-derived)
-
-    STEP-3B:
-        - Whether candidates are AUTO-loaded or MANUAL entry required
-        - Final per-stock strategy classification
+    This model remains unchanged when migrating to automation.
     """
 
     trade_date: date
 
-    # =========================
-    # STEP-3A — Strategy & Risk Control (Index Level)
-    # =========================
+    # -------------------------
+    # STEP-3A — Index Level
+    # -------------------------
 
-    market_context: str = Field(
-        ...,
-        description="Final market context derived from STEP-1"
-    )
+    market_context: str
+    trade_permission: str
 
-    trade_permission: str = Field(
-        ...,
-        description="Trade permission derived from STEP-2 open behavior"
-    )
+    allowed_strategies: List[str] = Field(default_factory=list)
+    max_trades_allowed: int = Field(ge=0)
+    execution_enabled: bool
 
-    allowed_strategies: List[str] = Field(
-        default_factory=list,
-        description="Allowed strategies for the day (e.g. GAP_FOLLOW, MOMENTUM)"
-    )
-
-    max_trades_allowed: int = Field(
-        ...,
-        ge=0,
-        description="Maximum number of trades permitted today"
-    )
-
-    execution_enabled: bool = Field(
-        ...,
-        description="True if max_trades_allowed > 0"
-    )
-
-    # =========================
+    # -------------------------
     # STEP-3B — Candidate Mode
-    # =========================
+    # -------------------------
 
-    candidates_mode: Literal["AUTO", "MANUAL"] = Field(
-        ...,
-        description="AUTO = system-loaded candidates, MANUAL = trader must add"
-    )
+    candidates_mode: Literal["AUTO", "MANUAL"]
+    candidates: List[TradeCandidate] = Field(default_factory=list)
 
-    candidates: List[TradeCandidate] = Field(
-        default_factory=list,
-        description="System-generated or manually-entered evaluated candidates"
-    )
-
-    # =========================
+    # -------------------------
     # Metadata
-    # =========================
+    # -------------------------
 
     generated_at: datetime
 
     class Config:
-        # ✅ Pydantic v2 compliant
         from_attributes = True
 
 
-# =========================
-# Response Wrapper
-# =========================
+# =========================================================
+# Preview Response (Read-Only)
+# =========================================================
 
 class Step3ExecutionResponse(BaseModel):
+    snapshot: Step3ExecutionSnapshot
+
+
+# =========================================================
+# STEP-3 COMPUTE (Evaluate Only — No Persist)
+# =========================================================
+
+class Step3ComputeRequest(BaseModel):
     """
-    STEP-3 Preview / Execution Response
+    Hybrid Manual Mode Input
+
+    In Phase-1:
+        stocks are manually supplied from UI.
+
+    In Future Automation:
+        This request model may no longer be exposed publicly.
+        Instead, backend will construct Step3StockContext internally.
     """
+
+    trade_date: date
+
+    stocks: List[Step3StockContext] = Field(
+        ...,
+        min_items=1,
+        description="List of per-stock evaluation contexts"
+    )
+
+
+class Step3ComputeResponse(BaseModel):
+    snapshot: Step3ExecutionSnapshot
+
+
+# =========================================================
+# STEP-3 FREEZE (Persist Final Evaluated Candidates)
+# =========================================================
+
+class Step3FreezeRequest(BaseModel):
+    """
+    Freeze persists ONLY final evaluated results.
+
+    Manual metrics are NOT stored.
+    This preserves deterministic audit trail.
+    """
+
+    trade_date: date
+
+    candidates: List[TradeCandidate] = Field(
+        ...,
+        min_items=1,
+    )
+
+
+class Step3FreezeResponse(BaseModel):
     snapshot: Step3ExecutionSnapshot

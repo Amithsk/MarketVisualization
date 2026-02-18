@@ -1,4 +1,31 @@
-# backend/app/models/step3_stock_selection.py
+# =========================================================
+# File: backend/app/models/step3_stock_selection.py
+# =========================================================
+"""
+STEP-3B: Stock Selection (Frozen System Output)
+
+ARCHITECTURAL PRINCIPLE
+-----------------------
+
+This table stores ONLY the FINAL deterministic evaluation result.
+
+It does NOT store:
+- Manual Layer-1 inputs
+- Manual Layer-2 inputs
+- Manual Layer-3 inputs
+
+Why?
+
+Because in future Automation Mode:
+- Inputs will come from stock data pipeline.
+- Engine logic will remain unchanged.
+- Only evaluated result must be persisted.
+
+This guarantees:
+- Clean audit trail
+- Deterministic reproducibility
+- Easy migration to full automation
+"""
 
 from sqlalchemy import Column, Date, DateTime, String, Text, Float
 from sqlalchemy.sql import func
@@ -7,50 +34,56 @@ from backend.app.db.base import Base
 
 class Step3StockSelection(Base):
     """
-    STEP-3B: Stock Selection (Frozen System Output)
-    ------------------------------------------------
     One row per (trade_date, symbol).
-    System generated.
-    Immutable once created.
+
+    Created only during STEP-3 Freeze.
+    Immutable once persisted.
     """
 
     __tablename__ = "step3_stock_selection"
 
-    # =========================
-    # Identity (Composite PK)
-    # =========================
+    # =====================================================
+    # Identity (Composite Primary Key)
+    # =====================================================
+
     trade_date = Column(Date, primary_key=True, index=True)
     symbol = Column(String(32), primary_key=True)
 
-    # =========================
-    # Trade Characteristics
-    # =========================
+    # =====================================================
+    # Deterministic Evaluation Result
+    # =====================================================
+
     direction = Column(String(8), nullable=False)  # LONG / SHORT
 
-    # Enum in DB: GAP_FOLLOW / MOMENTUM
-    strategy_used = Column(String(32), nullable=False)
+    strategy_used = Column(
+        String(32),
+        nullable=False
+    )  # GAP_FOLLOW / MOMENTUM / NO_TRADE
 
-    # Optional Relative Strength metric
+    # Optional RS metric for transparency & debugging
+    # In future automation mode this will be computed from pipeline
     rs_value = Column(Float, nullable=True)
 
-    # Mandatory explanation
+    # Mandatory explanation (factual engine output)
     reason = Column(Text, nullable=False)
 
-    # When system evaluated the stock
+    # Timestamp when engine evaluated this stock
     evaluated_at = Column(DateTime, nullable=False)
 
-    # =========================
-    # Audit
-    # =========================
+    # =====================================================
+    # Audit Metadata
+    # =====================================================
+
     created_at = Column(
         DateTime,
         server_default=func.now(),
         nullable=False
     )
 
-    # =========================
+    # =====================================================
     # Debug Helper
-    # =========================
+    # =====================================================
+
     def __repr__(self) -> str:
         return (
             f"<Step3StockSelection("

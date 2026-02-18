@@ -1,4 +1,3 @@
-// frontend/src/components/step2/Step2OpenBehavior.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -10,6 +9,19 @@ interface Step2OpenBehaviorProps {
   tradeDate: TradeDate;
   step2: ReturnType<typeof useStep2>;
 }
+
+/**
+ * STEP-2 Open Behavior
+ *
+ * Hybrid Manual Mode (Automation Ready)
+ *
+ * Phase-1:
+ *  - avg_5m_range_prev_day manually entered
+ *
+ * Future:
+ *  - backend auto-derives baseline
+ *  - UI automatically switches to read-only
+ */
 
 export default function Step2OpenBehavior({
   tradeDate,
@@ -27,8 +39,19 @@ export default function Step2OpenBehavior({
   } = step2;
 
   /* =====================================================
+     Baseline (Hybrid Mode Support)
+  ===================================================== */
+
+  const [manualBaseline, setManualBaseline] = useState<number>(0);
+
+  const baselineValue =
+    snapshot?.avg_5m_range_prev_day ?? manualBaseline;
+
+  const isManualMode = manualInputRequired === true;
+
+  /* =====================================================
      Candle Grid (09:15–09:45)
-     ===================================================== */
+  ===================================================== */
 
   const initialCandles: Step2CandleInput[] = [
     "09:15",
@@ -69,7 +92,7 @@ export default function Step2OpenBehavior({
 
   /* =====================================================
      Validation
-     ===================================================== */
+  ===================================================== */
 
   const candlesValid = useMemo(() => {
     return candles.every(
@@ -89,11 +112,15 @@ export default function Step2OpenBehavior({
 
   /* =====================================================
      Actions
-     ===================================================== */
+  ===================================================== */
 
   const handleCompute = () => {
     if (!candlesValid) return;
-    computeStep2(candles);
+
+    computeStep2({
+      candles,
+      avg5mRangePrevDay: baselineValue,
+    });
   };
 
   const handleFreeze = () => {
@@ -101,13 +128,14 @@ export default function Step2OpenBehavior({
 
     freezeStep2({
       candles,
+      avg5mRangePrevDay: baselineValue,
       reason,
     });
   };
 
   /* =====================================================
      UI
-     ===================================================== */
+  ===================================================== */
 
   return (
     <div className="space-y-8">
@@ -123,25 +151,39 @@ export default function Step2OpenBehavior({
       )}
 
       {/* =====================================================
-         PREVIOUS DAY BASELINE (SYSTEM)
-         ===================================================== */}
-      {snapshot?.avg_5m_range_prev_day !== null &&
-        snapshot?.avg_5m_range_prev_day !== undefined && (
-          <div className="rounded border p-4 space-y-2">
-            <h3 className="text-sm font-semibold text-gray-700">
-              Previous Day Baseline (System)
-            </h3>
+         PREVIOUS DAY BASELINE
+      ===================================================== */}
+      <div className="rounded border p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Previous Day Baseline
+        </h3>
 
-            <Metric
-              label="Avg 5-min Range (Prev Day)"
-              value={snapshot.avg_5m_range_prev_day}
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">
+            Avg 5-min Range (Prev Day)
+          </span>
+
+          {isManualMode && !isFrozen ? (
+            <input
+              type="number"
+              min="0"
+              value={baselineValue}
+              onChange={(e) =>
+                setManualBaseline(Number(e.target.value))
+              }
+              className="w-32 rounded border px-2 py-1 text-sm"
             />
-          </div>
-        )}
+          ) : (
+            <span className="font-medium">
+              {baselineValue ?? "--"}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* =====================================================
          MANUAL INPUT GRID
-         ===================================================== */}
+      ===================================================== */}
       {manualInputRequired && !isFrozen && (
         <div className="rounded border p-4 space-y-4">
           <h3 className="text-sm font-semibold text-gray-700">
@@ -164,7 +206,6 @@ export default function Step2OpenBehavior({
                 {candles.map((c, i) => (
                   <tr key={c.timestamp}>
                     <td className="p-2 border">{c.timestamp}</td>
-
                     {(
                       ["open", "high", "low", "close", "volume"] as const
                     ).map((field) => (
@@ -202,7 +243,7 @@ export default function Step2OpenBehavior({
 
       {/* =====================================================
          ANALYTICAL BREAKDOWN
-         ===================================================== */}
+      ===================================================== */}
       {analyticsReady && (
         <div className="rounded border p-4 space-y-4">
           <h3 className="text-sm font-semibold text-gray-700">
@@ -224,13 +265,13 @@ export default function Step2OpenBehavior({
           <Metric label="Early Volatility" value={snapshot.early_volatility} />
           <Metric label="Market Participation" value={snapshot.market_participation} />
 
-          <TradePermissionBanner tradeAllowed={tradeAllowed} />
+          <TradePermissionBanner tradeAllowed={tradeAllowed ?? false} />
         </div>
       )}
 
       {/* =====================================================
          FREEZE SECTION
-         ===================================================== */}
+      ===================================================== */}
       {!isFrozen && analyticsReady && (
         <div className="rounded border p-4 space-y-4">
           <h3 className="text-sm font-semibold text-gray-700">
@@ -275,7 +316,7 @@ export default function Step2OpenBehavior({
 
 /* =====================================================
    Small UI Helpers
-   ===================================================== */
+===================================================== */
 
 function Metric({
   label,

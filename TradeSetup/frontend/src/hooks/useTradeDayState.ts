@@ -1,4 +1,6 @@
-// frontend/src/hooks/useTradeDayState.ts
+// =========================================================
+// File: frontend/src/hooks/useTradeDayState.ts
+// =========================================================
 "use client";
 
 import { useMemo, useRef, useEffect } from "react";
@@ -21,12 +23,21 @@ const DEBUG = true;
  * ❌ No execution logic
  *
  * Backend remains source of truth.
+ *
+ * GATING PRINCIPLE
+ * ----------------
+ * STEP-4 must unlock ONLY after:
+ *  - STEP-1 frozen
+ *  - STEP-2 frozen
+ *  - STEP-3A execution allowed
+ *  - STEP-3B candidates frozen
  */
+
 export function useTradeDayState(tradeDate: TradeDate) {
   // STEP 1
   const step1 = useStep1(tradeDate);
 
-  // STEP 2 receives enabled flag from STEP-1 freeze state
+  // STEP 2
   const step2 = useStep2(tradeDate, {
     enabled: step1.isFrozen,
   });
@@ -43,7 +54,16 @@ export function useTradeDayState(tradeDate: TradeDate) {
   const gates = useMemo(() => {
     const step1Frozen = step1.isFrozen;
     const step2Frozen = step2.isFrozen;
+
     const executionEnabled = step3.executionEnabled === true;
+
+    // STEP-3B is considered frozen only when:
+    // - Backend declares AUTO mode
+    // - Candidates exist
+    const step3Frozen =
+      step3.candidatesMode === "AUTO" &&
+      step3.candidates.length > 0;
+
     const tradeFrozen = step4.isFrozen;
 
     return {
@@ -52,28 +72,33 @@ export function useTradeDayState(tradeDate: TradeDate) {
       // STEP-2 unlocked only after STEP-1 freeze
       canAccessStep2: step1Frozen,
 
-      // STEP-3 unlocked after STEP-2 freeze
+      // STEP-3 unlocked only after STEP-2 freeze
       canAccessStep3:
         step1Frozen &&
         step2Frozen,
 
-      // STEP-4 unlocked only after STEP-3 allows execution
+      // STEP-4 unlocked only after:
+      // - STEP-3 execution allowed
+      // - STEP-3 candidates finalized (frozen)
+      // - STEP-4 not already frozen
       canAccessStep4:
         step1Frozen &&
         step2Frozen &&
         executionEnabled &&
+        step3Frozen &&
         !tradeFrozen,
     };
   }, [
     step1.isFrozen,
     step2.isFrozen,
     step3.executionEnabled,
+    step3.candidatesMode,
+    step3.candidates.length,
     step4.isFrozen,
   ]);
 
   /**
    * Controlled Debug Logging
-   * Logs ONLY when gate state changes
    */
   const prevGateRef = useRef<string | null>(null);
 
@@ -91,6 +116,9 @@ export function useTradeDayState(tradeDate: TradeDate) {
           step1Frozen: step1.isFrozen,
           step2Frozen: step2.isFrozen,
           executionEnabled: step3.executionEnabled,
+          step3Frozen:
+            step3.candidatesMode === "AUTO" &&
+            step3.candidates.length > 0,
           canAccessStep2: gates.canAccessStep2,
           canAccessStep3: gates.canAccessStep3,
           canAccessStep4: gates.canAccessStep4,
@@ -105,6 +133,8 @@ export function useTradeDayState(tradeDate: TradeDate) {
     step1.isFrozen,
     step2.isFrozen,
     step3.executionEnabled,
+    step3.candidatesMode,
+    step3.candidates.length,
   ]);
 
   return {

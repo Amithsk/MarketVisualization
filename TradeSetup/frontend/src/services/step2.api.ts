@@ -27,26 +27,25 @@ export async function fetchStep2Preview(
 
 /**
  * =====================================================
- * STEP-2 Compute (Option B — Analytical Breakdown)
+ * STEP-2 Compute (Hybrid Manual Baseline Support)
  * =====================================================
- * Backend calculates:
- *  - IR High / Low / Range / Ratio
- *  - Volatility State
- *  - VWAP Cross Count
- *  - VWAP State
- *  - Range Hold Status
- *  - Derived classifications
- *  - trade_allowed
  *
- * This DOES NOT freeze.
+ * Phase-1:
+ *  - avg5mRangePrevDay manually supplied by UI
+ *
+ * Future Automation:
+ *  - backend will auto-derive baseline internally
+ *  - frontend will stop sending this field
  */
 export async function computeStep2Behavior(params: {
   tradeDate: TradeDate;
   candles: Step2CandleInput[];
+  avg5mRangePrevDay: number;
 }): Promise<Step2ComputeResponse> {
   const res = await apiClient.post("/step2/compute", {
     trade_date: params.tradeDate,
     candles: params.candles,
+    avg_5m_range_prev_day: params.avg5mRangePrevDay,
   });
 
   return res.data;
@@ -56,8 +55,10 @@ export async function computeStep2Behavior(params: {
  * =====================================================
  * STEP-2 Freeze
  * =====================================================
- * Frontend sends ONLY:
+ *
+ * Frontend sends:
  *  - raw candles
+ *  - avg5mRangePrevDay (manual baseline in hybrid mode)
  *  - reason
  *
  * Backend derives everything and persists snapshot.
@@ -65,11 +66,13 @@ export async function computeStep2Behavior(params: {
 export async function freezeStep2Behavior(params: {
   tradeDate: TradeDate;
   candles: Step2CandleInput[];
+  avg5mRangePrevDay: number;
   reason?: string;
 }): Promise<Step2FrozenResponse> {
   const res = await apiClient.post("/step2/freeze", {
     trade_date: params.tradeDate,
     candles: params.candles,
+    avg_5m_range_prev_day: params.avg5mRangePrevDay,
     reason: params.reason ?? null,
   });
 
