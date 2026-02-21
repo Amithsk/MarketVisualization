@@ -30,7 +30,20 @@ export default function TradeDayClient({
   } = useTradeDayState(tradeDate);
 
   const { candidates } = step3;
-  const { trade, isFrozen, freezeTrade, loading, error } = step4;
+
+  const {
+    preview,
+    previewLoading,
+    previewError,
+    generatePreview,
+
+    frozenTrade,
+    freezeLoading,
+    freezeError,
+    freezeTrade,
+  } = step4;
+
+  const isFrozen = !!frozenTrade;
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-6 space-y-8">
@@ -40,10 +53,12 @@ export default function TradeDayClient({
         </h1>
       </header>
 
+      {/* STEP 1 */}
       <StepSection step={1} title="Pre-Market Context">
         <Step1Context tradeDate={tradeDate} step1={step1} />
       </StepSection>
 
+      {/* STEP 2 */}
       <StepSection
         step={2}
         title="Market Open Behavior"
@@ -54,6 +69,7 @@ export default function TradeDayClient({
         )}
       </StepSection>
 
+      {/* STEP 3 */}
       <StepSection
         step={3}
         title="Execution Control"
@@ -67,6 +83,7 @@ export default function TradeDayClient({
         )}
       </StepSection>
 
+      {/* STEP 4 */}
       <StepSection
         step={4}
         title="Trade Construction"
@@ -74,19 +91,29 @@ export default function TradeDayClient({
       >
         {canAccessStep4 && (
           <>
+            {/* Frozen snapshot (if exists) */}
             <Step4TradePreview
               tradeDate={tradeDate}
-              trade={trade}
-              isFrozen={isFrozen}
+              trade={frozenTrade}
             />
-            <Step4TradeConstruct
-              tradeDate={tradeDate}
-              candidates={candidates}
-              freezeTrade={freezeTrade}
-              loading={loading}
-              error={error}
-              isFrozen={isFrozen}
-            />
+
+            {/* Construction + Preview + Freeze */}
+            {!isFrozen && (
+              <Step4TradeConstruct
+                tradeDate={tradeDate}
+                candidates={candidates}
+
+                preview={preview}
+                previewLoading={previewLoading}
+                previewError={previewError}
+                generatePreview={generatePreview}
+
+                frozenTrade={frozenTrade}
+                freezeLoading={freezeLoading}
+                freezeError={freezeError}
+                freezeTrade={freezeTrade}
+              />
+            )}
           </>
         )}
       </StepSection>

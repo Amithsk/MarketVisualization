@@ -1,3 +1,5 @@
+# backend/app/models/step4_trade.py
+
 from sqlalchemy import (
     Column,
     String,
@@ -16,16 +18,12 @@ class Step4Trade(Base):
     """
     STEP-4: Frozen Trade (Execution Intent)
     --------------------------------------
-    Stores the final, immutable trade committed by the trader.
-
-    Money-impacting.
-    Irreversible once frozen.
+    Immutable committed trade snapshot.
     """
 
     __tablename__ = "step4_trade"
 
     __table_args__ = (
-        # Enforce discipline: one trade per symbol per day
         UniqueConstraint(
             "trade_date",
             "symbol",
@@ -48,20 +46,11 @@ class Step4Trade(Base):
     # Link to STEP-3 (source)
     # =========================
     symbol = Column(String(32), nullable=False)
-    direction = Column(String(16), nullable=False)  # LONG / SHORT
-    setup_type = Column(String(32), nullable=False)  # from STEP-3
+    direction = Column(String(16), nullable=False)
+    setup_type = Column(String(32), nullable=False)
 
     # =========================
-    # Execution intent
-    # =========================
-    execution_mode = Column(
-        String(16),
-        nullable=False,
-        comment="MARKET / LIMIT / VWAP / etc",
-    )
-
-    # =========================
-    # Prices
+    # Prices (copied from construction)
     # =========================
     entry_price = Column(Float, nullable=False)
     stop_loss = Column(Float, nullable=False)
@@ -105,9 +94,9 @@ class Step4Trade(Base):
         return (
             f"<Step4Trade("
             f"id={self.trade_id}, "
-            f"trade_date={self.trade_date}, "
+            f"date={self.trade_date}, "
             f"symbol={self.symbol}, "
-            f"direction={self.direction}, "
+            f"dir={self.direction}, "
             f"qty={self.quantity}, "
             f"entry={self.entry_price}, "
             f"stop={self.stop_loss}"

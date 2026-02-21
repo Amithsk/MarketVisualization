@@ -14,6 +14,7 @@ from backend.app.models.step2_market_open_behavior import Step2MarketOpenBehavio
 from backend.app.models.step3_execution_control import Step3ExecutionControl
 from backend.app.models.step3_stock_selection import Step3StockSelection
 from backend.app.models.step4_trade import Step4Trade
+from backend.app.models.step4_trade_construction import Step4TradeConstruction 
 
 from backend.app.api.step1 import router as step1_router
 from backend.app.api.step2 import router as step2_router

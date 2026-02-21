@@ -1,21 +1,9 @@
 # =========================================================
 # File: backend/app/services/step3_service.py
 # =========================================================
-"""
-STEP-3 Service — Hybrid Manual Mode (Automation-Ready)
-
-ENGINE DESIGN GUARANTEE
------------------------
-
-- Evaluation engine depends ONLY on Step3StockContext.
-- Freeze persists ONLY deterministic evaluation result.
-- Manual raw inputs are NEVER persisted.
-- Future automation replaces input provider only.
-"""
 
 from datetime import date, datetime
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 import logging
 
 from backend.app.models.step1_market_context import Step1MarketContext
@@ -69,12 +57,142 @@ def _derive_step3a(market_context: str | None, trade_permission: str | None):
         max_trades = 0
 
     execution_allowed = max_trades > 0
-
     return allowed, max_trades, execution_allowed
 
 
 # =========================================================
-# PREVIEW (READ ONLY)
+# CORE DETERMINISTIC ENGINE (HYBRID STRUCTURAL SNAPSHOT)
+# =========================================================
+
+def _evaluate_stock(
+    context: Step3StockContext,
+    allowed_strategies: list[str],
+) -> TradeCandidate:
+
+    symbol = context.symbol.upper()
+
+    # -----------------------------------------------------
+    # Layer-1 — Tradability
+    # -----------------------------------------------------
+
+    if (
+        context.avg_traded_value_20d < 100
+        or not (1 <= context.atr_pct <= 4)
+        or context.abnormal_candle
+    ):
+        return TradeCandidate(
+            symbol=symbol,
+            direction="LONG",
+            strategy_used="NO_TRADE",
+            reason="Rejected at Layer-1 (Tradability filter failed)",
+            structure_valid=False,
+        )
+
+    # -----------------------------------------------------
+    # Layer-2 — Relative Strength vs NIFTY
+    # -----------------------------------------------------
+
+    stock_pct = (
+        (context.stock_current_price - context.stock_open_0915)
+        / context.stock_open_0915
+        * 100
+    )
+
+    nifty_pct = (
+        (context.nifty_current_price - context.nifty_open_0915)
+        / context.nifty_open_0915
+        * 100
+    )
+
+    rs = stock_pct - nifty_pct
+
+    if rs >= 0.3:
+        direction = "LONG"
+    elif rs <= -0.3:
+        direction = "SHORT"
+    else:
+        return TradeCandidate(
+            symbol=symbol,
+            direction="LONG",
+            strategy_used="NO_TRADE",
+            rs_value=rs,
+            reason="Rejected at Layer-2 (RS Neutral)",
+            structure_valid=False,
+        )
+
+    # -----------------------------------------------------
+    # Layer-3 — Strategy Fit
+    # -----------------------------------------------------
+
+    strategy = "NO_TRADE"
+
+    if (
+        "GAP_FOLLOW" in allowed_strategies
+        and abs(context.gap_pct) >= 1.0
+        and context.gap_hold
+        and context.structure_valid
+    ):
+        strategy = "GAP_FOLLOW"
+
+    elif (
+        "MOMENTUM" in allowed_strategies
+        and context.structure_valid
+        and (
+            (direction == "LONG" and context.price_vs_vwap == "ABOVE")
+            or (direction == "SHORT" and context.price_vs_vwap == "BELOW")
+        )
+    ):
+        strategy = "MOMENTUM"
+
+    if strategy == "NO_TRADE":
+        return TradeCandidate(
+            symbol=symbol,
+            direction=direction,
+            strategy_used="NO_TRADE",
+            rs_value=rs,
+            reason="Rejected at Layer-3 (Strategy fit failed)",
+            structure_valid=False,
+        )
+
+    # -----------------------------------------------------
+    # Structural Snapshot (Hybrid Mode)
+    # -----------------------------------------------------
+
+    intraday_high = context.stock_current_price
+    intraday_low = context.stock_open_0915
+    yesterday_close = context.stock_open_0915  # hybrid placeholder
+    vwap_value = context.stock_current_price  # hybrid placeholder
+
+    gap_high = None
+    gap_low = None
+    last_higher_low = None
+
+    if strategy == "GAP_FOLLOW":
+        gap_high = intraday_high
+        gap_low = intraday_low
+
+    elif strategy == "MOMENTUM":
+        last_higher_low = intraday_low
+
+    return TradeCandidate(
+        symbol=symbol,
+        direction=direction,
+        strategy_used=strategy,
+        rs_value=rs,
+        gap_high=gap_high,
+        gap_low=gap_low,
+        intraday_high=intraday_high,
+        intraday_low=intraday_low,
+        last_higher_low=last_higher_low,
+        yesterday_close=yesterday_close,
+        vwap_value=vwap_value,
+        structure_valid=context.structure_valid,
+        reason="Qualified through deterministic Layer-1/2/3 evaluation",
+    )
+
+
+# =========================================================
+# PREVIEW
 # =========================================================
 
 def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionResponse:
@@ -99,6 +217,8 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         or not step2_behavior.frozen_at
         or not step2_open
     ):
+        logger.info("[STEP3][PREVIEW][BLOCKED] trade_date=%s", trade_date)
+
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
                 trade_date=trade_date,
@@ -110,7 +230,8 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
                 candidates_mode="MANUAL",
                 candidates=[],
                 generated_at=decided_at,
-            )
+            ),
+            can_freeze=False,
         )
 
     allowed_strategies, max_trades_allowed, execution_allowed = _derive_step3a(
@@ -118,181 +239,57 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         step2_open.trade_permission,
     )
 
-    existing = db.query(Step3ExecutionControl).filter(
+    control_row = db.query(Step3ExecutionControl).filter(
         Step3ExecutionControl.trade_date == trade_date
     ).first()
 
-    if existing:
-        rows = db.query(Step3StockSelection).filter(
-            Step3StockSelection.trade_date == trade_date
-        ).all()
+    rows = db.query(Step3StockSelection).filter(
+        Step3StockSelection.trade_date == trade_date
+    ).all()
 
-        candidates = [
-            TradeCandidate(
-                symbol=r.symbol,
-                direction=r.direction,
-                strategy_used=r.strategy_used,
-                reason=r.reason,
-            )
-            for r in rows
-        ]
-
-        return Step3ExecutionResponse(
-            snapshot=Step3ExecutionSnapshot(
-                trade_date=trade_date,
-                market_context=existing.market_context,
-                trade_permission=existing.trade_permission,
-                allowed_strategies=allowed_strategies,
-                max_trades_allowed=max_trades_allowed,
-                execution_enabled=bool(existing.execution_allowed),
-                candidates_mode="AUTO" if candidates else "MANUAL",
-                candidates=candidates,
-                generated_at=existing.decided_at,
-            )
+    candidates = [
+        TradeCandidate(
+            symbol=r.symbol,
+            direction=r.direction,
+            strategy_used=r.strategy_used,
+            rs_value=r.rs_value,
+            gap_high=r.gap_high,
+            gap_low=r.gap_low,
+            intraday_high=r.intraday_high,
+            intraday_low=r.intraday_low,
+            last_higher_low=r.last_higher_low,
+            yesterday_close=r.yesterday_close,
+            vwap_value=r.vwap_value,
+            structure_valid=bool(r.structure_valid),
+            reason=r.reason,
         )
+        for r in rows
+    ]
 
-    execution_row = Step3ExecutionControl(
-        trade_date=trade_date,
-        market_context=step1.final_market_context,
-        trade_permission=step2_open.trade_permission,
-        allowed_strategies=",".join(allowed_strategies),
-        max_trades_allowed=max_trades_allowed,
-        execution_allowed=int(execution_allowed),
-        decided_at=decided_at,
+    logger.info(
+        "[STEP3][PREVIEW][SUCCESS] trade_date=%s persisted_candidates=%d",
+        trade_date,
+        len(candidates),
     )
-
-    try:
-        db.add(execution_row)
-        db.commit()
-    except IntegrityError:
-        db.rollback()
 
     return Step3ExecutionResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
-            market_context=step1.final_market_context,
-            trade_permission=step2_open.trade_permission,
+            market_context=control_row.market_context if control_row else None,
+            trade_permission=control_row.trade_permission if control_row else None,
             allowed_strategies=allowed_strategies,
             max_trades_allowed=max_trades_allowed,
             execution_enabled=execution_allowed,
-            candidates_mode="MANUAL",
-            candidates=[],
+            candidates_mode="AUTO" if candidates else "MANUAL",
+            candidates=candidates,
             generated_at=decided_at,
-        )
-    )
-
-
-# =========================================================
-# CORE DETERMINISTIC ENGINE
-# =========================================================
-
-def _evaluate_stock(
-    context: Step3StockContext,
-    allowed_strategies: list[str],
-) -> tuple[TradeCandidate, float | None]:
-
-    symbol = context.symbol.upper()
-
-    # -------------------------
-    # LAYER 1 — Tradability
-    # -------------------------
-
-    if (
-        context.avg_traded_value_20d < 100
-        or not (1 <= context.atr_pct <= 4)
-        or context.abnormal_candle
-    ):
-        return (
-            TradeCandidate(
-                symbol=symbol,
-                direction="LONG",
-                strategy_used="NO_TRADE",
-                reason="Rejected at Layer-1 (Tradability filter failed)",
-            ),
-            None,
-        )
-
-    # -------------------------
-    # LAYER 2 — RS Calculation
-    # -------------------------
-
-    stock_pct = (
-        (context.stock_current_price - context.stock_open_0915)
-        / context.stock_open_0915
-        * 100
-    )
-
-    nifty_pct = (
-        (context.nifty_current_price - context.nifty_open_0915)
-        / context.nifty_open_0915
-        * 100
-    )
-
-    rs = stock_pct - nifty_pct
-
-    if rs >= 0.3:
-        direction = "LONG"
-    elif rs <= -0.3:
-        direction = "SHORT"
-    else:
-        return (
-            TradeCandidate(
-                symbol=symbol,
-                direction="LONG",
-                strategy_used="NO_TRADE",
-                reason="Rejected at Layer-2 (RS Neutral)",
-            ),
-            rs,
-        )
-
-    # -------------------------
-    # LAYER 3 — Strategy Fit
-    # -------------------------
-
-    strategy = "NO_TRADE"
-
-    if (
-        "GAP_FOLLOW" in allowed_strategies
-        and abs(context.gap_pct) >= 1.0
-        and context.gap_hold
-        and context.structure_valid
-    ):
-        strategy = "GAP_FOLLOW"
-
-    elif (
-        "MOMENTUM" in allowed_strategies
-        and context.structure_valid
-        and (
-            (direction == "LONG" and context.price_vs_vwap == "ABOVE")
-            or (direction == "SHORT" and context.price_vs_vwap == "BELOW")
-        )
-    ):
-        strategy = "MOMENTUM"
-
-    if strategy == "NO_TRADE":
-        return (
-            TradeCandidate(
-                symbol=symbol,
-                direction=direction,
-                strategy_used="NO_TRADE",
-                reason="Rejected at Layer-3 (Strategy fit failed)",
-            ),
-            rs,
-        )
-
-    return (
-        TradeCandidate(
-            symbol=symbol,
-            direction=direction,
-            strategy_used=strategy,
-            reason="Qualified through deterministic Layer-1/2/3 evaluation",
         ),
-        rs,
+        can_freeze=False,
     )
 
 
 # =========================================================
-# COMPUTE (NO PERSIST)
+# COMPUTE
 # =========================================================
 
 def compute_step3_candidates(
@@ -304,14 +301,23 @@ def compute_step3_candidates(
     preview = generate_step3_execution(db, trade_date)
     snapshot = preview.snapshot
 
-    evaluated: list[TradeCandidate] = []
+    evaluated = []
 
     for context in stocks:
-        candidate, _ = _evaluate_stock(
-            context,
-            snapshot.allowed_strategies,
-        )
+        candidate = _evaluate_stock(context, snapshot.allowed_strategies)
         evaluated.append(candidate)
+
+    can_freeze = (
+        snapshot.execution_enabled
+        and any(c.strategy_used != "NO_TRADE" for c in evaluated)
+    )
+
+    logger.info(
+        "[STEP3][COMPUTE][SUCCESS] trade_date=%s candidates=%d can_freeze=%s",
+        trade_date,
+        len(evaluated),
+        can_freeze,
+    )
 
     return Step3ComputeResponse(
         snapshot=Step3ExecutionSnapshot(
@@ -321,15 +327,16 @@ def compute_step3_candidates(
             allowed_strategies=snapshot.allowed_strategies,
             max_trades_allowed=snapshot.max_trades_allowed,
             execution_enabled=snapshot.execution_enabled,
-            candidates_mode="AUTO",
+            candidates_mode="MANUAL",
             candidates=evaluated,
             generated_at=datetime.utcnow(),
-        )
+        ),
+        can_freeze=can_freeze,
     )
 
 
 # =========================================================
-# FREEZE (PERSIST FINAL OUTPUT ONLY)
+# FREEZE
 # =========================================================
 
 def freeze_step3_candidates(
@@ -340,35 +347,71 @@ def freeze_step3_candidates(
 
     decided_at = datetime.utcnow()
 
+    control_row = db.query(Step3ExecutionControl).filter(
+        Step3ExecutionControl.trade_date == trade_date
+    ).first()
+
+    if not control_row:
+        raise ValueError("Preview must be generated before freeze.")
+
+    qualified = [
+        c for c in candidates
+        if c.strategy_used != "NO_TRADE"
+    ]
+
+    if not qualified:
+        raise ValueError("No qualified trades available to freeze.")
+
+    qualified = qualified[:control_row.max_trades_allowed]
+
     db.query(Step3StockSelection).filter(
         Step3StockSelection.trade_date == trade_date
     ).delete()
 
-    for c in candidates:
+    for c in qualified:
         db.add(
             Step3StockSelection(
                 trade_date=trade_date,
                 symbol=c.symbol,
                 direction=c.direction,
                 strategy_used=c.strategy_used,
+                rs_value=c.rs_value,
+                gap_high=c.gap_high,
+                gap_low=c.gap_low,
+                intraday_high=c.intraday_high,
+                intraday_low=c.intraday_low,
+                last_higher_low=c.last_higher_low,
+                yesterday_close=c.yesterday_close,
+                vwap_value=c.vwap_value,
+                structure_valid=int(c.structure_valid),
                 reason=c.reason,
-                rs_value=None,  # stored if future enhancement needed
                 evaluated_at=decided_at,
             )
         )
 
     db.commit()
 
+    logger.info(
+        "[STEP3][FREEZE][SUCCESS] trade_date=%s persisted=%d",
+        trade_date,
+        len(qualified),
+    )
+
     return Step3FreezeResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
-            market_context=None,
-            trade_permission=None,
-            allowed_strategies=[],
-            max_trades_allowed=0,
-            execution_enabled=True,
+            market_context=control_row.market_context,
+            trade_permission=control_row.trade_permission,
+            allowed_strategies=(
+                control_row.allowed_strategies.split(",")
+                if control_row.allowed_strategies
+                else []
+            ),
+            max_trades_allowed=control_row.max_trades_allowed,
+            execution_enabled=bool(control_row.execution_allowed),
             candidates_mode="AUTO",
-            candidates=candidates,
+            candidates=qualified,
             generated_at=decided_at,
-        )
+        ),
+        can_freeze=False,
     )

@@ -13,74 +13,34 @@ import { useStep4 } from "@/hooks/useStep4";
 
 const DEBUG = true;
 
-/**
- * Trade Day Orchestrator
- * ---------------------
- * PURE orchestration + gating only.
- *
- * ❌ No API calls
- * ❌ No previews triggered here
- * ❌ No execution logic
- *
- * Backend remains source of truth.
- *
- * GATING PRINCIPLE
- * ----------------
- * STEP-4 must unlock ONLY after:
- *  - STEP-1 frozen
- *  - STEP-2 frozen
- *  - STEP-3A execution allowed
- *  - STEP-3B candidates frozen
- */
-
 export function useTradeDayState(tradeDate: TradeDate) {
-  // STEP 1
   const step1 = useStep1(tradeDate);
-
-  // STEP 2
   const step2 = useStep2(tradeDate, {
     enabled: step1.isFrozen,
   });
-
-  // STEP 3
   const step3 = useStep3(tradeDate);
-
-  // STEP 4
   const step4 = useStep4();
 
-  /**
-   * Gating logic ONLY
-   */
   const gates = useMemo(() => {
     const step1Frozen = step1.isFrozen;
     const step2Frozen = step2.isFrozen;
 
     const executionEnabled = step3.executionEnabled === true;
 
-    // STEP-3B is considered frozen only when:
-    // - Backend declares AUTO mode
-    // - Candidates exist
-    const step3Frozen =
-      step3.candidatesMode === "AUTO" &&
-      step3.candidates.length > 0;
+    // 🔥 Step-3 frozen strictly means persisted (AUTO mode)
+    const step3Frozen = step3.candidatesMode === "AUTO";
 
-    const tradeFrozen = step4.isFrozen;
+    const tradeFrozen = !!step4.frozenTrade;
 
     return {
       canAccessStep1: true,
 
-      // STEP-2 unlocked only after STEP-1 freeze
       canAccessStep2: step1Frozen,
 
-      // STEP-3 unlocked only after STEP-2 freeze
       canAccessStep3:
         step1Frozen &&
         step2Frozen,
 
-      // STEP-4 unlocked only after:
-      // - STEP-3 execution allowed
-      // - STEP-3 candidates finalized (frozen)
-      // - STEP-4 not already frozen
       canAccessStep4:
         step1Frozen &&
         step2Frozen &&
@@ -93,13 +53,9 @@ export function useTradeDayState(tradeDate: TradeDate) {
     step2.isFrozen,
     step3.executionEnabled,
     step3.candidatesMode,
-    step3.candidates.length,
-    step4.isFrozen,
+    step4.frozenTrade,
   ]);
 
-  /**
-   * Controlled Debug Logging
-   */
   const prevGateRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -116,9 +72,8 @@ export function useTradeDayState(tradeDate: TradeDate) {
           step1Frozen: step1.isFrozen,
           step2Frozen: step2.isFrozen,
           executionEnabled: step3.executionEnabled,
-          step3Frozen:
-            step3.candidatesMode === "AUTO" &&
-            step3.candidates.length > 0,
+          step3Frozen: step3.candidatesMode === "AUTO",
+          tradeFrozen: !!step4.frozenTrade,
           canAccessStep2: gates.canAccessStep2,
           canAccessStep3: gates.canAccessStep3,
           canAccessStep4: gates.canAccessStep4,
@@ -134,7 +89,7 @@ export function useTradeDayState(tradeDate: TradeDate) {
     step2.isFrozen,
     step3.executionEnabled,
     step3.candidatesMode,
-    step3.candidates.length,
+    step4.frozenTrade,
   ]);
 
   return {

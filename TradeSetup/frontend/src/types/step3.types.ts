@@ -10,16 +10,13 @@ import type { TradeDate, IsoTimestamp } from "@/types/common.types";
  * Backend is authoritative.
  * Frontend is display only.
  *
- * ARCHITECTURE NOTE (Hybrid Manual Mode)
- * ---------------------------------------
- * Phase-1:
- *   - UI supplies full Step3StockContext inputs manually.
- *   - Backend evaluates deterministically.
+ * candidatesMode:
+ *   - "MANUAL"  → Not frozen
+ *   - "AUTO"    → Persisted (frozen) state
  *
- * Future Automation Mode:
- *   - Step3StockContext will be built from stock data pipeline.
- *   - Manual UI inputs will be removed.
- *   - Evaluation engine will remain unchanged.
+ * canFreeze:
+ *   - Backend-authoritative flag
+ *   - Frontend must NOT infer freeze eligibility
  */
 
 
@@ -75,13 +72,34 @@ export interface Step3StockContext {
 
 
 // =========================================================
-// Final Per-Stock Output (Backend Derived)
+// Final Per-Stock Output (Backend Derived — Deterministic)
+// MUST match backend TradeCandidate exactly
 // =========================================================
 
 export interface TradeCandidate {
   symbol: string;
   direction: TradeDirection;
   strategyUsed: StrategyUsed;
+
+  // -------------------------
+  // Structural Snapshot (Frozen in STEP-3)
+  // -------------------------
+
+  rsValue?: number | null;
+
+  gapHigh?: number | null;
+  gapLow?: number | null;
+
+  intradayHigh?: number | null;
+  intradayLow?: number | null;
+
+  lastHigherLow?: number | null;
+
+  yesterdayClose?: number | null;
+  vwapValue?: number | null;
+
+  structureValid: boolean;
+
   reason: string;
 }
 
@@ -98,10 +116,10 @@ export interface Step3ExecutionSnapshot {
   // STEP-3A — Index Level
   // -------------------------
 
-  marketContext: string;
-  tradePermission: string;
+  marketContext: string | null;
+  tradePermission: string | null;
 
-  allowedStrategies: string[];
+  allowedStrategies: StrategyUsed[];
   maxTradesAllowed: number;
   executionEnabled: boolean;
 
@@ -122,4 +140,5 @@ export interface Step3ExecutionSnapshot {
 
 export interface Step3ExecutionResponse {
   snapshot: Step3ExecutionSnapshot;
+  canFreeze: boolean; // Backend authoritative flag
 }

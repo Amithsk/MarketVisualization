@@ -1,98 +1,97 @@
 // frontend/src/types/step4.types.ts
 
-import { TradeDate, IsoTimestamp, FreezeMetadata } from "./common.types";
+import { TradeDate, IsoTimestamp } from "./common.types";
 
 /**
  * STEP-4: Execution & Trade Construction
  * --------------------------------------
- * Captures the final, frozen trade intent for the day.
- * This object represents a money-impacting decision.
+ * Backend is the single source of truth.
+ * Frontend never derives execution values.
  */
 
-/**
- * Final trade direction.
- */
-export type FinalTradeDirection = "LONG" | "SHORT";
+/* =====================================================
+   PREVIEW TYPES
+===================================================== */
 
-/**
- * How the trade is intended to be executed.
- */
-export type ExecutionMode =
-  | "MARKET"
-  | "LIMIT"
-  | "STOP_MARKET"
-  | "STOP_LIMIT";
+export type TradeStatus = "READY" | "BLOCKED";
 
-/**
- * Trade intent BEFORE freeze.
- * This is what the UI constructs and sends to backend.
- */
-export interface TradeIntent {
-  tradeDate: TradeDate;
-
-  /**
-   * Instrument details (from STEP-3).
-   */
+export interface Step4PreviewRequest {
+  trade_date: TradeDate;
   symbol: string;
-  direction: FinalTradeDirection;
 
-  /**
-   * Execution intent.
-   */
-  executionMode: ExecutionMode;
+  capital: number;
+  risk_percent: number;
+  entry_buffer: number;
+  r_multiple: number;
+}
 
-  /**
-   * Prices explicitly committed by the trader.
-   */
-  entryPrice: number;
-  stopLoss: number;
+export interface Step4PreviewSnapshot {
+  trade_date: TradeDate;
+  symbol: string;
 
-  /**
-   * Risk definition.
-   * Percentage of total capital risked.
-   */
-  riskPercent: number;
+  direction: "LONG" | "SHORT";
+  strategy_used: "GAP_FOLLOW" | "MOMENTUM";
 
-  /**
-   * Quantity is explicitly committed.
-   */
+  entry_price: number;
+  stop_loss: number;
+  risk_per_share: number;
   quantity: number;
+  target_price: number;
 
-  /**
-   * Optional rationale written at commit time.
-   */
+  trade_status: TradeStatus;
+  block_reason?: string;
+
+  constructed_at: IsoTimestamp;
+}
+
+export interface Step4PreviewResponse {
+  preview: Step4PreviewSnapshot;
+}
+
+
+/* =====================================================
+   FREEZE TYPES
+===================================================== */
+
+export interface Step4FreezeRequest {
+  trade_date: TradeDate;
+  symbol: string;
+
+  capital: number;
+  risk_percent: number;
+  entry_buffer: number;
+  r_multiple: number;
+
   rationale?: string;
 }
 
-/**
- * Core frozen trade object as returned by backend.
- * IMMUTABLE after creation.
- */
-export interface FrozenTrade extends FreezeMetadata {
-  tradeDate: TradeDate;
+export interface FrozenTrade {
+  trade_date: TradeDate;
 
   symbol: string;
-  direction: FinalTradeDirection;
+  direction: "LONG" | "SHORT";
+  setup_type: "GAP_FOLLOW" | "MOMENTUM";
 
-  executionMode: ExecutionMode;
-
-  entryPrice: number;
-  stopLoss: number;
-
-  riskPercent: number;
+  entry_price: number;
+  stop_loss: number;
+  risk_per_share: number;
   quantity: number;
+  target_price: number;
+
+  trade_status: TradeStatus;
+  block_reason?: string;
+
+  capital: number;
+  risk_percent: number;
+  entry_buffer: number;
+  r_multiple: number;
 
   rationale?: string;
 
-  /**
-   * Audit timestamp
-   */
-  frozenAt: IsoTimestamp;
+  frozen_at: IsoTimestamp;
 }
 
-/**
- * Response shape after STEP-4 freeze.
- */
 export interface Step4FrozenTradeResponse {
   trade: FrozenTrade;
+  frozen: boolean;
 }

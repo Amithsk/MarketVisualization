@@ -22,13 +22,11 @@ export default function Step3ExecutionControl({
   const {
     snapshot,
     allowedStrategies,
-    maxTradesAllowed,
     executionEnabled,
     candidates,
     candidatesMode,
     generatedAt,
-    loading,
-    error,
+    canFreeze,
     previewStep3,
     computeStep3Candidates,
     freezeStep3Candidates,
@@ -90,10 +88,6 @@ export default function Step3ExecutionControl({
     ]);
   };
 
-  const removeRow = (index: number) => {
-    setStocks((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleCompute = () => {
     const validStocks = stocks.filter(
       (s) => s.symbol.trim().length > 0
@@ -102,101 +96,216 @@ export default function Step3ExecutionControl({
     computeStep3Candidates(validStocks);
   };
 
+  const DEV_FORCE_ENABLE_FREEZE = true;
+  const hasAnyCandidate = candidates.length > 0;
+
+  const effectiveCanFreeze =
+    DEV_FORCE_ENABLE_FREEZE
+      ? hasAnyCandidate
+      : canFreeze;
+
   const handleFreeze = () => {
-    if (!snapshot || candidates.length === 0) return;
+    if (!effectiveCanFreeze) return;
     freezeStep3Candidates(candidates);
   };
 
-  const isFrozen = candidatesMode === "AUTO" && candidates.length > 0;
+  const isPersisted = candidatesMode === "AUTO";
 
   return (
     <div className="space-y-6">
+
+      {/* ================= STEP-3A HEADER ================= */}
       {snapshot && (
-        <div className="rounded border p-4 text-sm">
-          <div className="flex justify-between">
-            <span>Market Context</span>
-            <span>{snapshot.marketContext}</span>
+        <div className="rounded border p-4 text-sm space-y-2 bg-gray-50">
+          <div className="font-semibold text-sm mb-2">
+            STEP-3A — Execution Control
           </div>
-          <div className="flex justify-between">
-            <span>Allowed Strategies</span>
-            <span>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>Market Context (STEP-1)</div>
+            <div>{snapshot.marketContext ?? "-"}</div>
+
+            <div>Trade Permission (STEP-2)</div>
+            <div>{snapshot.tradePermission ?? "-"}</div>
+
+            <div>Allowed Strategies</div>
+            <div>
               {allowedStrategies.length
                 ? allowedStrategies.join(", ")
                 : "NO_TRADE"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span>Execution Enabled</span>
-            <span
+            </div>
+
+            <div>Max Trades Allowed</div>
+            <div>{snapshot.maxTradesAllowed}</div>
+
+            <div>Execution Enabled</div>
+            <div
               className={
                 executionEnabled
-                  ? "text-green-600"
-                  : "text-red-600"
+                  ? "text-green-600 font-semibold"
+                  : "text-red-600 font-semibold"
               }
             >
               {executionEnabled ? "YES" : "NO"}
-            </span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ================= INPUT SECTION ================= */}
-      {!isFrozen && (
-        <div className="rounded border p-4 space-y-4">
+      {/* ================= STEP-3B INPUT ================= */}
+      {!isPersisted && (
+        <div className="rounded border p-4 space-y-6">
+
+          <div className="font-semibold text-sm">
+            STEP-3B — Stock Selection Funnel
+          </div>
+
           {stocks.map((row, index) => (
-            <div key={index} className="border p-3 rounded space-y-2">
-              <input
-                type="text"
-                placeholder="Symbol"
-                value={row.symbol}
-                onChange={(e) =>
-                  updateField(index, "symbol", e.target.value.toUpperCase())
-                }
-                className="border px-2 py-1 text-sm w-32"
-              />
+            <div key={index} className="border rounded p-4 space-y-4">
 
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <input type="number" placeholder="Avg Value (Cr)"
-                  onChange={(e)=>updateField(index,"avgTradedValue20d",Number(e.target.value))} />
-                <input type="number" placeholder="ATR %"
-                  onChange={(e)=>updateField(index,"atrPct",Number(e.target.value))} />
-                <input type="number" placeholder="Gap %"
-                  onChange={(e)=>updateField(index,"gapPct",Number(e.target.value))} />
-                <input type="number" placeholder="Stock Open"
-                  onChange={(e)=>updateField(index,"stockOpen0915",Number(e.target.value))} />
-                <input type="number" placeholder="Stock Current"
-                  onChange={(e)=>updateField(index,"stockCurrentPrice",Number(e.target.value))} />
-                <input type="number" placeholder="Nifty Open"
-                  onChange={(e)=>updateField(index,"niftyOpen0915",Number(e.target.value))} />
-                <input type="number" placeholder="Nifty Current"
-                  onChange={(e)=>updateField(index,"niftyCurrentPrice",Number(e.target.value))} />
+              {/* Symbol */}
+              <div>
+                <input
+                  type="text"
+                  placeholder="Symbol"
+                  value={row.symbol}
+                  onChange={(e) =>
+                    updateField(index, "symbol", e.target.value.toUpperCase())
+                  }
+                  className="border px-2 py-1 text-sm w-32"
+                />
               </div>
 
-              <div className="flex gap-4 text-xs">
-                <label>
-                  <input type="checkbox"
-                    onChange={(e)=>updateField(index,"abnormalCandle",e.target.checked)} />
-                  Abnormal
-                </label>
-                <label>
-                  <input type="checkbox"
-                    onChange={(e)=>updateField(index,"gapHold",e.target.checked)} />
-                  Gap Hold
-                </label>
-                <label>
-                  <input type="checkbox"
-                    onChange={(e)=>updateField(index,"structureValid",e.target.checked)} />
-                  Structure Valid
-                </label>
+              {/* Layer-1 */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-600">
+                  Layer-1 — Tradability
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <input
+                    type="number"
+                    placeholder="Avg Traded Value"
+                    onChange={(e) =>
+                      updateField(index, "avgTradedValue20d", Number(e.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    placeholder="ATR %"
+                    onChange={(e) =>
+                      updateField(index, "atrPct", Number(e.target.value))
+                    }
+                  />
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      onChange={(e) =>
+                        updateField(index, "abnormalCandle", e.target.checked)
+                      }
+                    />
+                    Abnormal Candle
+                  </label>
+                </div>
               </div>
+
+              {/* Layer-2 */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-600">
+                  Layer-2 — RS vs NIFTY
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <input
+                    type="number"
+                    placeholder="Stock Open (09:15)"
+                    onChange={(e) =>
+                      updateField(index, "stockOpen0915", Number(e.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock Current"
+                    onChange={(e) =>
+                      updateField(index, "stockCurrentPrice", Number(e.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    placeholder="Nifty Open (09:15)"
+                    onChange={(e) =>
+                      updateField(index, "niftyOpen0915", Number(e.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    placeholder="Nifty Current"
+                    onChange={(e) =>
+                      updateField(index, "niftyCurrentPrice", Number(e.target.value))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Layer-3 */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-600">
+                  Layer-3 — Strategy Fit
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <input
+                    type="number"
+                    placeholder="Gap %"
+                    onChange={(e) =>
+                      updateField(index, "gapPct", Number(e.target.value))
+                    }
+                  />
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      onChange={(e) =>
+                        updateField(index, "gapHold", e.target.checked)
+                      }
+                    />
+                    Gap Hold
+                  </label>
+
+                  <select
+                    value={row.priceVsVwap}
+                    onChange={(e) =>
+                      updateField(index, "priceVsVwap", e.target.value)
+                    }
+                    className="border px-1 py-1"
+                  >
+                    <option value="ABOVE">ABOVE VWAP</option>
+                    <option value="BELOW">BELOW VWAP</option>
+                  </select>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      onChange={(e) =>
+                        updateField(index, "structureValid", e.target.checked)
+                      }
+                    />
+                    Structure Valid
+                  </label>
+                </div>
+              </div>
+
             </div>
           ))}
 
           <div className="flex gap-4">
-            <button onClick={addRow} className="text-xs text-blue-600">
+            <button
+              onClick={addRow}
+              className="text-xs text-blue-600"
+            >
               + Add Stock
             </button>
-            <button onClick={handleCompute} className="text-xs text-green-600 font-semibold">
+            <button
+              onClick={handleCompute}
+              className="text-xs text-green-600 font-semibold"
+            >
               Compute
             </button>
           </div>
@@ -206,11 +315,16 @@ export default function Step3ExecutionControl({
       {/* ================= RESULT SECTION ================= */}
       {candidates.length > 0 && (
         <div className="rounded border p-4 space-y-3">
+
+          <div className="font-semibold text-sm">
+            STEP-3 Evaluation Result
+          </div>
+
           {candidates.map((c) => {
             const isPass = c.strategyUsed !== "NO_TRADE";
 
             return (
-              <div key={c.symbol} className="border rounded p-3 text-sm">
+              <div key={c.symbol} className="border rounded p-3 text-sm space-y-1">
                 <div className="flex justify-between">
                   <div className="font-semibold">{c.symbol}</div>
                   <div
@@ -224,28 +338,31 @@ export default function Step3ExecutionControl({
                   </div>
                 </div>
 
-                <div className="text-xs mt-1">
-                  Direction: {c.direction}
-                </div>
-
-                <div className="text-xs">
-                  Strategy: {c.strategyUsed}
-                </div>
-
-                <div className="text-xs text-gray-500 mt-1">
-                  {c.reason}
-                </div>
+                <div className="text-xs">Direction: {c.direction}</div>
+                <div className="text-xs">Strategy: {c.strategyUsed}</div>
+                <div className="text-xs text-gray-500">{c.reason}</div>
               </div>
             );
           })}
 
-          {!isFrozen && (
+          {!isPersisted && (
             <button
               onClick={handleFreeze}
-              className="text-xs text-purple-600 font-semibold"
+              disabled={!effectiveCanFreeze}
+              className={`text-xs font-semibold ${
+                effectiveCanFreeze
+                  ? "text-purple-600"
+                  : "text-gray-400 cursor-not-allowed"
+              }`}
             >
               Freeze Candidates
             </button>
+          )}
+
+          {isPersisted && (
+            <div className="text-xs text-green-600 font-semibold">
+              ✓ Candidates Frozen
+            </div>
           )}
         </div>
       )}

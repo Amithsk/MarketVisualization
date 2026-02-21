@@ -4,41 +4,86 @@
 import { useCallback, useState } from "react";
 import type { ApiState } from "@/types/common.types";
 import type {
-  TradeIntent,
+  Step4PreviewRequest,
+  Step4PreviewSnapshot,
+  Step4FreezeRequest,
   FrozenTrade,
-  Step4FrozenTradeResponse,
 } from "@/types/step4.types";
-import { freezeFinalTrade } from "@/services/step4.api";
+import {
+  generateStep4Preview,
+  freezeFinalTrade,
+} from "@/services/step4.api";
 
 /**
  * STEP-4 hook
- * Handles final trade construction & irreversible freeze.
+ * Backend is single source of truth.
  */
 export function useStep4() {
-  const [state, setState] = useState<ApiState<FrozenTrade>>({
-    data: null,
-    loading: false,
-    error: null,
-  });
+  const [previewState, setPreviewState] =
+    useState<ApiState<Step4PreviewSnapshot>>({
+      data: null,
+      loading: false,
+      error: null,
+    });
+
+  const [freezeState, setFreezeState] =
+    useState<ApiState<FrozenTrade>>({
+      data: null,
+      loading: false,
+      error: null,
+    });
 
   /**
-   * Freeze final trade (irreversible)
+   * Generate / overwrite preview
    */
-  const freezeTrade = useCallback(
-    async (tradeIntent: TradeIntent) => {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
+  const generatePreview = useCallback(
+    async (payload: Step4PreviewRequest) => {
+      setPreviewState((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+      }));
 
       try {
-        const response: Step4FrozenTradeResponse =
-          await freezeFinalTrade(tradeIntent);
+        const response = await generateStep4Preview(payload);
 
-        setState({
+        setPreviewState({
+          data: response.preview,
+          loading: false,
+          error: null,
+        });
+      } catch (error: any) {
+        setPreviewState((prev) => ({
+          data: prev.data,
+          loading: false,
+          error,
+        }));
+      }
+    },
+    []
+  );
+
+  /**
+   * Freeze trade (irreversible)
+   */
+  const freezeTrade = useCallback(
+    async (payload: Step4FreezeRequest) => {
+      setFreezeState((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+      }));
+
+      try {
+        const response = await freezeFinalTrade(payload);
+
+        setFreezeState({
           data: response.trade,
           loading: false,
           error: null,
         });
       } catch (error: any) {
-        setState((prev) => ({
+        setFreezeState((prev) => ({
           data: prev.data,
           loading: false,
           error,
@@ -49,10 +94,16 @@ export function useStep4() {
   );
 
   return {
-    trade: state.data,
-    isFrozen: state.data?.freezeStatus === "FROZEN",
-    loading: state.loading,
-    error: state.error,
+    // Preview
+    preview: previewState.data,
+    previewLoading: previewState.loading,
+    previewError: previewState.error,
+    generatePreview,
+
+    // Freeze
+    frozenTrade: freezeState.data,
+    freezeLoading: freezeState.loading,
+    freezeError: freezeState.error,
     freezeTrade,
   };
 }

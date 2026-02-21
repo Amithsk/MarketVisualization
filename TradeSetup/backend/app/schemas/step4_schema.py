@@ -1,99 +1,131 @@
+# backend/app/schemas/step4_schema.py
+
 from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
-# =========================
-# Requests
-# =========================
+# =====================================================
+# STEP-4 PREVIEW
+# =====================================================
 
-class Step4FreezeRequest(BaseModel):
+class Step4PreviewRequest(BaseModel):
     """
-    Freeze a STEP-4 trade.
-
-    This is a money-impacting, irreversible action.
-    All validations here are defensive.
+    Generate / overwrite STEP-4 construction snapshot.
     """
 
     trade_date: date
 
-    # -------------------------
-    # Instrument (must come from STEP-3)
-    # -------------------------
     symbol: str = Field(
         ...,
         min_length=1,
         max_length=32,
-        description="Instrument symbol (must exist in STEP-3)"
+        description="Instrument symbol (must exist in STEP-3 snapshot)"
     )
 
-    direction: str = Field(
-        ...,
-        min_length=4,
-        max_length=16,
-        description="Trade direction (LONG / SHORT)"
-    )
-
-    setup_type: str = Field(
-        ...,
-        min_length=3,
-        max_length=32,
-        description="Setup type from STEP-3 (traceability)"
-    )
-
-    # -------------------------
-    # Execution intent
-    # -------------------------
-    execution_mode: str = Field(
-        ...,
-        min_length=3,
-        max_length=16,
-        description="Execution mode (MARKET, LIMIT, VWAP, etc.)"
-    )
-
-    # -------------------------
-    # Prices
-    # -------------------------
-    entry_price: float = Field(
+    capital: float = Field(
         ...,
         gt=0,
-        description="Intended entry price"
+        description="Total trading capital"
     )
 
-    stop_loss: float = Field(
-        ...,
-        gt=0,
-        description="Protective stop-loss price"
-    )
-
-    # -------------------------
-    # Risk definition
-    # -------------------------
     risk_percent: float = Field(
         ...,
         gt=0,
         le=5.0,
-        description="Risk per trade as % of capital (hard-capped)"
+        description="Risk per trade as % of capital"
     )
 
-    quantity: int = Field(
+    entry_buffer: float = Field(
+        ...,
+        ge=0,
+        description="Buffer added to breakout level"
+    )
+
+    r_multiple: float = Field(
         ...,
         gt=0,
-        description="Trade quantity (must be > 0)"
+        description="Target R multiple"
     )
 
-    # -------------------------
-    # Optional rationale
-    # -------------------------
+
+class Step4PreviewSnapshot(BaseModel):
+    """
+    Derived preview snapshot (construction layer).
+    """
+
+    trade_date: date
+    symbol: str
+    direction: str
+    strategy_used: str
+
+    entry_price: float
+    stop_loss: float
+    risk_per_share: float
+    quantity: int
+    target_price: float
+
+    trade_status: str
+    block_reason: str | None = None
+
+    constructed_at: datetime
+
+
+class Step4PreviewResponse(BaseModel):
+    """
+    Response after STEP-4 preview generation.
+    """
+    preview: Step4PreviewSnapshot
+
+
+# =====================================================
+# STEP-4 FREEZE
+# =====================================================
+
+class Step4FreezeRequest(BaseModel):
+    """
+    Freeze a STEP-4 trade.
+    """
+
+    trade_date: date
+
+    symbol: str = Field(
+        ...,
+        min_length=1,
+        max_length=32,
+        description="Instrument symbol (must exist in STEP-3 snapshot)"
+    )
+
+    capital: float = Field(
+        ...,
+        gt=0,
+        description="Total trading capital"
+    )
+
+    risk_percent: float = Field(
+        ...,
+        gt=0,
+        le=5.0,
+        description="Risk per trade as % of capital"
+    )
+
+    entry_buffer: float = Field(
+        ...,
+        ge=0,
+        description="Buffer added to breakout level"
+    )
+
+    r_multiple: float = Field(
+        ...,
+        gt=0,
+        description="Target R multiple"
+    )
+
     rationale: str | None = Field(
         None,
         max_length=512,
         description="Optional trader rationale"
     )
 
-
-# =========================
-# Snapshot
-# =========================
 
 class FrozenTradeSnapshot(BaseModel):
     """
@@ -105,13 +137,20 @@ class FrozenTradeSnapshot(BaseModel):
     symbol: str
     direction: str
     setup_type: str
-    execution_mode: str
 
     entry_price: float
     stop_loss: float
-
-    risk_percent: float
+    risk_per_share: float
     quantity: int
+    target_price: float
+
+    trade_status: str
+    block_reason: str | None = None
+
+    capital: float
+    risk_percent: float
+    entry_buffer: float
+    r_multiple: float
 
     rationale: str | None = None
 
@@ -120,10 +159,6 @@ class FrozenTradeSnapshot(BaseModel):
     class Config:
         orm_mode = True
 
-
-# =========================
-# Response
-# =========================
 
 class Step4FrozenTradeResponse(BaseModel):
     """

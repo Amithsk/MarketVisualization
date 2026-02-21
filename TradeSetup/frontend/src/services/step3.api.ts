@@ -13,6 +13,8 @@ import type {
 
 /**
  * Normalize backend snapshot → frontend format
+ * Converts snake_case → camelCase
+ * Preserves deterministic structural snapshot
  */
 function normalizeSnapshot(raw: any): Step3ExecutionSnapshot {
   return {
@@ -20,16 +22,34 @@ function normalizeSnapshot(raw: any): Step3ExecutionSnapshot {
 
     marketContext: raw.market_context,
     tradePermission: raw.trade_permission,
+
     allowedStrategies: raw.allowed_strategies ?? [],
     maxTradesAllowed: raw.max_trades_allowed,
     executionEnabled: raw.execution_enabled,
 
     candidatesMode: raw.candidates_mode,
+
     candidates:
-      raw.candidates?.map((c: any) => ({
+      raw.candidates?.map((c: any): TradeCandidate => ({
         symbol: c.symbol,
         direction: c.direction,
         strategyUsed: c.strategy_used,
+
+        rsValue: c.rs_value ?? null,
+
+        gapHigh: c.gap_high ?? null,
+        gapLow: c.gap_low ?? null,
+
+        intradayHigh: c.intraday_high ?? null,
+        intradayLow: c.intraday_low ?? null,
+
+        lastHigherLow: c.last_higher_low ?? null,
+
+        yesterdayClose: c.yesterday_close ?? null,
+        vwapValue: c.vwap_value ?? null,
+
+        structureValid: Boolean(c.structure_valid),
+
         reason: c.reason,
       })) ?? [],
 
@@ -38,7 +58,7 @@ function normalizeSnapshot(raw: any): Step3ExecutionSnapshot {
 }
 
 /**
- * STEP-3 PREVIEW (Read Only)
+ * STEP-3 PREVIEW
  */
 export async function fetchStep3Preview(
   tradeDate: TradeDate
@@ -49,18 +69,12 @@ export async function fetchStep3Preview(
 
   return {
     snapshot: normalizeSnapshot(response.data.snapshot),
+    canFreeze: response.data.can_freeze ?? false,
   };
 }
 
 /**
- * STEP-3 COMPUTE (Hybrid Manual Mode)
- *
- * Phase-1:
- *   - Sends full Step3StockContext[] from UI.
- *
- * Future Automation:
- *   - stocks will be constructed internally in backend.
- *   - frontend will stop sending manual metrics.
+ * STEP-3 COMPUTE
  */
 export async function computeStep3(
   tradeDate: TradeDate,
@@ -90,11 +104,13 @@ export async function computeStep3(
 
   return {
     snapshot: normalizeSnapshot(response.data.snapshot),
+    canFreeze: response.data.can_freeze ?? false,
   };
 }
 
 /**
- * STEP-3 FREEZE (Persist Evaluated Candidates Only)
+ * STEP-3 FREEZE
+ * Sends full deterministic structural snapshot
  */
 export async function freezeStep3(
   tradeDate: TradeDate,
@@ -106,11 +122,28 @@ export async function freezeStep3(
       symbol: c.symbol,
       direction: c.direction,
       strategy_used: c.strategyUsed,
+
+      rs_value: c.rsValue ?? null,
+
+      gap_high: c.gapHigh ?? null,
+      gap_low: c.gapLow ?? null,
+
+      intraday_high: c.intradayHigh ?? null,
+      intraday_low: c.intradayLow ?? null,
+
+      last_higher_low: c.lastHigherLow ?? null,
+
+      yesterday_close: c.yesterdayClose ?? null,
+      vwap_value: c.vwapValue ?? null,
+
+      structure_valid: c.structureValid,
+
       reason: c.reason,
     })),
   });
 
   return {
     snapshot: normalizeSnapshot(response.data.snapshot),
+    canFreeze: response.data.can_freeze ?? false,
   };
 }
