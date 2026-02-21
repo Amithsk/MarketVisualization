@@ -61,7 +61,7 @@ def _derive_step3a(market_context: str | None, trade_permission: str | None):
 
 
 # =========================================================
-# CORE DETERMINISTIC ENGINE (HYBRID STRUCTURAL SNAPSHOT)
+# CORE DETERMINISTIC ENGINE
 # =========================================================
 
 def _evaluate_stock(
@@ -70,10 +70,6 @@ def _evaluate_stock(
 ) -> TradeCandidate:
 
     symbol = context.symbol.upper()
-
-    # -----------------------------------------------------
-    # Layer-1 — Tradability
-    # -----------------------------------------------------
 
     if (
         context.avg_traded_value_20d < 100
@@ -87,10 +83,6 @@ def _evaluate_stock(
             reason="Rejected at Layer-1 (Tradability filter failed)",
             structure_valid=False,
         )
-
-    # -----------------------------------------------------
-    # Layer-2 — Relative Strength vs NIFTY
-    # -----------------------------------------------------
 
     stock_pct = (
         (context.stock_current_price - context.stock_open_0915)
@@ -119,10 +111,6 @@ def _evaluate_stock(
             reason="Rejected at Layer-2 (RS Neutral)",
             structure_valid=False,
         )
-
-    # -----------------------------------------------------
-    # Layer-3 — Strategy Fit
-    # -----------------------------------------------------
 
     strategy = "NO_TRADE"
 
@@ -154,14 +142,10 @@ def _evaluate_stock(
             structure_valid=False,
         )
 
-    # -----------------------------------------------------
-    # Structural Snapshot (Hybrid Mode)
-    # -----------------------------------------------------
-
     intraday_high = context.stock_current_price
     intraday_low = context.stock_open_0915
-    yesterday_close = context.stock_open_0915  # hybrid placeholder
-    vwap_value = context.stock_current_price  # hybrid placeholder
+    yesterday_close = context.stock_open_0915
+    vwap_value = context.stock_current_price
 
     gap_high = None
     gap_low = None
@@ -170,7 +154,6 @@ def _evaluate_stock(
     if strategy == "GAP_FOLLOW":
         gap_high = intraday_high
         gap_low = intraday_low
-
     elif strategy == "MOMENTUM":
         last_higher_low = intraday_low
 
@@ -192,7 +175,7 @@ def _evaluate_stock(
 
 
 # =========================================================
-# PREVIEW
+# PREVIEW (PERSISTS CONTROL ROW)
 # =========================================================
 
 def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionResponse:
@@ -217,7 +200,7 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         or not step2_behavior.frozen_at
         or not step2_open
     ):
-        logger.info("[STEP3][PREVIEW][BLOCKED] trade_date=%s", trade_date)
+        logger.info("[STEP3][STATE][PREVIEW_BLOCKED] trade_date=%s", trade_date)
 
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
@@ -243,6 +226,29 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         Step3ExecutionControl.trade_date == trade_date
     ).first()
 
+    if not control_row:
+        control_row = Step3ExecutionControl(
+            trade_date=trade_date,
+            market_context=step1.final_market_context,
+            trade_permission=step2_open.trade_permission,
+            allowed_strategies=",".join(allowed_strategies),
+            max_trades_allowed=max_trades_allowed,
+            execution_allowed=int(execution_allowed),
+            decided_at=decided_at,
+        )
+        db.add(control_row)
+        db.commit()
+        logger.info("[STEP3][STATE][CONTROL_CREATED] trade_date=%s", trade_date)
+    else:
+        control_row.market_context = step1.final_market_context
+        control_row.trade_permission = step2_open.trade_permission
+        control_row.allowed_strategies = ",".join(allowed_strategies)
+        control_row.max_trades_allowed = max_trades_allowed
+        control_row.execution_allowed = int(execution_allowed)
+        control_row.decided_at = decided_at
+        db.commit()
+        logger.info("[STEP3][STATE][CONTROL_UPDATED] trade_date=%s", trade_date)
+
     rows = db.query(Step3StockSelection).filter(
         Step3StockSelection.trade_date == trade_date
     ).all()
@@ -266,17 +272,13 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         for r in rows
     ]
 
-    logger.info(
-        "[STEP3][PREVIEW][SUCCESS] trade_date=%s persisted_candidates=%d",
-        trade_date,
-        len(candidates),
-    )
+    logger.info("[STEP3][STATE][PREVIEW_SUCCESS] trade_date=%s", trade_date)
 
     return Step3ExecutionResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
-            market_context=control_row.market_context if control_row else None,
-            trade_permission=control_row.trade_permission if control_row else None,
+            market_context=step1.final_market_context,
+            trade_permission=step2_open.trade_permission,
             allowed_strategies=allowed_strategies,
             max_trades_allowed=max_trades_allowed,
             execution_enabled=execution_allowed,
@@ -289,7 +291,7 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
 
 
 # =========================================================
-# COMPUTE
+# COMPUTE (RESTORED)
 # =========================================================
 
 def compute_step3_candidates(
@@ -313,7 +315,7 @@ def compute_step3_candidates(
     )
 
     logger.info(
-        "[STEP3][COMPUTE][SUCCESS] trade_date=%s candidates=%d can_freeze=%s",
+        "[STEP3][STATE][COMPUTE] trade_date=%s candidates=%d can_freeze=%s",
         trade_date,
         len(evaluated),
         can_freeze,
@@ -336,7 +338,7 @@ def compute_step3_candidates(
 
 
 # =========================================================
-# FREEZE
+# FREEZE (RESTORED)
 # =========================================================
 
 def freeze_step3_candidates(
@@ -354,10 +356,7 @@ def freeze_step3_candidates(
     if not control_row:
         raise ValueError("Preview must be generated before freeze.")
 
-    qualified = [
-        c for c in candidates
-        if c.strategy_used != "NO_TRADE"
-    ]
+    qualified = [c for c in candidates if c.strategy_used != "NO_TRADE"]
 
     if not qualified:
         raise ValueError("No qualified trades available to freeze.")
@@ -392,7 +391,7 @@ def freeze_step3_candidates(
     db.commit()
 
     logger.info(
-        "[STEP3][FREEZE][SUCCESS] trade_date=%s persisted=%d",
+        "[STEP3][STATE][FREEZE_SUCCESS] trade_date=%s persisted=%d",
         trade_date,
         len(qualified),
     )

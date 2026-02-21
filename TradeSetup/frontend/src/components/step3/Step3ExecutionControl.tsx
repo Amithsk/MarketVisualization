@@ -51,6 +51,9 @@ export default function Step3ExecutionControl({
     },
   ]);
 
+  // =========================
+  // Initial Preview
+  // =========================
   useEffect(() => {
     if (!hasPreviewed.current) {
       previewStep3();
@@ -58,17 +61,52 @@ export default function Step3ExecutionControl({
     }
   }, [previewStep3]);
 
+  // =========================
+  // LOCK LOGIC
+  // Lock after compute OR freeze
+  // =========================
+  const isLocked = canFreeze || candidatesMode === "AUTO";
+  const isPersisted = candidatesMode === "AUTO";
+
+  // =========================
+  // MAIN STATE DEBUG (only major transitions)
+  // =========================
+  useEffect(() => {
+    if (!snapshot) return;
+
+    console.info("[STEP3][STATE-CHANGE]", {
+      tradeDate,
+      candidatesMode,
+      canFreeze,
+      executionEnabled,
+      candidateCount: snapshot.candidates.length,
+      generatedAt: snapshot.generatedAt,
+    });
+  }, [
+    snapshot?.generatedAt,
+    candidatesMode,
+    canFreeze,
+    executionEnabled,
+  ]);
+
+  // =========================
+  // Helpers
+  // =========================
   const updateField = (
     index: number,
     field: keyof ManualStockRow,
     value: any
   ) => {
+    if (isLocked) return;
+
     const updated = [...stocks];
     updated[index] = { ...updated[index], [field]: value };
     setStocks(updated);
   };
 
   const addRow = () => {
+    if (isLocked) return;
+
     setStocks((prev) => [
       ...prev,
       {
@@ -89,27 +127,21 @@ export default function Step3ExecutionControl({
   };
 
   const handleCompute = () => {
+    if (isLocked) return;
+
     const validStocks = stocks.filter(
       (s) => s.symbol.trim().length > 0
     );
+
     if (validStocks.length === 0) return;
+
     computeStep3Candidates(validStocks);
   };
 
-  const DEV_FORCE_ENABLE_FREEZE = true;
-  const hasAnyCandidate = candidates.length > 0;
-
-  const effectiveCanFreeze =
-    DEV_FORCE_ENABLE_FREEZE
-      ? hasAnyCandidate
-      : canFreeze;
-
   const handleFreeze = () => {
-    if (!effectiveCanFreeze) return;
+    if (!canFreeze) return;
     freezeStep3Candidates(candidates);
   };
-
-  const isPersisted = candidatesMode === "AUTO";
 
   return (
     <div className="space-y-6">
@@ -169,6 +201,7 @@ export default function Step3ExecutionControl({
                   type="text"
                   placeholder="Symbol"
                   value={row.symbol}
+                  disabled={isLocked}
                   onChange={(e) =>
                     updateField(index, "symbol", e.target.value.toUpperCase())
                   }
@@ -185,6 +218,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Avg Traded Value"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "avgTradedValue20d", Number(e.target.value))
                     }
@@ -192,6 +226,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="ATR %"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "atrPct", Number(e.target.value))
                     }
@@ -199,6 +234,7 @@ export default function Step3ExecutionControl({
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      disabled={isLocked}
                       onChange={(e) =>
                         updateField(index, "abnormalCandle", e.target.checked)
                       }
@@ -217,6 +253,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Stock Open (09:15)"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "stockOpen0915", Number(e.target.value))
                     }
@@ -224,6 +261,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Stock Current"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "stockCurrentPrice", Number(e.target.value))
                     }
@@ -231,6 +269,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Nifty Open (09:15)"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "niftyOpen0915", Number(e.target.value))
                     }
@@ -238,6 +277,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Nifty Current"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "niftyCurrentPrice", Number(e.target.value))
                     }
@@ -254,6 +294,7 @@ export default function Step3ExecutionControl({
                   <input
                     type="number"
                     placeholder="Gap %"
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "gapPct", Number(e.target.value))
                     }
@@ -262,6 +303,7 @@ export default function Step3ExecutionControl({
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      disabled={isLocked}
                       onChange={(e) =>
                         updateField(index, "gapHold", e.target.checked)
                       }
@@ -271,6 +313,7 @@ export default function Step3ExecutionControl({
 
                   <select
                     value={row.priceVsVwap}
+                    disabled={isLocked}
                     onChange={(e) =>
                       updateField(index, "priceVsVwap", e.target.value)
                     }
@@ -283,6 +326,7 @@ export default function Step3ExecutionControl({
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      disabled={isLocked}
                       onChange={(e) =>
                         updateField(index, "structureValid", e.target.checked)
                       }
@@ -295,20 +339,22 @@ export default function Step3ExecutionControl({
             </div>
           ))}
 
-          <div className="flex gap-4">
-            <button
-              onClick={addRow}
-              className="text-xs text-blue-600"
-            >
-              + Add Stock
-            </button>
-            <button
-              onClick={handleCompute}
-              className="text-xs text-green-600 font-semibold"
-            >
-              Compute
-            </button>
-          </div>
+          {!isLocked && (
+            <div className="flex gap-4">
+              <button
+                onClick={addRow}
+                className="text-xs text-blue-600"
+              >
+                + Add Stock
+              </button>
+              <button
+                onClick={handleCompute}
+                className="text-xs text-green-600 font-semibold"
+              >
+                Compute
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -348,9 +394,9 @@ export default function Step3ExecutionControl({
           {!isPersisted && (
             <button
               onClick={handleFreeze}
-              disabled={!effectiveCanFreeze}
+              disabled={!canFreeze}
               className={`text-xs font-semibold ${
-                effectiveCanFreeze
+                canFreeze
                   ? "text-purple-600"
                   : "text-gray-400 cursor-not-allowed"
               }`}
