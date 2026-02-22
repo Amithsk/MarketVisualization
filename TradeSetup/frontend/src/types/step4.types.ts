@@ -10,12 +10,49 @@ import { TradeDate, IsoTimestamp } from "./common.types";
  */
 
 /* =====================================================
-   PREVIEW TYPES
+   COMMON
 ===================================================== */
 
 export type TradeStatus = "READY" | "BLOCKED";
+export type Step4Mode = "AUTO" | "MANUAL_REQUIRED";
+
+/* =====================================================
+   PHASE-1 → PREVIEW (STRUCTURAL CONTEXT LOAD)
+===================================================== */
 
 export interface Step4PreviewRequest {
+  trade_date: TradeDate;
+}
+
+export interface Step4ExecutionBlueprint {
+  trade_date: TradeDate;
+
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  strategy_used: "GAP_FOLLOW" | "MOMENTUM";
+
+  gap_high?: number;
+  gap_low?: number;
+
+  intraday_high?: number;
+  intraday_low?: number;
+
+  last_higher_low?: number;
+  vwap_value?: number;
+
+  structure_valid: boolean;
+}
+
+export interface Step4PreviewResponse {
+  mode: Step4Mode;
+  candidates: Step4ExecutionBlueprint[];
+}
+
+/* =====================================================
+   PHASE-2 → COMPUTE (RISK CALCULATION)
+===================================================== */
+
+export interface Step4ComputeRequest {
   trade_date: TradeDate;
   symbol: string;
 
@@ -44,13 +81,12 @@ export interface Step4PreviewSnapshot {
   constructed_at: IsoTimestamp;
 }
 
-export interface Step4PreviewResponse {
+export interface Step4ComputeResponse {
   preview: Step4PreviewSnapshot;
 }
 
-
 /* =====================================================
-   FREEZE TYPES
+   FREEZE
 ===================================================== */
 
 export interface Step4FreezeRequest {

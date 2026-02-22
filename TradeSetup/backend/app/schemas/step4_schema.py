@@ -2,15 +2,64 @@
 
 from datetime import date, datetime
 from pydantic import BaseModel, Field
+from typing import List, Optional
 
 
 # =====================================================
-# STEP-4 PREVIEW
+# STEP-4 PREVIEW (PHASE-1: CONTEXT LOAD)
 # =====================================================
 
 class Step4PreviewRequest(BaseModel):
     """
-    Generate / overwrite STEP-4 construction snapshot.
+    STEP-4 Preview (Phase-1)
+    Loads structural execution blueprint from STEP-3.
+    No risk computation happens here.
+    """
+
+    trade_date: date
+
+
+class Step4ExecutionBlueprint(BaseModel):
+    """
+    Structural snapshot from STEP-3 (Read-Only).
+    Used to populate STEP-4 UI.
+    """
+
+    trade_date: date
+    symbol: str
+    direction: str
+    strategy_used: str
+
+    gap_high: Optional[float] = None
+    gap_low: Optional[float] = None
+
+    intraday_high: Optional[float] = None
+    intraday_low: Optional[float] = None
+
+    last_higher_low: Optional[float] = None
+    vwap_value: Optional[float] = None
+
+    structure_valid: bool
+
+
+class Step4PreviewResponse(BaseModel):
+    """
+    Response after STEP-4 Preview (Phase-1).
+    Returns structural blueprint only.
+    """
+
+    mode: str  # AUTO / MANUAL_REQUIRED
+    candidates: List[Step4ExecutionBlueprint]
+
+
+# =====================================================
+# STEP-4 COMPUTE (PHASE-2)
+# =====================================================
+
+class Step4ComputeRequest(BaseModel):
+    """
+    STEP-4 Compute (Phase-2)
+    Performs deterministic execution math.
     """
 
     trade_date: date
@@ -50,7 +99,8 @@ class Step4PreviewRequest(BaseModel):
 
 class Step4PreviewSnapshot(BaseModel):
     """
-    Derived preview snapshot (construction layer).
+    Derived execution snapshot (construction layer).
+    Returned after compute.
     """
 
     trade_date: date
@@ -65,14 +115,14 @@ class Step4PreviewSnapshot(BaseModel):
     target_price: float
 
     trade_status: str
-    block_reason: str | None = None
+    block_reason: Optional[str] = None
 
     constructed_at: datetime
 
 
-class Step4PreviewResponse(BaseModel):
+class Step4ComputeResponse(BaseModel):
     """
-    Response after STEP-4 preview generation.
+    Response after STEP-4 compute.
     """
     preview: Step4PreviewSnapshot
 
@@ -120,7 +170,7 @@ class Step4FreezeRequest(BaseModel):
         description="Target R multiple"
     )
 
-    rationale: str | None = Field(
+    rationale: Optional[str] = Field(
         None,
         max_length=512,
         description="Optional trader rationale"
@@ -145,14 +195,14 @@ class FrozenTradeSnapshot(BaseModel):
     target_price: float
 
     trade_status: str
-    block_reason: str | None = None
+    block_reason: Optional[str] = None
 
     capital: float
     risk_percent: float
     entry_buffer: float
     r_multiple: float
 
-    rationale: str | None = None
+    rationale: Optional[str] = None
 
     frozen_at: datetime
 

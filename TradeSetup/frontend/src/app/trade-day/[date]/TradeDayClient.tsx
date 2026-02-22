@@ -29,13 +29,16 @@ export default function TradeDayClient({
     canAccessStep4,
   } = useTradeDayState(tradeDate);
 
-  const { candidates } = step3;
-
   const {
-    preview,
+    previewContext,
     previewLoading,
     previewError,
-    generatePreview,
+    loadPreview,
+
+    computeResult,
+    computeLoading,
+    computeError,
+    computeTrade,
 
     frozenTrade,
     freezeLoading,
@@ -97,16 +100,20 @@ export default function TradeDayClient({
               trade={frozenTrade}
             />
 
-            {/* Construction + Preview + Freeze */}
+            {/* Construction + Compute + Freeze */}
             {!isFrozen && (
               <Step4TradeConstruct
                 tradeDate={tradeDate}
-                candidates={candidates}
 
-                preview={preview}
+                previewContext={previewContext}
                 previewLoading={previewLoading}
                 previewError={previewError}
-                generatePreview={generatePreview}
+                loadPreview={loadPreview}
+
+                computeResult={computeResult}
+                computeLoading={computeLoading}
+                computeError={computeError}
+                computeTrade={computeTrade}
 
                 frozenTrade={frozenTrade}
                 freezeLoading={freezeLoading}

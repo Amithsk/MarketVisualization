@@ -15,37 +15,105 @@ from backend.app.models.step4_trade import Step4Trade
 from backend.app.models.step4_trade_construction import Step4TradeConstruction
 
 from backend.app.schemas.step4_schema import (
+    Step4PreviewResponse,
+    Step4ExecutionBlueprint,
+    Step4ComputeRequest,
+    Step4ComputeResponse,
+    Step4PreviewSnapshot,
     Step4FreezeRequest,
     Step4FrozenTradeResponse,
     FrozenTradeSnapshot,
-    Step4PreviewRequest,
-    Step4PreviewResponse,
-    Step4PreviewSnapshot,
 )
 
 logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# STEP-4 PREVIEW (DETERMINISTIC FROM STEP-3 SNAPSHOT)
+# STEP-4 PHASE-1 → LOAD CONTEXT (STRUCTURAL ONLY)
 # =====================================================
 
-def preview_step4_trade(
+def load_step4_context(
     db: Session,
-    request: Step4PreviewRequest,
+    trade_date,
 ) -> Step4PreviewResponse:
+
+    logger.info(
+        "[STEP4][CONTEXT][START] trade_date=%s",
+        trade_date,
+    )
+
+    step3 = db.query(Step3ExecutionControl).filter(
+        Step3ExecutionControl.trade_date == trade_date
+    ).first()
+
+    if not step3 or not step3.execution_allowed:
+        logger.info(
+            "[STEP4][CONTEXT][MANUAL_REQUIRED] execution not allowed trade_date=%s",
+            trade_date,
+        )
+        return Step4PreviewResponse(mode="MANUAL_REQUIRED", candidates=[])
+
+    candidates = db.query(Step3StockSelection).filter(
+        Step3StockSelection.trade_date == trade_date
+    ).all()
+
+    filtered = [
+        c for c in candidates
+        if c.strategy_used != "NO_TRADE" and bool(c.structure_valid)
+    ]
+
+    blueprints = [
+        Step4ExecutionBlueprint(
+            trade_date=c.trade_date,
+            symbol=c.symbol,
+            direction=c.direction,
+            strategy_used=c.strategy_used,
+            gap_high=c.gap_high,
+            gap_low=c.gap_low,
+            intraday_high=c.intraday_high,
+            intraday_low=c.intraday_low,
+            last_higher_low=c.last_higher_low,
+            vwap_value=c.vwap_value,
+            structure_valid=bool(c.structure_valid),
+        )
+        for c in filtered
+    ]
+
+    mode = "AUTO" if blueprints else "MANUAL_REQUIRED"
+
+    logger.info(
+        "[STEP4][CONTEXT][SUCCESS] trade_date=%s mode=%s candidates=%d",
+        trade_date,
+        mode,
+        len(blueprints),
+    )
+
+    return Step4PreviewResponse(
+        mode=mode,
+        candidates=blueprints,
+    )
+
+
+# =====================================================
+# STEP-4 PHASE-2 → COMPUTE (RISK + UPSERT)
+# =====================================================
+
+def compute_step4_trade(
+    db: Session,
+    request: Step4ComputeRequest,
+) -> Step4ComputeResponse:
 
     trade_date = request.trade_date
     symbol = request.symbol.strip().upper()
 
     logger.info(
-        "[STEP4][PREVIEW][START] trade_date=%s symbol=%s",
+        "[STEP4][COMPUTE][START] trade_date=%s symbol=%s",
         trade_date,
         symbol,
     )
 
     # -------------------------------------------------
-    # STEP-1 Validation
+    # STEP-1 VALIDATION
     # -------------------------------------------------
 
     step1 = db.query(Step1MarketContext).filter(
@@ -56,7 +124,7 @@ def preview_step4_trade(
         raise ValueError("STEP-1 must be frozen before STEP-4")
 
     # -------------------------------------------------
-    # STEP-2 Validation
+    # STEP-2 VALIDATION
     # -------------------------------------------------
 
     step2 = db.query(Step2MarketBehavior).filter(
@@ -67,7 +135,7 @@ def preview_step4_trade(
         raise ValueError("Trading is not allowed for this day")
 
     # -------------------------------------------------
-    # STEP-3 Validation
+    # STEP-3 VALIDATION
     # -------------------------------------------------
 
     step3 = db.query(Step3ExecutionControl).filter(
@@ -87,9 +155,10 @@ def preview_step4_trade(
 
     direction = candidate.direction
     strategy = candidate.strategy_used
+    structure_valid = bool(candidate.structure_valid)
 
     # -------------------------------------------------
-    # Structural Deterministic Read
+    # STRUCTURAL DETERMINISTIC READ
     # -------------------------------------------------
 
     if strategy == "GAP_FOLLOW":
@@ -118,7 +187,7 @@ def preview_step4_trade(
         raise ValueError("Invalid strategy from STEP-3")
 
     # -------------------------------------------------
-    # Risk Calculation
+    # RISK CALCULATION
     # -------------------------------------------------
 
     risk_per_share = abs(entry_price - stop_loss)
@@ -152,38 +221,32 @@ def preview_step4_trade(
     ).first()
 
     if construction:
-        construction.strategy_used = strategy
-        construction.direction = direction
-        construction.entry_price = entry_price
-        construction.stop_loss = stop_loss
-        construction.risk_per_share = risk_per_share
-        construction.quantity = quantity
-        construction.target_price = target_price
-        construction.trade_status = trade_status
-        construction.block_reason = block_reason
-        construction.constructed_at = datetime.utcnow()
+        logger.debug("[STEP4][COMPUTE] Updating construction row")
     else:
+        logger.debug("[STEP4][COMPUTE] Creating construction row")
         construction = Step4TradeConstruction(
             trade_date=trade_date,
             symbol=symbol,
-            strategy_used=strategy,
-            direction=direction,
-            entry_price=entry_price,
-            stop_loss=stop_loss,
-            risk_per_share=risk_per_share,
-            quantity=quantity,
-            target_price=target_price,
-            trade_status=trade_status,
-            block_reason=block_reason,
-            constructed_at=datetime.utcnow(),
         )
         db.add(construction)
+
+    construction.strategy_used = strategy
+    construction.direction = direction
+    construction.structure_valid = structure_valid
+    construction.entry_price = entry_price
+    construction.stop_loss = stop_loss
+    construction.risk_per_share = risk_per_share
+    construction.quantity = quantity
+    construction.target_price = target_price
+    construction.trade_status = trade_status
+    construction.block_reason = block_reason
+    construction.constructed_at = datetime.utcnow()
 
     db.commit()
     db.refresh(construction)
 
     logger.info(
-        "[STEP4][PREVIEW][SUCCESS] trade_date=%s symbol=%s status=%s qty=%d",
+        "[STEP4][COMPUTE][SUCCESS] trade_date=%s symbol=%s status=%s qty=%d",
         trade_date,
         symbol,
         trade_status,
@@ -205,11 +268,11 @@ def preview_step4_trade(
         constructed_at=construction.constructed_at,
     )
 
-    return Step4PreviewResponse(preview=snapshot)
+    return Step4ComputeResponse(preview=snapshot)
 
 
 # =====================================================
-# STEP-4 FREEZE
+# STEP-4 FREEZE (UNCHANGED CORE LOGIC)
 # =====================================================
 
 def freeze_step4_trade(
@@ -232,7 +295,7 @@ def freeze_step4_trade(
     ).first()
 
     if not construction:
-        raise ValueError("STEP-4 preview must be generated before freeze")
+        raise ValueError("STEP-4 compute must be generated before freeze")
 
     if construction.trade_status != "READY":
         raise ValueError("Cannot freeze a BLOCKED trade")

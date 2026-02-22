@@ -1,5 +1,5 @@
 // =========================================================
-// File: frontend/src/hooks/useTradeDayState.ts
+// File: src/hooks/useTradeDayState.ts
 // =========================================================
 "use client";
 
@@ -15,10 +15,13 @@ const DEBUG = true;
 
 export function useTradeDayState(tradeDate: TradeDate) {
   const step1 = useStep1(tradeDate);
+
   const step2 = useStep2(tradeDate, {
     enabled: step1.isFrozen,
   });
+
   const step3 = useStep3(tradeDate);
+
   const step4 = useStep4();
 
   const gates = useMemo(() => {
@@ -27,7 +30,7 @@ export function useTradeDayState(tradeDate: TradeDate) {
 
     const executionEnabled = step3.executionEnabled === true;
 
-    // 🔥 Step-3 frozen strictly means persisted (AUTO mode)
+    // STEP-3 frozen strictly means persisted (AUTO mode)
     const step3Frozen = step3.candidatesMode === "AUTO";
 
     const tradeFrozen = !!step4.frozenTrade;

@@ -52,23 +52,23 @@ export default function Step4TradePreview({
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Setup</span>
-                <span className="font-medium">{trade.setupType}</span>
+                <span className="font-medium">{trade.setup_type}</span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Entry Price</span>
-                <span className="font-medium">{trade.entryPrice}</span>
+                <span className="font-medium">{trade.entry_price}</span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Stop Loss</span>
-                <span className="font-medium">{trade.stopLoss}</span>
+                <span className="font-medium">{trade.stop_loss}</span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Risk / Share</span>
                 <span className="font-medium">
-                  {trade.riskPerShare}
+                  {trade.risk_per_share}
                 </span>
               </div>
 
@@ -80,28 +80,28 @@ export default function Step4TradePreview({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Target Price</span>
                 <span className="font-medium">
-                  {trade.targetPrice}
+                  {trade.target_price}
                 </span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Risk %</span>
                 <span className="font-medium">
-                  {trade.riskPercent}%
+                  {trade.risk_percent}%
                 </span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Entry Buffer</span>
                 <span className="font-medium">
-                  {trade.entryBuffer}
+                  {trade.entry_buffer}
                 </span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">R Multiple</span>
                 <span className="font-medium">
-                  {trade.rMultiple}
+                  {trade.r_multiple}
                 </span>
               </div>
 
@@ -109,18 +109,18 @@ export default function Step4TradePreview({
                 <span className="text-gray-500">Trade Status</span>
                 <span
                   className={
-                    trade.tradeStatus === "READY"
+                    trade.trade_status === "READY"
                       ? "font-medium text-green-600"
                       : "font-medium text-red-600"
                   }
                 >
-                  {trade.tradeStatus}
+                  {trade.trade_status}
                 </span>
               </div>
 
-              {trade.blockReason && (
+              {trade.block_reason && (
                 <div className="text-sm text-red-600">
-                  Reason: {trade.blockReason}
+                  Reason: {trade.block_reason}
                 </div>
               )}
 
@@ -132,7 +132,7 @@ export default function Step4TradePreview({
               )}
 
               <div className="pt-2 text-xs text-gray-400">
-                Frozen at: {trade.frozenAt}
+                Frozen at: {trade.frozen_at}
               </div>
             </>
           )}

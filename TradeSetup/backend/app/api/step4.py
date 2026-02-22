@@ -9,11 +9,14 @@ from backend.app.db.session import get_db
 from backend.app.schemas.step4_schema import (
     Step4PreviewRequest,
     Step4PreviewResponse,
+    Step4ComputeRequest,
+    Step4ComputeResponse,
     Step4FreezeRequest,
     Step4FrozenTradeResponse,
 )
 from backend.app.services.step4_service import (
-    preview_step4_trade,
+    load_step4_context,
+    compute_step4_trade,
     freeze_step4_trade,
 )
 
@@ -26,7 +29,7 @@ router = APIRouter(
 
 
 # =====================================================
-# STEP-4 PREVIEW
+# STEP-4 PREVIEW (PHASE-1: CONTEXT LOAD)
 # =====================================================
 
 @router.post(
@@ -39,25 +42,93 @@ def preview_trade(
     db: Session = Depends(get_db),
 ):
     """
-    Generate / overwrite STEP-4 construction snapshot.
+    STEP-4 Phase-1:
+    Load structural execution blueprint from STEP-3.
+    No risk calculation happens here.
     """
 
+    logger.info(
+        "[STEP4][API][PREVIEW][START] trade_date=%s",
+        request.trade_date,
+    )
+
     try:
-        return preview_step4_trade(
+        response = load_step4_context(
             db=db,
-            request=request,
+            trade_date=request.trade_date,
         )
 
+        logger.info(
+            "[STEP4][API][PREVIEW][SUCCESS] trade_date=%s mode=%s candidates=%d",
+            request.trade_date,
+            response.mode,
+            len(response.candidates),
+        )
+
+        return response
+
     except ValueError as e:
-        # Domain validation errors
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
         )
 
     except Exception as e:
-        # Print full traceback to terminal for debugging
         logger.error("[STEP4][PREVIEW][UNEXPECTED ERROR]")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+# =====================================================
+# STEP-4 COMPUTE (PHASE-2)
+# =====================================================
+
+@router.post(
+    "/compute",
+    response_model=Step4ComputeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def compute_trade(
+    request: Step4ComputeRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    STEP-4 Phase-2:
+    Perform deterministic execution math and upsert construction.
+    """
+
+    logger.info(
+        "[STEP4][API][COMPUTE][START] trade_date=%s symbol=%s",
+        request.trade_date,
+        request.symbol,
+    )
+
+    try:
+        response = compute_step4_trade(
+            db=db,
+            request=request,
+        )
+
+        logger.info(
+            "[STEP4][API][COMPUTE][SUCCESS] trade_date=%s symbol=%s status=%s",
+            request.trade_date,
+            request.symbol,
+            response.preview.trade_status,
+        )
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+
+    except Exception as e:
+        logger.error("[STEP4][COMPUTE][UNEXPECTED ERROR]")
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -82,11 +153,25 @@ def freeze_trade(
     Freeze final trade execution intent (irreversible).
     """
 
+    logger.info(
+        "[STEP4][API][FREEZE][START] trade_date=%s symbol=%s",
+        request.trade_date,
+        request.symbol,
+    )
+
     try:
-        return freeze_step4_trade(
+        response = freeze_step4_trade(
             db=db,
             request=request,
         )
+
+        logger.info(
+            "[STEP4][API][FREEZE][SUCCESS] trade_date=%s symbol=%s",
+            request.trade_date,
+            request.symbol,
+        )
+
+        return response
 
     except ValueError as e:
         raise HTTPException(
