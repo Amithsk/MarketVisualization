@@ -53,17 +53,18 @@ export default function Step1Context({
 
   /* ------------------------------
      Sync snapshot → local state
+     (CLEAN camelCase only)
   ------------------------------- */
   useEffect(() => {
     if (!snapshot) return;
 
     setSystemData({
-      yesterdayClose: snapshot.yesterdayClose ?? undefined,
-      yesterdayHigh: snapshot.yesterdayHigh ?? undefined,
-      yesterdayLow: snapshot.yesterdayLow ?? undefined,
-      day2High: snapshot.day2High ?? undefined,
-      day2Low: snapshot.day2Low ?? undefined,
-      preOpenPrice: undefined,
+      yesterdayClose: snapshot.yesterdayClose,
+      yesterdayHigh: snapshot.yesterdayHigh,
+      yesterdayLow: snapshot.yesterdayLow,
+      day2High: snapshot.day2High,
+      day2Low: snapshot.day2Low,
+      preOpenPrice: snapshot.preOpenPrice,
       last5DayRanges: snapshot.last5DayRanges ?? [],
     });
   }, [snapshot]);
@@ -149,7 +150,6 @@ export default function Step1Context({
         </span>
       </div>
 
-      {/* System Market Data */}
       <Section title="System Market Data">
         <Grid>
           <Field
@@ -225,7 +225,6 @@ export default function Step1Context({
           />
         </Grid>
 
-        {/* 🔥 Last 5-Day Ranges (RESTORED) */}
         <div className="mt-4">
           <label className="text-xs font-semibold">
             Last 5-Day Ranges (comma separated)
@@ -268,7 +267,6 @@ export default function Step1Context({
         )}
       </Section>
 
-      {/* Derived Context */}
       <Section title="Derived Context">
         {derivedContext ? (
           <Grid>
@@ -289,7 +287,6 @@ export default function Step1Context({
         )}
       </Section>
 
-      {/* Final Context */}
       <Section title="Final Market Context">
         {!isFrozen ? (
           <Grid>
