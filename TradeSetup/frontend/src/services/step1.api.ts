@@ -2,13 +2,18 @@
 import apiClient from "@/lib/apiClient";
 import type { TradeDate } from "@/types/common.types";
 import type {
+  Step1PreviewResponseDTO,
+  Step1FrozenResponseDTO,
   Step1PreviewResponse,
   Step1FrozenResponse,
+  Step1ContextSnapshot,
   MarketBias,
 } from "@/types/step1.types";
 
 /**
- * Raw system inputs used ONLY in MANUAL mode
+ * =========================================================
+ * RAW SYSTEM INPUTS (MANUAL MODE ONLY)
+ * =========================================================
  */
 export type Step1ComputePayload = {
   yesterdayClose: number;
@@ -28,19 +33,47 @@ export type Step1ComputeResponse = {
     | "NO_TRADE_DAY";
 };
 
-/**
- * Normalize backend snapshot → frontend shape
- */
-function normalizeSnapshot(raw: any) {
+/* =========================================================
+   🔁 DTO → NORMALIZED SNAPSHOT
+   ========================================================= */
+
+function normalizeSnapshot(
+  raw: Step1PreviewResponseDTO["snapshot"]
+): Step1ContextSnapshot {
   return {
-    ...raw,
-    frozenAt: raw.frozen_at ?? null,
+    tradeDate: raw!.trade_date,
+
+    yesterdayClose: raw!.yesterday_close,
+    yesterdayHigh: raw!.yesterday_high,
+    yesterdayLow: raw!.yesterday_low,
+    day2High: raw!.day2_high,
+    day2Low: raw!.day2_low,
+
+    last5DayRanges: raw!.last_5_day_ranges,
+
+    preOpenPrice: raw!.pre_open_price,
+
+    gapPct: raw!.gap_pct,
+    gapClass: raw!.gap_class,
+
+    rangeRatio: raw!.range_ratio,
+    rangeSize: raw!.range_size,
+
+    overlapType: raw!.overlap_type,
+    db2State: raw!.db2_state,
+
+    marketBias: raw!.market_bias,
+    gapContext: raw!.gap_context,
+    premarketNotes: raw!.premarket_notes,
+
+    frozenAt: raw!.frozen_at,
   };
 }
 
-/**
- * Fetch STEP-1 pre-market context preview.
- */
+/* =========================================================
+   STEP-1 PREVIEW
+   ========================================================= */
+
 export async function fetchStep1Preview(
   tradeDate: TradeDate
 ): Promise<Step1PreviewResponse> {
@@ -49,19 +82,19 @@ export async function fetchStep1Preview(
   });
 
   try {
-    const response = await apiClient.post<Step1PreviewResponse>(
-      "/step1/preview",
-      { trade_date: tradeDate }
-    );
+    const response =
+      await apiClient.post<Step1PreviewResponseDTO>(
+        "/step1/preview",
+        { trade_date: tradeDate }
+      );
 
-    console.log("[DEBUG][API][STEP-1][PREVIEW] success", {
-      mode: response.data.mode,
-    });
+    const dto = response.data;
 
     return {
-      ...response.data,
-      snapshot: response.data.snapshot
-        ? normalizeSnapshot(response.data.snapshot)
+      mode: dto.mode,
+      canFreeze: dto.can_freeze,
+      snapshot: dto.snapshot
+        ? normalizeSnapshot(dto.snapshot)
         : null,
     };
   } catch {
@@ -72,9 +105,10 @@ export async function fetchStep1Preview(
   }
 }
 
-/**
- * Compute STEP-1 derived context (MANUAL mode only).
- */
+/* =========================================================
+   STEP-1 COMPUTE (MANUAL)
+   ========================================================= */
+
 export async function computeStep1Context(
   payload: Step1ComputePayload
 ): Promise<Step1ComputeResponse> {
@@ -96,18 +130,11 @@ export async function computeStep1Context(
       requestBody
     );
 
-    const mapped: Step1ComputeResponse = {
+    return {
       derivedContext: response.data.derived_context,
       suggestedMarketContext:
         response.data.suggested_market_context,
     };
-
-    console.log(
-      "[DEBUG][API][STEP-1][COMPUTE] mapped response",
-      mapped
-    );
-
-    return mapped;
   } catch {
     console.error(
       "[DEBUG][API][STEP-1][COMPUTE] failed before response"
@@ -116,9 +143,10 @@ export async function computeStep1Context(
   }
 }
 
-/**
- * Freeze STEP-1 context (AUTHORITATIVE SNAPSHOT)
- */
+/* =========================================================
+   STEP-1 FREEZE
+   ========================================================= */
+
 export async function freezeStep1Context(params: {
   tradeDate: TradeDate;
   marketBias: MarketBias;
@@ -139,21 +167,16 @@ export async function freezeStep1Context(params: {
   console.log("[DEBUG][API][STEP-1][FREEZE] start", payload);
 
   try {
-    const response = await apiClient.post<Step1FrozenResponse>(
-      "/step1/freeze",
-      payload
-    );
+    const response =
+      await apiClient.post<Step1FrozenResponseDTO>(
+        "/step1/freeze",
+        payload
+      );
 
-    const normalized = {
-      ...response.data,
+    return {
+      frozen: true,
       snapshot: normalizeSnapshot(response.data.snapshot),
     };
-
-    console.log("[DEBUG][API][STEP-1][FREEZE] success", {
-      frozenAt: normalized.snapshot.frozenAt,
-    });
-
-    return normalized;
   } catch {
     console.error(
       "[DEBUG][API][STEP-1][FREEZE] failed before response"

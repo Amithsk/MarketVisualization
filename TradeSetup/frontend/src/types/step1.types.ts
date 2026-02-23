@@ -1,13 +1,13 @@
-//backend/src/types/step1.types.ts
+//frontend/src/types/step1.types.ts
 import type { TradeDate } from "@/types/common.types";
 
 /**
  * =========================================================
  * STEP-1: PRE-MARKET CONTEXT — FROZEN TYPES
  * =========================================================
- * - Backend is the single source of truth
- * - Frontend uses these types for rendering only
- * - No calculations happen in UI
+ * Backend = source of truth
+ * UI = render only
+ * Hooks = normalization boundary
  */
 
 /* =========================================================
@@ -34,41 +34,66 @@ export const GAP_CONTEXT_VALUES = [
 export type GapContext = typeof GAP_CONTEXT_VALUES[number];
 
 /* =========================================================
- * CORE SNAPSHOT — BACKEND OWNED
+ * 🔒 BACKEND DTO (SNAKE_CASE — EXACT API CONTRACT)
+ * ========================================================= */
+
+export interface Step1SnapshotDTO {
+  trade_date: TradeDate;
+
+  yesterday_close?: number;
+  yesterday_high?: number;
+  yesterday_low?: number;
+  day2_high?: number;
+  day2_low?: number;
+
+  last_5_day_ranges?: number[];
+
+  pre_open_price?: number;
+
+  gap_pct?: number;
+  gap_class?: string;
+
+  range_ratio?: number;
+  range_size?: string;
+
+  overlap_type?: string;
+  db2_state?: string;
+
+  market_bias: MarketBias;
+  gap_context: GapContext;
+  premarket_notes?: string;
+
+  frozen_at?: string;
+}
+
+export interface Step1PreviewResponseDTO {
+  mode: "AUTO" | "MANUAL";
+  snapshot: Step1SnapshotDTO | null;
+  can_freeze: boolean;
+}
+
+export interface Step1FrozenResponseDTO {
+  snapshot: Step1SnapshotDTO;
+  frozen: true;
+}
+
+/* =========================================================
+ * 🧠 FRONTEND NORMALIZED SNAPSHOT (camelCase)
  * ========================================================= */
 
 export interface Step1ContextSnapshot {
-  /* ==============================
-   * Identity
-   * ============================== */
   tradeDate: TradeDate;
 
-  /* ==============================
-   * SYSTEM MARKET DATA (RAW)
-   * Editable ONLY when backend mode = MANUAL
-   * ============================== */
   yesterdayClose?: number;
   yesterdayHigh?: number;
   yesterdayLow?: number;
   day2High?: number;
   day2Low?: number;
 
-  /**
-   * Last 5 completed trading-day ranges.
-   * Order: most recent → oldest
-   * Backend derived when automation exists,
-   * otherwise provided manually in MANUAL mode.
-   */
   last5DayRanges?: number[];
 
-  /* ==============================
-   * PRE-OPEN
-   * ============================== */
   preOpenPrice?: number;
 
-  /* ==============================
-   * DERIVED CONTEXT (SYSTEM)
-   * ============================== */
   gapPct?: number;
   gapClass?: string;
 
@@ -78,22 +103,12 @@ export interface Step1ContextSnapshot {
   overlapType?: string;
   db2State?: string;
 
-  /* ==============================
-   * FINAL MARKET CONTEXT
-   * ============================== */
   marketBias: MarketBias;
   gapContext: GapContext;
   premarketNotes?: string;
 
-  /* ==============================
-   * FREEZE METADATA
-   * ============================== */
   frozenAt?: string;
 }
-
-/* =========================================================
- * PREVIEW RESPONSE
- * ========================================================= */
 
 export interface Step1PreviewResponse {
   mode: "AUTO" | "MANUAL";
@@ -101,24 +116,15 @@ export interface Step1PreviewResponse {
   canFreeze: boolean;
 }
 
-/* =========================================================
- * FREEZE RESPONSE
- * ========================================================= */
-
 export interface Step1FrozenResponse {
   snapshot: Step1ContextSnapshot;
   frozen: true;
 }
 
 /* =========================================================
- * DEBUG HELPERS (OPTIONAL, EXPLICIT USE ONLY)
+ * DEBUG HELPER
  * ========================================================= */
 
-/**
- * Explicit debug utility.
- * Call this ONLY from hooks or components when needed.
- * Never auto-executes.
- */
 export function debugStep1Snapshot(
   label: string,
   snapshot: Step1ContextSnapshot | null
@@ -144,4 +150,3 @@ export function debugStep1Snapshot(
     frozenAt: snapshot?.frozenAt,
   });
 }
-

@@ -29,13 +29,6 @@ type SystemMarketData = {
 
 type DerivedContext = Record<string, number | string>;
 
-function normalizeSnapshot(raw: any): Step1ContextSnapshot {
-  return {
-    ...raw,
-    frozenAt: raw.frozen_at ?? null,
-  };
-}
-
 export function useStep1(tradeDate: TradeDate) {
   const [snapshot, setSnapshot] =
     useState<Step1ContextSnapshot | null>(null);
@@ -59,11 +52,9 @@ export function useStep1(tradeDate: TradeDate) {
         await fetchStep1Preview(tradeDate);
 
       setSnapshot((prev) => {
+        // If already frozen, never overwrite
         if (prev?.frozenAt) return prev;
-
-        return response.snapshot
-          ? normalizeSnapshot(response.snapshot)
-          : null;
+        return response.snapshot;
       });
 
       setMode(response.mode);
@@ -150,7 +141,7 @@ export function useStep1(tradeDate: TradeDate) {
             derivedContext,
           });
 
-        setSnapshot(normalizeSnapshot(response.snapshot));
+        setSnapshot(response.snapshot);
         setMode("AUTO");
         setDerivedContext(null);
         setSuggestedMarketContext(null);
