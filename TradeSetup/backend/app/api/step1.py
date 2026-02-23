@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
 
-from backend.app.db.session import get_db
+from backend.app.db.session import get_db, get_nifty_db
 from backend.app.schemas.step1_schema import (
     Step1PreviewRequest,
     Step1FreezeRequest,
@@ -34,13 +34,20 @@ router = APIRouter(
 def preview_step1(
     request: Step1PreviewRequest,
     db: Session = Depends(get_db),
+    nifty_db: Session = Depends(get_nifty_db),
 ):
     """
     STEP-1 Preview — Pre-Market Context
     """
     try:
+        logger.debug(
+            "[STEP-1][API][PREVIEW] Received preview request for trade_date=%s",
+            request.trade_date,
+        )
+
         return preview_step1_context(
             db=db,
+            nifty_db=nifty_db,
             trade_date=request.trade_date,
         )
 

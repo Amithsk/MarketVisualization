@@ -13,6 +13,10 @@ from backend.app.schemas.step1_schema import (
     Step1ComputeResponse,
 )
 
+from backend.app.services.nifty_market_data_service import (
+    get_step1_structural_data,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,8 +26,14 @@ logger = logging.getLogger(__name__)
 
 def preview_step1_context(
     db: Session,
+    nifty_db: Session,
     trade_date: date,
 ) -> Step1PreviewResponse:
+
+    logger.debug(
+        "[STEP-1][PREVIEW] Requested for trade_date=%s",
+        trade_date,
+    )
 
     existing = (
         db.query(Step1MarketContext)
@@ -31,7 +41,16 @@ def preview_step1_context(
         .first()
     )
 
+    # -------------------------------------------------
+    # Case 1: Already frozen
+    # -------------------------------------------------
+
     if existing:
+        logger.debug(
+            "[STEP-1][PREVIEW] Existing frozen snapshot found for trade_date=%s",
+            trade_date,
+        )
+
         snapshot = Step1ContextSnapshot(
             trade_date=existing.trade_date,
             market_bias=existing.final_market_context,
@@ -45,8 +64,33 @@ def preview_step1_context(
             can_freeze=False,
         )
 
+    # -------------------------------------------------
+    # Case 2: No snapshot → Fetch from NIFTY DB
+    # -------------------------------------------------
+
+    logger.debug(
+        "[STEP-1][PREVIEW] No snapshot found. Fetching structural data from NIFTY DB for trade_date=%s",
+        trade_date,
+    )
+
+    structural_data = get_step1_structural_data(
+        nifty_db=nifty_db,
+        trade_date=trade_date,
+    )
+
+    logger.debug(
+        "[STEP-1][PREVIEW] Structural data fetched successfully for trade_date=%s",
+        trade_date,
+    )
+
     snapshot = Step1ContextSnapshot(
         trade_date=trade_date,
+        yesterday_close=structural_data["yesterday_close"],
+        yesterday_high=structural_data["yesterday_high"],
+        yesterday_low=structural_data["yesterday_low"],
+        day2_high=structural_data["day2_high"],
+        day2_low=structural_data["day2_low"],
+        last_5_day_ranges=structural_data["last_5_day_ranges"],
         frozen_at=None,
     )
 
@@ -153,7 +197,7 @@ def freeze_step1_context(
     preopen_price: float,
     derived_context: dict,
     market_bias: str,
-    gap_context: str,          # informational, NOT persisted
+    gap_context: str,
     premarket_notes: str | None,
 ) -> Step1FrozenResponse:
 
