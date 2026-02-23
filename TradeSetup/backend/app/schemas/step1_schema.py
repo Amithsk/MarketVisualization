@@ -1,4 +1,3 @@
-#backend/app/schemas/step1_schema.py
 import logging
 from datetime import date, datetime
 from typing import Optional, Literal, List, Dict
@@ -115,6 +114,10 @@ class Step1ContextSnapshot(BaseModel):
     yesterday_close: Optional[float] = None
     yesterday_high: Optional[float] = None
     yesterday_low: Optional[float] = None
+
+    # 🔹 NEW: Required for compute API
+    day2_high: Optional[float] = None
+    day2_low: Optional[float] = None
 
     last_5_day_ranges: List[float] = []
 
