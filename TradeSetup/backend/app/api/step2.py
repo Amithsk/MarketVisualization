@@ -89,7 +89,7 @@ def preview_step2(
 
 
 # =====================================================
-# COMPUTE (NEW)
+# COMPUTE
 # =====================================================
 
 @router.post(
@@ -113,6 +113,7 @@ def compute_step2(
             db=db,
             trade_date=request.trade_date,
             candles=request.candles,
+            avg_5m_range_prev_day=request.avg_5m_range_prev_day,
         )
 
         logger.info(
@@ -152,7 +153,7 @@ def compute_step2(
 
 
 # =====================================================
-# FREEZE (UPDATED)
+# FREEZE
 # =====================================================
 
 @router.post(
@@ -176,7 +177,7 @@ def freeze_step2(
             db=db,
             trade_date=request.trade_date,
             candles=request.candles,
-            reason=request.reason,
+            reason=request.reason,  # baseline removed (correct)
         )
 
         logger.info(

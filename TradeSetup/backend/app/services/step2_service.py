@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import logging
 
+from backend.app.db.session import get_nifty_db
 from backend.app.models.step1_market_context import Step1MarketContext
 from backend.app.models.step2_market_behavior import Step2MarketBehavior
 from backend.app.models.step2_market_open_behavior import Step2MarketOpenBehavior
@@ -15,8 +16,12 @@ from backend.app.schemas.step2_schema import (
     Step2OpenBehaviorSnapshot,
     Step2CandleInput,
 )
+from backend.app.services.nifty_market_data_service import (
+    get_previous_session_last20_avg_range,
+)
 
 logger = logging.getLogger(__name__)
+
 
 # =====================================================
 # ANALYTICAL ENGINE
@@ -37,7 +42,6 @@ def _compute_vwap(candles: List[Step2CandleInput]):
     cumulative_pv = 0
     cumulative_volume = 0
     cross_count = 0
-
     prev_relation = None
 
     for c in candles:
@@ -46,7 +50,6 @@ def _compute_vwap(candles: List[Step2CandleInput]):
         cumulative_volume += c.volume
 
         vwap = cumulative_pv / cumulative_volume if cumulative_volume else typical_price
-
         relation = "ABOVE" if c.close > vwap else "BELOW"
 
         if prev_relation and relation != prev_relation:
@@ -148,6 +151,8 @@ def _build_snapshot(
 
 def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewResponse:
 
+    logger.debug("[STEP2][PREVIEW] trade_date=%s", trade_date)
+
     step1 = (
         db.query(Step1MarketContext)
         .filter(Step1MarketContext.trade_date == trade_date)
@@ -157,11 +162,17 @@ def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewRespons
     if not step1:
         raise ValueError("STEP-1 must be frozen before STEP-2")
 
+    nifty_db = next(get_nifty_db())
+    avg_5m_range_prev_day = get_previous_session_last20_avg_range(
+        nifty_db=nifty_db,
+        trade_date=trade_date,
+    )
+
     snapshot = _build_snapshot(
         trade_date=trade_date,
         mode="MANUAL",
         manual_input_required=True,
-        avg_5m_range_prev_day=None,
+        avg_5m_range_prev_day=avg_5m_range_prev_day,
         ir_high=None,
         ir_low=None,
         ir_range=None,
@@ -188,6 +199,7 @@ def compute_step2_behavior(
     db: Session,
     trade_date: date,
     candles: List[Step2CandleInput],
+    avg_5m_range_prev_day: float | None,
 ) -> Step2ComputeResponse:
 
     step1 = (
@@ -198,8 +210,6 @@ def compute_step2_behavior(
 
     if not step1:
         raise ValueError("STEP-1 must be frozen before STEP-2")
-
-    avg_5m_range_prev_day = None
 
     ir_high, ir_low, ir_range = _compute_ir(candles)
 
@@ -249,7 +259,7 @@ def compute_step2_behavior(
 
 
 # =====================================================
-# FREEZE (DUAL TABLE PERSISTENCE)
+# FREEZE
 # =====================================================
 
 def freeze_step2_behavior(
@@ -263,6 +273,7 @@ def freeze_step2_behavior(
         db=db,
         trade_date=trade_date,
         candles=candles,
+        avg_5m_range_prev_day=None,  # freeze still depends on compute call from frontend
     )
 
     snapshot = compute_response.snapshot

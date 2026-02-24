@@ -55,7 +55,7 @@ class Step2CandleInput(BaseModel):
     volume: float
 
 
-# 🔹 NEW — COMPUTE REQUEST
+# 🔹 UPDATED — COMPUTE REQUEST (baseline required here)
 class Step2ComputeRequest(BaseModel):
     """
     Compute analytical STEP-2 metrics from 5-min candles.
@@ -63,12 +63,18 @@ class Step2ComputeRequest(BaseModel):
     """
     trade_date: date
 
+    avg_5m_range_prev_day: Optional[float] = Field(
+        None,
+        description="Previous session last 20 candle avg range from preview"
+    )
+
     candles: List[Step2CandleInput] = Field(
         ...,
         description="5-minute OHLCV candles from 09:15 to 09:45"
     )
 
 
+# 🔹 FREEZE REQUEST (baseline NOT required here)
 class Step2FreezeRequest(BaseModel):
     """
     Freeze request capturing ONLY raw observations.
@@ -161,7 +167,6 @@ class Step2PreviewResponse(BaseModel):
     can_freeze: bool
 
 
-# 🔹 NEW — COMPUTE RESPONSE
 class Step2ComputeResponse(BaseModel):
     """
     Analytical response after compute.
