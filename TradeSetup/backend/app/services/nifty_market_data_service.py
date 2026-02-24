@@ -1,7 +1,8 @@
-#backend/app/services/nifty_market_data_service.py
+# backend/app/services/nifty_market_data_service.py
+
 import logging
 from datetime import date
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -27,13 +28,9 @@ def get_step1_structural_data(
     """
 
     logger.debug(
-        "[NIFTY][STEP1] Aggregation requested for trade_date=%s",
+        "[NIFTY][STEP1] structural aggregation requested trade_date=%s",
         trade_date,
     )
-
-    # -------------------------------------------------
-    # 1️⃣ Identify last 6 trading dates
-    # -------------------------------------------------
 
     trading_days_query = text(
         """
@@ -53,20 +50,7 @@ def get_step1_structural_data(
     trading_days = [row.trading_day for row in result.fetchall()]
 
     if len(trading_days) < 6:
-        logger.error(
-            "[NIFTY][STEP1] Insufficient historical data before %s",
-            trade_date,
-        )
         raise ValueError("Not enough historical data for STEP-1")
-
-    logger.debug(
-        "[NIFTY][STEP1] Identified trading_days=%s",
-        trading_days,
-    )
-
-    # -------------------------------------------------
-    # 2️⃣ Aggregate per-day OHLC
-    # -------------------------------------------------
 
     daily_data = {}
 
@@ -97,11 +81,6 @@ def get_step1_structural_data(
             "range": float(row.day_high - row.day_low),
         }
 
-    # -------------------------------------------------
-    # 3️⃣ Map to STEP-1 structure
-    # -------------------------------------------------
-
-    # trading_days is DESC ordered
     yesterday = trading_days[0]
     day2 = trading_days[1]
     last_5_days = trading_days[:5]
@@ -118,8 +97,87 @@ def get_step1_structural_data(
     }
 
     logger.debug(
-        "[NIFTY][STEP1] Aggregation complete for trade_date=%s",
+        "[NIFTY][STEP1] structural aggregation complete trade_date=%s",
         trade_date,
     )
 
     return structural_data
+
+
+# -------------------------------------------------
+# STEP-2 PREVIOUS SESSION BASELINE (NEW)
+# -------------------------------------------------
+
+def get_previous_session_last20_avg_range(
+    nifty_db: Session,
+    trade_date: date,
+) -> Optional[float]:
+    """
+    Fetches average (High - Low) of the last 20
+    five-minute candles from the previous trading session.
+
+    Behavior:
+    - Identifies the most recent session before trade_date
+    - Selects last 20 candles of that session
+    - Returns average(high - low)
+    - Returns None if no candles exist
+    """
+
+    logger.debug(
+        "[NIFTY][STEP2] baseline requested trade_date=%s",
+        trade_date,
+    )
+
+    # 1️⃣ Identify previous trading session
+    previous_session_query = text(
+        """
+        SELECT DISTINCT DATE(`Date`) AS trading_day
+        FROM nifty_prices
+        WHERE DATE(`Date`) < :trade_date
+        ORDER BY trading_day DESC
+        LIMIT 1
+        """
+    )
+
+    session_row = nifty_db.execute(
+        previous_session_query,
+        {"trade_date": trade_date},
+    ).fetchone()
+
+    if not session_row:
+        return None
+
+    previous_session = session_row.trading_day
+
+    # 2️⃣ Fetch last 20 candles of that session
+    last20_query = text(
+        """
+        SELECT (`High` - `Low`) AS candle_range
+        FROM nifty_prices
+        WHERE DATE(`Date`) = :previous_session
+        ORDER BY `Date` DESC
+        LIMIT 20
+        """
+    )
+
+    rows = nifty_db.execute(
+        last20_query,
+        {"previous_session": previous_session},
+    ).fetchall()
+
+    if not rows:
+        return None
+
+    ranges = [float(row.candle_range) for row in rows if row.candle_range is not None]
+
+    if not ranges:
+        return None
+
+    avg_range = sum(ranges) / len(ranges)
+
+    logger.debug(
+        "[NIFTY][STEP2] baseline computed trade_date=%s",
+        trade_date,
+    )
+
+    return float(avg_range)
