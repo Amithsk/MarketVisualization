@@ -151,10 +151,7 @@ def _build_snapshot(
 
 def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewResponse:
 
-    logger.debug(
-        "[STEP2][PREVIEW] trade_date=%s",
-        trade_date,
-    )
+    logger.debug("[STEP2][PREVIEW] trade_date=%s", trade_date)
 
     step1 = (
         db.query(Step1MarketContext)
@@ -165,7 +162,6 @@ def preview_step2_behavior(db: Session, trade_date: date) -> Step2PreviewRespons
     if not step1:
         raise ValueError("STEP-1 must be frozen before STEP-2")
 
-    # 🔹 Fetch baseline from NIFTY DB
     nifty_db = next(get_nifty_db())
     avg_5m_range_prev_day = get_previous_session_last20_avg_range(
         nifty_db=nifty_db,
@@ -203,6 +199,7 @@ def compute_step2_behavior(
     db: Session,
     trade_date: date,
     candles: List[Step2CandleInput],
+    avg_5m_range_prev_day: float | None,
 ) -> Step2ComputeResponse:
 
     step1 = (
@@ -213,8 +210,6 @@ def compute_step2_behavior(
 
     if not step1:
         raise ValueError("STEP-1 must be frozen before STEP-2")
-
-    avg_5m_range_prev_day = None
 
     ir_high, ir_low, ir_range = _compute_ir(candles)
 
@@ -264,7 +259,7 @@ def compute_step2_behavior(
 
 
 # =====================================================
-# FREEZE (DUAL TABLE PERSISTENCE)
+# FREEZE
 # =====================================================
 
 def freeze_step2_behavior(
@@ -278,6 +273,7 @@ def freeze_step2_behavior(
         db=db,
         trade_date=trade_date,
         candles=candles,
+        avg_5m_range_prev_day=None,  # freeze still depends on compute call from frontend
     )
 
     snapshot = compute_response.snapshot
