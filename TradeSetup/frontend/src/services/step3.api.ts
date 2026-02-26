@@ -35,6 +35,11 @@ function normalizeSnapshot(raw: any): Step3ExecutionSnapshot {
         direction: c.direction,
         strategyUsed: c.strategy_used,
 
+        // 🔥 ADD THESE 3 LAYER-1 FIELDS
+        avgTradedValue20d: c.avg_traded_value_20d ?? 0,
+        atrPct: c.atr_pct ?? 0,
+        abnormalCandle: Boolean(c.abnormal_candle),
+
         rsValue: c.rs_value ?? null,
 
         gapHigh: c.gap_high ?? null,

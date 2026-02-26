@@ -21,13 +21,8 @@ import {
 
 /**
  * STEP-3 Hook — Execution Control & Stock Selection
- *
  * Backend is authoritative.
- * Frontend never infers freeze eligibility.
- * candidatesMode reflects persistence state only.
- * canFreeze reflects backend decision.
- *
- * Debug logging only on major state transitions.
+ * Hook is responsible for normalization.
  */
 
 export function useStep3(tradeDate: TradeDate) {
@@ -35,17 +30,66 @@ export function useStep3(tradeDate: TradeDate) {
     useState<Step3ExecutionSnapshot | null>(null);
 
   const [canFreeze, setCanFreeze] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+
+  // ======================================================
+  // 🔥 NORMALIZATION LAYER (snake_case → camelCase)
+  // ======================================================
+
+  const normalizeSnapshot = (
+    apiSnapshot: any
+  ): Step3ExecutionSnapshot => {
+    return {
+      ...apiSnapshot,
+
+      candidates: (apiSnapshot.candidates || []).map((c: any) => ({
+        symbol: c.symbol,
+        direction: c.direction,
+        strategyUsed: c.strategy_used ?? c.strategyUsed ?? "NO_TRADE",
+
+        // Layer-1
+        avgTradedValue20d:
+          c.avgTradedValue20d ??
+          c.avg_traded_value_20d ??
+          0,
+
+        atrPct:
+          c.atrPct ??
+          c.atr_pct ??
+          0,
+
+        abnormalCandle:
+          c.abnormalCandle ??
+          c.abnormal_candle ??
+          false,
+
+        // Structural fields
+        rsValue: c.rs_value ?? c.rsValue ?? null,
+        gapHigh: c.gap_high ?? c.gapHigh ?? null,
+        gapLow: c.gap_low ?? c.gapLow ?? null,
+        intradayHigh: c.intraday_high ?? c.intradayHigh ?? null,
+        intradayLow: c.intraday_low ?? c.intradayLow ?? null,
+        lastHigherLow:
+          c.last_higher_low ?? c.lastHigherLow ?? null,
+        yesterdayClose:
+          c.yesterday_close ?? c.yesterdayClose ?? null,
+        vwapValue:
+          c.vwap_value ?? c.vwapValue ?? null,
+
+        structureValid:
+          c.structure_valid ?? c.structureValid ?? false,
+
+        reason: c.reason,
+      })),
+    };
+  };
 
   // ======================================================
   // PREVIEW
   // ======================================================
 
   const previewStep3 = useCallback(async () => {
-    console.info("[STEP3][HOOK][PREVIEW][START]", tradeDate);
-
     setLoading(true);
     setError(null);
 
@@ -53,27 +97,15 @@ export function useStep3(tradeDate: TradeDate) {
       const response: Step3ExecutionResponse =
         await fetchStep3Preview(tradeDate);
 
-      setSnapshot(response.snapshot);
+      const normalized = normalizeSnapshot(response.snapshot);
+
+      setSnapshot(normalized);
       setCanFreeze(response.canFreeze);
 
-      console.info(
-        "[STEP3][HOOK][PREVIEW][SUCCESS]",
-        {
-          tradeDate,
-          candidatesMode: response.snapshot.candidatesMode,
-          executionEnabled: response.snapshot.executionEnabled,
-        }
-      );
     } catch (err) {
       setError(err);
       setSnapshot(null);
       setCanFreeze(false);
-
-      console.error(
-        "[STEP3][HOOK][PREVIEW][ERROR]",
-        tradeDate,
-        err
-      );
     } finally {
       setLoading(false);
     }
@@ -85,11 +117,6 @@ export function useStep3(tradeDate: TradeDate) {
 
   const computeStep3Candidates = useCallback(
     async (stocks: Step3StockContext[]) => {
-      console.info(
-        "[STEP3][HOOK][COMPUTE][START]",
-        { tradeDate, stockCount: stocks.length }
-      );
-
       setLoading(true);
       setError(null);
 
@@ -97,26 +124,14 @@ export function useStep3(tradeDate: TradeDate) {
         const response: Step3ExecutionResponse =
           await computeStep3(tradeDate, stocks);
 
-        setSnapshot(response.snapshot);
+        const normalized = normalizeSnapshot(response.snapshot);
+
+        setSnapshot(normalized);
         setCanFreeze(response.canFreeze);
 
-        console.info(
-          "[STEP3][HOOK][COMPUTE][SUCCESS]",
-          {
-            tradeDate,
-            candidates: response.snapshot.candidates.length,
-            canFreeze: response.canFreeze,
-          }
-        );
       } catch (err) {
         setError(err);
         setCanFreeze(false);
-
-        console.error(
-          "[STEP3][HOOK][COMPUTE][ERROR]",
-          tradeDate,
-          err
-        );
       } finally {
         setLoading(false);
       }
@@ -130,11 +145,6 @@ export function useStep3(tradeDate: TradeDate) {
 
   const freezeStep3Candidates = useCallback(
     async (candidates: TradeCandidate[]) => {
-      console.info(
-        "[STEP3][HOOK][FREEZE][START]",
-        { tradeDate, candidates: candidates.length }
-      );
-
       setLoading(true);
       setError(null);
 
@@ -142,25 +152,13 @@ export function useStep3(tradeDate: TradeDate) {
         const response: Step3ExecutionResponse =
           await freezeStep3(tradeDate, candidates);
 
-        setSnapshot(response.snapshot);
+        const normalized = normalizeSnapshot(response.snapshot);
+
+        setSnapshot(normalized);
         setCanFreeze(response.canFreeze);
 
-        console.info(
-          "[STEP3][HOOK][FREEZE][SUCCESS]",
-          {
-            tradeDate,
-            persisted: response.snapshot.candidates.length,
-            candidatesMode: response.snapshot.candidatesMode,
-          }
-        );
       } catch (err) {
         setError(err);
-
-        console.error(
-          "[STEP3][HOOK][FREEZE][ERROR]",
-          tradeDate,
-          err
-        );
       } finally {
         setLoading(false);
       }
@@ -170,29 +168,19 @@ export function useStep3(tradeDate: TradeDate) {
 
   return {
     snapshot,
-    canFreeze, // 🔥 backend authoritative freeze flag
+    canFreeze,
 
-    // =========================
     // STEP-3A
-    // =========================
-
     marketContext: snapshot?.marketContext ?? null,
     tradePermission: snapshot?.tradePermission ?? null,
     allowedStrategies: snapshot?.allowedStrategies ?? [],
     maxTradesAllowed: snapshot?.maxTradesAllowed ?? 0,
     executionEnabled: snapshot?.executionEnabled ?? false,
 
-    // =========================
     // STEP-3B
-    // =========================
-
     candidatesMode: snapshot?.candidatesMode ?? "MANUAL",
     candidates: snapshot?.candidates ?? [],
     generatedAt: snapshot?.generatedAt ?? null,
-
-    // =========================
-    // Actions
-    // =========================
 
     previewStep3,
     computeStep3Candidates,

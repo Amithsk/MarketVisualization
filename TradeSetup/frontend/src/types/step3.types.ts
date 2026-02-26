@@ -81,6 +81,11 @@ export interface TradeCandidate {
   direction: TradeDirection;
   strategyUsed: StrategyUsed;
 
+  // 🔥 ADDING LAYER-1 PREVIEW FIELDS (Optional)
+  avgTradedValue20d?: number;
+  atrPct?: number;
+  abnormalCandle?: boolean;
+
   // -------------------------
   // Structural Snapshot (Frozen in STEP-3)
   // -------------------------
