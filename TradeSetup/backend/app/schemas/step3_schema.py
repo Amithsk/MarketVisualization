@@ -62,9 +62,17 @@ class TradeCandidate(BaseModel):
 
     strategy_used: Literal["GAP_FOLLOW", "MOMENTUM", "NO_TRADE"]
 
-    # ============================
-    # Structural Snapshot Fields
-    # ============================
+    # =====================================================
+    # Layer-1 Preview Fields (Optional — do NOT affect freeze)
+    # =====================================================
+
+    avg_traded_value_20d: Optional[float] = None
+    atr_pct: Optional[float] = None
+    abnormal_candle: Optional[bool] = None
+
+    # =====================================================
+    # Structural Snapshot Fields (Frozen during STEP-3 freeze)
+    # =====================================================
 
     rs_value: Optional[float] = None
 
@@ -85,7 +93,7 @@ class TradeCandidate(BaseModel):
 
     structure_valid: bool = True
 
-    # Mandatory engine explanation
+    # Mandatory deterministic explanation
     reason: str = Field(
         ...,
         min_length=3,
@@ -101,7 +109,7 @@ class Step3ExecutionSnapshot(BaseModel):
 
     trade_date: date
 
-    # STEP-3A
+    # STEP-3A (Execution Matrix)
     market_context: Optional[str]
     trade_permission: Optional[str]
 
@@ -109,7 +117,7 @@ class Step3ExecutionSnapshot(BaseModel):
     max_trades_allowed: int = Field(ge=0)
     execution_enabled: bool
 
-    # STEP-3B
+    # STEP-3B (Candidates)
     candidates_mode: Literal["AUTO", "MANUAL"]
     candidates: List[TradeCandidate] = Field(default_factory=list)
 

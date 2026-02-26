@@ -21,7 +21,17 @@ from backend.app.schemas.step3_schema import (
     Step3StockContext,
 )
 
+# ✅ NEW — data provider (no business logic here)
+from backend.app.services.nifty_stock_data_service import (
+    get_universe_symbols,
+    get_avg_traded_value_20d,
+    get_atr_14_for_date,
+    get_yesterday_candles,
+)
+
 logger = logging.getLogger(__name__)
+
+LIQUIDITY_THRESHOLD_RUPEES = 1_000_000_000  # ₹100 Cr
 
 
 # =========================================================
@@ -61,7 +71,7 @@ def _derive_step3a(market_context: str | None, trade_permission: str | None):
 
 
 # =========================================================
-# CORE DETERMINISTIC ENGINE
+# CORE DETERMINISTIC ENGINE (UNCHANGED)
 # =========================================================
 
 def _evaluate_stock(
@@ -175,7 +185,7 @@ def _evaluate_stock(
 
 
 # =========================================================
-# PREVIEW (PERSISTS CONTROL ROW)
+# PREVIEW (UPDATED — LAYER1 INTEGRATED, CONTROL PERSISTENCE KEPT)
 # =========================================================
 
 def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionResponse:
@@ -222,6 +232,18 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         step2_open.trade_permission,
     )
 
+    logger.info(
+        "[STEP3][STATE][STEP3A] trade_date=%s allowed=%s max_trades=%s execution=%s",
+        trade_date,
+        allowed_strategies,
+        max_trades_allowed,
+        execution_allowed,
+    )
+
+    # ==========================
+    # CONTROL ROW PERSISTENCE
+    # ==========================
+
     control_row = db.query(Step3ExecutionControl).filter(
         Step3ExecutionControl.trade_date == trade_date
     ).first()
@@ -238,7 +260,6 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         )
         db.add(control_row)
         db.commit()
-        logger.info("[STEP3][STATE][CONTROL_CREATED] trade_date=%s", trade_date)
     else:
         control_row.market_context = step1.final_market_context
         control_row.trade_permission = step2_open.trade_permission
@@ -247,29 +268,96 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         control_row.execution_allowed = int(execution_allowed)
         control_row.decided_at = decided_at
         db.commit()
-        logger.info("[STEP3][STATE][CONTROL_UPDATED] trade_date=%s", trade_date)
 
-    rows = db.query(Step3StockSelection).filter(
-        Step3StockSelection.trade_date == trade_date
-    ).all()
+    # ==========================
+    # EARLY EXIT IF NO TRADE
+    # ==========================
+
+    if not execution_allowed:
+        logger.info("[STEP3][STATE][NO_TRADE_EXIT] trade_date=%s", trade_date)
+
+        return Step3ExecutionResponse(
+            snapshot=Step3ExecutionSnapshot(
+                trade_date=trade_date,
+                market_context=step1.final_market_context,
+                trade_permission=step2_open.trade_permission,
+                allowed_strategies=allowed_strategies,
+                max_trades_allowed=max_trades_allowed,
+                execution_enabled=False,
+                candidates_mode="MANUAL",
+                candidates=[],
+                generated_at=decided_at,
+            ),
+            can_freeze=False,
+        )
+
+    # ==========================
+    # LAYER 1 — UNIVERSE
+    # ==========================
+
+    symbols = get_universe_symbols(db)
+    logger.info("[STEP3][STATE][UNIVERSE_LOADED] trade_date=%s count=%s", trade_date, len(symbols))
+
+    avg_map = get_avg_traded_value_20d(db, trade_date, symbols)
+    atr_map = get_atr_14_for_date(db, trade_date, symbols)
+    candle_map = get_yesterday_candles(db, trade_date, symbols)
+
+    passed = []
+
+    for symbol in symbols:
+
+        avg_val = avg_map.get(symbol)
+        atr = atr_map.get(symbol)
+        candle = candle_map.get(symbol)
+
+        if not avg_val or not atr or not candle:
+            continue
+
+        if avg_val < LIQUIDITY_THRESHOLD_RUPEES:
+            continue
+
+        atr_pct = (atr / candle["close"]) * 100 if candle["close"] else 0
+        if atr_pct < 1 or atr_pct > 4:
+            continue
+
+        abnormal = (candle["high"] - candle["low"]) >= (2 * atr)
+        if abnormal:
+            continue
+
+        passed.append({
+            "symbol": symbol,
+            "avg_traded_value_20d": avg_val,
+            "atr_pct": round(atr_pct, 2),
+            "abnormal_candle": abnormal,
+        })
+
+    logger.info("[STEP3][STATE][LAYER1_PASS] trade_date=%s passed=%s", trade_date, len(passed))
+
+    passed.sort(key=lambda x: x["avg_traded_value_20d"], reverse=True)
+    top6 = passed[:6]
+
+    logger.info("[STEP3][STATE][TOP6_SELECTED] trade_date=%s count=%s", trade_date, len(top6))
 
     candidates = [
         TradeCandidate(
-            symbol=r.symbol,
-            direction=r.direction,
-            strategy_used=r.strategy_used,
-            rs_value=r.rs_value,
-            gap_high=r.gap_high,
-            gap_low=r.gap_low,
-            intraday_high=r.intraday_high,
-            intraday_low=r.intraday_low,
-            last_higher_low=r.last_higher_low,
-            yesterday_close=r.yesterday_close,
-            vwap_value=r.vwap_value,
-            structure_valid=bool(r.structure_valid),
-            reason=r.reason,
+            symbol=c["symbol"],
+            direction="LONG",
+            strategy_used="NO_TRADE",
+            avg_traded_value_20d=c["avg_traded_value_20d"],
+            atr_pct=c["atr_pct"],
+            abnormal_candle=c["abnormal_candle"],
+            rs_value=None,
+            gap_high=None,
+            gap_low=None,
+            intraday_high=None,
+            intraday_low=None,
+            last_higher_low=None,
+            yesterday_close=None,
+            vwap_value=None,
+            structure_valid=False,
+            reason="Layer-1 PASS (Manual Layer-2/3 pending)",
         )
-        for r in rows
+        for c in top6
     ]
 
     logger.info("[STEP3][STATE][PREVIEW_SUCCESS] trade_date=%s", trade_date)
@@ -282,7 +370,7 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
             allowed_strategies=allowed_strategies,
             max_trades_allowed=max_trades_allowed,
             execution_enabled=execution_allowed,
-            candidates_mode="AUTO" if candidates else "MANUAL",
+            candidates_mode="MANUAL",
             candidates=candidates,
             generated_at=decided_at,
         ),
@@ -291,7 +379,7 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
 
 
 # =========================================================
-# COMPUTE (RESTORED)
+# COMPUTE (UNCHANGED)
 # =========================================================
 
 def compute_step3_candidates(
@@ -338,7 +426,7 @@ def compute_step3_candidates(
 
 
 # =========================================================
-# FREEZE (RESTORED)
+# FREEZE (UNCHANGED)
 # =========================================================
 
 def freeze_step3_candidates(
