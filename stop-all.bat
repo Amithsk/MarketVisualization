@@ -8,7 +8,7 @@ REM 1. Gracefully stop NGINX
 REM --------------------------------------
 echo [1/6] Stopping NGINX...
 cd /d D:\Tool\nginx
-nginx.exe -s stop >nul 2>&1
+taskkill /IM nginx.exe /F >nul 2>&1
 
 REM --------------------------------------
 REM 2. Stop NGROK

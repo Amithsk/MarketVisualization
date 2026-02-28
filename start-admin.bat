@@ -26,33 +26,38 @@ REM 3. JOURNAL FRONTEND (3001)
 REM -------------------------------
 start "Journal Frontend (3001)" cmd /k ^
 cd /d D:\MarketVisualization\TradeJournal\frontend ^&^
-echo Running Journal Frontend on 3001 ^&^
-npm run dev
+echo Building Journal Frontend... ^&^
+npm run build ^&^
+echo Starting Journal Frontend... ^&^
+npm run start
 
 REM -------------------------------
 REM 4. SETUP FRONTEND (3002)
 REM -------------------------------
 start "Setup Frontend (3002)" cmd /k ^
 cd /d D:\MarketVisualization\TradeSetup\frontend ^&^
-echo Running Setup Frontend on 3002 ^&^
-npm run dev
+echo Building Setup Frontend... ^&^
+npm run build ^&^
+echo Starting Setup Frontend... ^&^
+npm run start
 
 REM -------------------------------
-REM 5. STREAMLIT (8501)
+REM 5. STREAMLIT (8501)  <-- FIXED
 REM -------------------------------
 start "Streamlit (8501)" cmd /k ^
 cd /d D:\MarketVisualization\ ^&^
 call visualenv\Scripts\activate ^&^
 cd Code ^&^
-echo Running Streamlit on 8501 ^&^
-streamlit run app.py --server.port 8501
+echo Running Streamlit on 8501 (base path: /viz) ^&^
+streamlit run app.py --server.port 8501 --server.headless true --server.baseUrlPath viz
 
 REM -------------------------------
 REM 6. NGINX
 REM -------------------------------
 start "NGINX" cmd /k ^
 cd /d D:\Tool\nginx ^&^
-echo Starting NGINX ^&^
+echo Starting NGINX cleanly... ^&^
+taskkill /IM nginx.exe /F ^>nul 2^>^&1 ^&^
 nginx.exe
 
 REM -------------------------------
