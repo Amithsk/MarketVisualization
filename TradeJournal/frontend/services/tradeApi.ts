@@ -1,6 +1,7 @@
+// frontend/services/trade.ts
 import { TradePlan, TradeReview } from "@/types/trade"
 
-const API_BASE = "http://localhost:8000/api"
+const API_BASE = "/journal/api"
 
 /* ===============================
    LOW-LEVEL FETCH WRAPPER
