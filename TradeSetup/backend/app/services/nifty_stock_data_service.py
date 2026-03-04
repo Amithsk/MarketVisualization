@@ -8,7 +8,25 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 
+
 logger = logging.getLogger(__name__)
+
+# =========================================================
+# TRADING DATE UTILITIES
+# =========================================================
+
+def _get_previous_trading_date(db: Session, trade_date: date) -> date:
+    """
+    Returns the most recent trading date before the given trade_date.
+    """
+    sql = text("""
+        SELECT MAX(trade_date) AS prev_trade_date
+        FROM intraday_bhavcopy
+        WHERE trade_date < :trade_date
+    """)
+
+    row = db.execute(sql, {"trade_date": trade_date}).fetchone()
+    return row[0] if row and row[0] else None
 
 
 # =========================================================
@@ -48,20 +66,37 @@ def get_avg_traded_value_20d(
     Returns {symbol: avg_20d_net_trdval}
     """
 
+    # nothing to do if no symbols requested
     if not symbols:
         return {}
 
+    # Step 1: Get last 20 trading dates before the provided date
+    date_sql = text("""
+        SELECT DISTINCT trade_date
+        FROM intraday_bhavcopy
+        WHERE trade_date < :trade_date
+        ORDER BY trade_date DESC
+        LIMIT 20
+    """)
+
+    date_rows = db.execute(date_sql, {"trade_date": trade_date}).fetchall()
+    last_20_dates = [r[0] for r in date_rows]
+
+    if not last_20_dates:
+        # no history available yet
+        return {}
+
+    # Step 2: Calculate average net traded value over those dates
     sql = text("""
         SELECT symbol, AVG(net_trdval) AS avg_20d
         FROM intraday_bhavcopy
-        WHERE trade_date < :trade_date
-          AND trade_date >= DATE_SUB(:trade_date, INTERVAL 30 DAY)
+        WHERE trade_date IN :last_20_dates
           AND symbol IN :symbols
         GROUP BY symbol
     """)
 
     rows = db.execute(sql, {
-        "trade_date": trade_date,
+        "last_20_dates": tuple(last_20_dates),
         "symbols": tuple(symbols),
     }).fetchall()
 
@@ -92,16 +127,20 @@ def get_atr_14_for_date(
     if not symbols:
         return {}
 
+    previous_trading_date = _get_previous_trading_date(db, trade_date)
+    if not previous_trading_date:
+        return {}
+
     sql = text("""
         SELECT symbol, value
         FROM strategy_features
-        WHERE trade_date = :trade_date
+        WHERE trade_date = :previous_trading_date
           AND feature_name = 'atr_14'
           AND symbol IN :symbols
     """)
 
     rows = db.execute(sql, {
-        "trade_date": trade_date,
+        "previous_trading_date": previous_trading_date,
         "symbols": tuple(symbols),
     }).fetchall()
 
@@ -139,7 +178,10 @@ def get_yesterday_candles(
     if not symbols:
         return {}
 
-    yesterday = trade_date - timedelta(days=1)
+    #yesterday = trade_date - timedelta(days=1)
+    yesterday = _get_previous_trading_date(db, trade_date)
+    if not yesterday:
+        return {}
 
     sql = text("""
         SELECT symbol, high, low, close
@@ -203,3 +245,6 @@ def fetch_yesterday_candles(
     symbols: List[str],
 ) -> Dict[str, Dict[str, float]]:
     return get_yesterday_candles(db, trade_date, symbols)
+
+
+

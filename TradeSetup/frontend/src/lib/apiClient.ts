@@ -6,7 +6,7 @@ import type { ApiError } from "@/types/common.types";
  * Shared Axios client for frontend → backend communication.
  */
 const apiClient: AxiosInstance = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: "/setup/api",
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",

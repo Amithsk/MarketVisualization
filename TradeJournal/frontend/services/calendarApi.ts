@@ -1,6 +1,6 @@
 // frontend/services/calendarApi.ts
 
-const API_BASE = "http://localhost:8000/api"
+const API_BASE = "/journal/api"
 
 /**
  * Backend response shape for calendar aggregation
