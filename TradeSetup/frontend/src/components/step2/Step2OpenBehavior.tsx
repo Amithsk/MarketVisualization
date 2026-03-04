@@ -1,3 +1,4 @@
+//frontend/src/components/step2/Step2OpenBehavior.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -63,11 +64,11 @@ export default function Step2OpenBehavior({
     "09:45",
   ].map((t) => ({
     timestamp: t,
-    open: 0,
-    high: 0,
-    low: 0,
-    close: 0,
-    volume: 0,
+    open: null,
+    high: null,
+    low: null,
+    close: null,
+    volume: null,
   }));
 
   const [candles, setCandles] =
@@ -78,7 +79,7 @@ export default function Step2OpenBehavior({
   const updateCandle = (
     index: number,
     field: keyof Step2CandleInput,
-    value: number
+    value: number | null
   ) => {
     setCandles((prev) => {
       const updated = [...prev];
@@ -97,6 +98,11 @@ export default function Step2OpenBehavior({
   const candlesValid = useMemo(() => {
     return candles.every(
       (c) =>
+        c.open !== null &&
+        c.high !== null &&
+        c.low !== null &&
+        c.close !== null &&
+        c.volume !== null &&
         c.open > 0 &&
         c.high > 0 &&
         c.low > 0 &&
@@ -211,17 +217,20 @@ export default function Step2OpenBehavior({
                     ).map((field) => (
                       <td key={field} className="p-2 border">
                         <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border px-1 py-0.5"
-                          value={c[field]}
-                          onChange={(e) =>
-                            updateCandle(
-                              i,
-                              field,
-                              Number(e.target.value)
-                            )
-                          }
+                            type="number"
+                            min="10000"
+                            max="99999"
+                            step="0.01"
+                            className="w-full rounded border px-1 py-0.5"
+                            value={c[field] ?? ""}
+                              onChange={(e) => {
+                                    const value = e.target.value;
+
+                            if (value.length > 5) return;
+
+                                  updateCandle(
+                                         i, field, value === "" ? null : Number(value));
+                    }}
                         />
                       </td>
                     ))}
