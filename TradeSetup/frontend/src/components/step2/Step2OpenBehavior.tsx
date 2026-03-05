@@ -10,7 +10,6 @@ interface Step2OpenBehaviorProps {
   tradeDate: TradeDate;
   step2: ReturnType<typeof useStep2>;
 }
-
 /**
  * STEP-2 Open Behavior
  *
@@ -23,7 +22,6 @@ interface Step2OpenBehaviorProps {
  *  - backend auto-derives baseline
  *  - UI automatically switches to read-only
  */
-
 export default function Step2OpenBehavior({
   tradeDate,
   step2,
@@ -40,7 +38,7 @@ export default function Step2OpenBehavior({
   } = step2;
 
   /* =====================================================
-     Baseline (Hybrid Mode Support)
+     Baseline(Hybrid Mode support) 
   ===================================================== */
 
   const [manualBaseline, setManualBaseline] = useState<number>(0);
@@ -51,7 +49,7 @@ export default function Step2OpenBehavior({
   const isManualMode = manualInputRequired === true;
 
   /* =====================================================
-     Candle Grid (09:15–09:45)
+     Candle Grid(09:15-09:45)
   ===================================================== */
 
   const initialCandles: Step2CandleInput[] = [
@@ -145,6 +143,7 @@ export default function Step2OpenBehavior({
 
   return (
     <div className="space-y-8">
+
       <div className="text-sm text-gray-500">
         Market Open Behavior for{" "}
         <span className="font-medium">{tradeDate}</span>
@@ -156,9 +155,8 @@ export default function Step2OpenBehavior({
         </div>
       )}
 
-      {/* =====================================================
-         PREVIOUS DAY BASELINE
-      ===================================================== */}
+      {/* ================= PREVIOUS DAY BASELINE ================= */}
+
       <div className="rounded border p-4 space-y-3">
         <h3 className="text-sm font-semibold text-gray-700">
           Previous Day Baseline
@@ -187,56 +185,72 @@ export default function Step2OpenBehavior({
         </div>
       </div>
 
-      {/* =====================================================
-         MANUAL INPUT GRID
-      ===================================================== */}
+      {/* ================= MANUAL GRID ================= */}
+
       {manualInputRequired && !isFrozen && (
         <div className="rounded border p-4 space-y-4">
+
           <h3 className="text-sm font-semibold text-gray-700">
             5-Minute Candle Input (09:15–09:45)
           </h3>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm border">
+
               <thead className="bg-gray-50">
                 <tr>
                   <th className="p-2 border">Time</th>
                   <th className="p-2 border">Open</th>
+                  <th className="p-2 border">Close</th>
                   <th className="p-2 border">High</th>
                   <th className="p-2 border">Low</th>
-                  <th className="p-2 border">Close</th>
                   <th className="p-2 border">Volume</th>
                 </tr>
               </thead>
+
               <tbody>
                 {candles.map((c, i) => (
                   <tr key={c.timestamp}>
-                    <td className="p-2 border">{c.timestamp}</td>
+                    <td className="p-2 border">
+                      {c.timestamp}
+                    </td>
+
                     {(
-                      ["open", "high", "low", "close", "volume"] as const
+                      ["open", "close", "high", "low", "volume"] as const
                     ).map((field) => (
                       <td key={field} className="p-2 border">
+
                         <input
-                            type="number"
-                            min="10000"
-                            max="99999"
-                            step="0.01"
-                            className="w-full rounded border px-1 py-0.5"
-                            value={c[field] ?? ""}
-                              onChange={(e) => {
-                                    const value = e.target.value;
+                          type="number"
+                          step="0.01"
+                          min={field === "volume" ? 0 : 10000}
+                          max={field === "volume" ? undefined : 99999}
+                          className="w-full rounded border px-1 py-0.5"
+                          value={c[field] ?? ""}
+                          onChange={(e) => {
 
-                            if (value.length > 5) return;
+                            const value = e.target.value;
 
-                                  updateCandle(
-                                         i, field, value === "" ? null : Number(value));
-                    }}
+                            if (field !== "volume" && value.length > 5) {
+                              return;
+                            }
+
+                            updateCandle(
+                              i,
+                              field,
+                              value === ""
+                                ? null
+                                : Number(value)
+                            );
+                          }}
                         />
+
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
+
             </table>
           </div>
 
@@ -247,14 +261,15 @@ export default function Step2OpenBehavior({
           >
             Compute Analytical Breakdown
           </button>
+
         </div>
       )}
 
-      {/* =====================================================
-         ANALYTICAL BREAKDOWN
-      ===================================================== */}
+      {/* ================= ANALYTICS ================= */}
+
       {analyticsReady && (
         <div className="rounded border p-4 space-y-4">
+
           <h3 className="text-sm font-semibold text-gray-700">
             Analytical Breakdown (Backend Derived)
           </h3>
@@ -275,14 +290,15 @@ export default function Step2OpenBehavior({
           <Metric label="Market Participation" value={snapshot.market_participation} />
 
           <TradePermissionBanner tradeAllowed={tradeAllowed ?? false} />
+
         </div>
       )}
 
-      {/* =====================================================
-         FREEZE SECTION
-      ===================================================== */}
+      {/* ================= FREEZE ================= */}
+
       {!isFrozen && analyticsReady && (
         <div className="rounded border p-4 space-y-4">
+
           <h3 className="text-sm font-semibold text-gray-700">
             Freeze STEP-2
           </h3>
@@ -302,6 +318,7 @@ export default function Step2OpenBehavior({
           >
             Freeze STEP-2 Behavior
           </button>
+
         </div>
       )}
 
@@ -319,12 +336,13 @@ export default function Step2OpenBehavior({
           Backend error occurred.
         </div>
       )}
+
     </div>
   );
 }
 
 /* =====================================================
-   Small UI Helpers
+   UI Helpers
 ===================================================== */
 
 function Metric({
@@ -347,17 +365,17 @@ function TradePermissionBanner({
 }: {
   tradeAllowed: boolean;
 }) {
+
+  const style = tradeAllowed
+    ? "rounded border p-4 border-green-300 bg-green-50 text-green-700"
+    : "rounded border p-4 border-red-300 bg-red-50 text-red-700";
+
   return (
-    <div
-      className={`rounded border p-4 ${
-        tradeAllowed
-          ? "border-green-300 bg-green-50 text-green-700"
-          : "border-red-300 bg-red-50 text-red-700"
-      }`}
-    >
+    <div className={style}>
       <div className="text-sm font-medium">
         Trade Permission
       </div>
+
       <div className="mt-2 text-sm">
         {tradeAllowed
           ? "Trading is permitted."

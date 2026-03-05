@@ -139,17 +139,7 @@ export default function Step4TradePreview({
         </div>
       </div>
 
-      {/* Risk context */}
-      <div className="rounded border p-4">
-        <h3 className="text-sm font-semibold text-gray-700">
-          Discipline Notes
-        </h3>
-        <ul className="mt-2 list-disc pl-5 text-sm text-gray-500 space-y-1">
-          <li>Execution values are backend-derived</li>
-          <li>Position sizing is calculated automatically</li>
-          <li>Trade snapshot is immutable once frozen</li>
-        </ul>
-      </div>
+            
     </div>
   );
 }
