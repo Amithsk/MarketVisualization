@@ -188,7 +188,7 @@ def compute_step1_context(
 
 
 # -------------------------------------------------
-# STEP-1 FREEZE (MAP TO EXISTING DB TABLE)
+# STEP-1 FREEZE (MAP UI BIAS → DB ENUM)
 # -------------------------------------------------
 
 def freeze_step1_context(
@@ -204,6 +204,18 @@ def freeze_step1_context(
     if db.query(Step1MarketContext).filter_by(trade_date=trade_date).first():
         raise ValueError("STEP-1 is already frozen")
 
+    bias = (market_bias or "").strip().upper()
+
+    bias_to_context = {
+        "BULLISH": "TREND_DAY",
+        "BEARISH": "TREND_DAY",
+        "NEUTRAL": "RANGE_UNCERTAIN_DAY",
+        "RANGE_BOUND": "RANGE_UNCERTAIN_DAY",
+        "UNDEFINED": "NO_TRADE_DAY",
+    }
+
+    final_context = bias_to_context.get(bias, "NO_TRADE_DAY")
+
     context = Step1MarketContext(
         trade_date=trade_date,
         preopen_price=preopen_price,
@@ -212,7 +224,7 @@ def freeze_step1_context(
         prior_range_size=derived_context["range_size"],
         prior_day_overlap=derived_context["overlap_type"],
         prior_structure_state=derived_context["db2_state"],
-        final_market_context=market_bias.strip().upper(),
+        final_market_context=final_context,
         final_reason=(
             premarket_notes
             or f"System gap={derived_context['gap_context']}, structure={derived_context['db2_state']}"
@@ -225,7 +237,7 @@ def freeze_step1_context(
 
     snapshot = Step1ContextSnapshot(
         trade_date=context.trade_date,
-        market_bias=context.final_market_context,
+        market_bias=bias,
         premarket_notes=context.final_reason,
         frozen_at=context.created_at,
     )
