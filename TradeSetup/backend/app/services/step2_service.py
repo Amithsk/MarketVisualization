@@ -266,16 +266,18 @@ def freeze_step2_behavior(
     db: Session,
     trade_date: date,
     candles: List[Step2CandleInput],
-    avg_5m_range_prev_day: float,
     reason: str | None = None,
     
 ) -> Step2FrozenResponse:
+    #To compute the snapshot, we need the avg_5m_range_prev_day which is derived from nifty_db. To ensure consistency between preview and freeze, we fetch it again here instead of relying on the value from preview. This way, even if there are changes in the underlying data or logic, the freeze will always compute based on the latest available information.
+    nifty_db = next(get_nifty_db())
+    avg_5m_range_prev_day = get_previous_session_last20_avg_range(nifty_db=nifty_db,trade_date=trade_date,)
 
     compute_response = compute_step2_behavior(
         db=db,
         trade_date=trade_date,
         candles=candles,
-        avg_5m_range_prev_day=avg_5m_range_prev_day,  # freeze reusing the value from preview
+        avg_5m_range_prev_day=avg_5m_range_prev_day,  
     )
 
     snapshot = compute_response.snapshot
