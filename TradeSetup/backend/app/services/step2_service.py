@@ -266,14 +266,16 @@ def freeze_step2_behavior(
     db: Session,
     trade_date: date,
     candles: List[Step2CandleInput],
+    avg_5m_range_prev_day: float,
     reason: str | None = None,
+    
 ) -> Step2FrozenResponse:
 
     compute_response = compute_step2_behavior(
         db=db,
         trade_date=trade_date,
         candles=candles,
-        avg_5m_range_prev_day=None,  # freeze still depends on compute call from frontend
+        avg_5m_range_prev_day=avg_5m_range_prev_day,  # freeze reusing the value from preview
     )
 
     snapshot = compute_response.snapshot
