@@ -151,7 +151,7 @@ def compute_step1_context(
 
     if yh <= d2h and yl >= d2l:
         overlap_type = "FULL_OVERLAP"
-    elif yh > d2h or yl < d2l:
+    elif yl > d2h or yh < d2l:
         overlap_type = "NO_OVERLAP"
     else:
         overlap_type = "PARTIAL_OVERLAP"
