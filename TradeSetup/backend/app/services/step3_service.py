@@ -20,8 +20,7 @@ from backend.app.schemas.step3_schema import (
     Step3FreezeResponse,
     Step3StockContext,
 )
-
-# ✅ NEW — data provider (no business logic here)
+# NEW — data provider 
 from backend.app.services.nifty_stock_data_service import (
     get_universe_symbols,
     get_avg_traded_value_20d,
@@ -31,12 +30,12 @@ from backend.app.services.nifty_stock_data_service import (
 
 logger = logging.getLogger(__name__)
 
-LIQUIDITY_THRESHOLD_RUPEES = 1_000_000_000  # ₹100 Cr
-
+LIQUIDITY_THRESHOLD_RUPEES = 1_000_000_000
 
 # =========================================================
 # STEP-3A — Deterministic Matrix
 # =========================================================
+
 
 def _derive_step3a(market_context: str | None, trade_permission: str | None):
     allowed: list[str] = []
@@ -68,16 +67,11 @@ def _derive_step3a(market_context: str | None, trade_permission: str | None):
 
     execution_allowed = max_trades > 0
     return allowed, max_trades, execution_allowed
-
-
 # =========================================================
 # CORE DETERMINISTIC ENGINE (UNCHANGED)
 # =========================================================
 
-def _evaluate_stock(
-    context: Step3StockContext,
-    allowed_strategies: list[str],
-) -> TradeCandidate:
+def _evaluate_stock(context: Step3StockContext, allowed_strategies: list[str]) -> TradeCandidate:
 
     symbol = context.symbol.upper()
 
@@ -182,8 +176,6 @@ def _evaluate_stock(
         structure_valid=context.structure_valid,
         reason="Qualified through deterministic Layer-1/2/3 evaluation",
     )
-
-
 # =========================================================
 # PREVIEW (UPDATED — LAYER1 INTEGRATED, CONTROL PERSISTENCE KEPT)
 # =========================================================
@@ -211,7 +203,6 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         or not step2_open
     ):
         logger.info("[STEP3][STATE][PREVIEW_BLOCKED] trade_date=%s", trade_date)
-
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
                 trade_date=trade_date,
@@ -231,7 +222,6 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         step1.final_market_context,
         step2_open.trade_permission,
     )
-
     logger.info(
         "[STEP3][STATE][STEP3A] trade_date=%s allowed=%s max_trades=%s execution=%s",
         trade_date,
@@ -239,7 +229,6 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         max_trades_allowed,
         execution_allowed,
     )
-
     # ==========================
     # CONTROL ROW PERSISTENCE
     # ==========================
@@ -268,14 +257,12 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         control_row.execution_allowed = int(execution_allowed)
         control_row.decided_at = decided_at
         db.commit()
-
     # ==========================
     # EARLY EXIT IF NO TRADE
     # ==========================
 
     if not execution_allowed:
         logger.info("[STEP3][STATE][NO_TRADE_EXIT] trade_date=%s", trade_date)
-
         return Step3ExecutionResponse(
             snapshot=Step3ExecutionSnapshot(
                 trade_date=trade_date,
@@ -290,14 +277,13 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
             ),
             can_freeze=False,
         )
-
+    
     # ==========================
     # LAYER 1 — UNIVERSE
     # ==========================
 
     symbols = get_universe_symbols(db)
     logger.info("[STEP3][STATE][UNIVERSE_LOADED] trade_date=%s count=%s", trade_date, len(symbols))
-
     avg_map = get_avg_traded_value_20d(db, trade_date, symbols)
     atr_map = get_atr_14_for_date(db, trade_date, symbols)
     candle_map = get_yesterday_candles(db, trade_date, symbols)
@@ -330,14 +316,10 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
             "atr_pct": round(atr_pct, 2),
             "abnormal_candle": abnormal,
         })
-
     logger.info("[STEP3][STATE][LAYER1_PASS] trade_date=%s passed=%s", trade_date, len(passed))
-
     passed.sort(key=lambda x: x["avg_traded_value_20d"], reverse=True)
     top6 = passed[:6]
-
     logger.info("[STEP3][STATE][TOP6_SELECTED] trade_date=%s count=%s", trade_date, len(top6))
-
     candidates = [
         TradeCandidate(
             symbol=c["symbol"],
@@ -359,9 +341,7 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         )
         for c in top6
     ]
-
     logger.info("[STEP3][STATE][PREVIEW_SUCCESS] trade_date=%s", trade_date)
-
     return Step3ExecutionResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
@@ -377,16 +357,10 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
         can_freeze=False,
     )
 
-
 # =========================================================
 # COMPUTE (UNCHANGED)
 # =========================================================
-
-def compute_step3_candidates(
-    db: Session,
-    trade_date: date,
-    stocks: list[Step3StockContext],
-) -> Step3ComputeResponse:
+def compute_step3_candidates(db: Session, trade_date: date, stocks: list[Step3StockContext]) -> Step3ComputeResponse:
 
     preview = generate_step3_execution(db, trade_date)
     snapshot = preview.snapshot
@@ -402,12 +376,47 @@ def compute_step3_candidates(
         and any(c.strategy_used != "NO_TRADE" for c in evaluated)
     )
 
-    logger.info(
-        "[STEP3][STATE][COMPUTE] trade_date=%s candidates=%d can_freeze=%s",
-        trade_date,
-        len(evaluated),
-        can_freeze,
-    )
+    if snapshot.execution_enabled and not any(c.strategy_used != "NO_TRADE" for c in evaluated):
+
+        db.query(Step3StockSelection).filter(
+            Step3StockSelection.trade_date == trade_date
+        ).delete()
+
+        for c in evaluated:
+
+            rejection_tag = None
+            if c.reason and "Layer-1" in c.reason:
+                rejection_tag = "LAYER1_FAIL"
+            elif c.reason and "Layer-2" in c.reason:
+                rejection_tag = "RS_NEUTRAL"
+            elif c.reason and "Layer-3" in c.reason:
+                rejection_tag = "STRATEGY_FAIL"
+            else:
+                rejection_tag = "UNKNOWN"
+
+            db.add(
+                Step3StockSelection(
+                    trade_date=trade_date,
+                    symbol=c.symbol,
+                    direction=c.direction,
+                    strategy_used=c.strategy_used,
+                    rs_value=c.rs_value,
+                    gap_high=c.gap_high,
+                    gap_low=c.gap_low,
+                    intraday_high=c.intraday_high,
+                    intraday_low=c.intraday_low,
+                    last_higher_low=c.last_higher_low,
+                    yesterday_close=c.yesterday_close,
+                    vwap_value=c.vwap_value,
+                    structure_valid=int(c.structure_valid),
+                    reason=c.reason,
+                    evaluated_at=datetime.utcnow(),
+                    tradable=False,
+                    rejection_tag=rejection_tag,
+                )
+            )
+
+        db.commit()
 
     return Step3ComputeResponse(
         snapshot=Step3ExecutionSnapshot(
@@ -424,16 +433,10 @@ def compute_step3_candidates(
         can_freeze=can_freeze,
     )
 
-
 # =========================================================
 # FREEZE (UNCHANGED)
 # =========================================================
-
-def freeze_step3_candidates(
-    db: Session,
-    trade_date: date,
-    candidates: list[TradeCandidate],
-) -> Step3FreezeResponse:
+def freeze_step3_candidates(db: Session, trade_date: date, candidates: list[TradeCandidate]) -> Step3FreezeResponse:
 
     decided_at = datetime.utcnow()
 
@@ -444,18 +447,27 @@ def freeze_step3_candidates(
     if not control_row:
         raise ValueError("Preview must be generated before freeze.")
 
-    qualified = [c for c in candidates if c.strategy_used != "NO_TRADE"]
-
-    if not qualified:
-        raise ValueError("No qualified trades available to freeze.")
-
-    qualified = qualified[:control_row.max_trades_allowed]
+    qualified = candidates[:control_row.max_trades_allowed]
 
     db.query(Step3StockSelection).filter(
         Step3StockSelection.trade_date == trade_date
     ).delete()
 
-    for c in qualified:
+    for idx, c in enumerate(candidates):
+
+        is_tradable = c.strategy_used != "NO_TRADE" and idx < control_row.max_trades_allowed
+
+        rejection_tag = None
+        if not is_tradable:
+            if c.reason and "Layer-1" in c.reason:
+                rejection_tag = "LAYER1_FAIL"
+            elif c.reason and "Layer-2" in c.reason:
+                rejection_tag = "RS_NEUTRAL"
+            elif c.reason and "Layer-3" in c.reason:
+                rejection_tag = "STRATEGY_FAIL"
+            else:
+                rejection_tag = "UNKNOWN"
+
         db.add(
             Step3StockSelection(
                 trade_date=trade_date,
@@ -473,17 +485,17 @@ def freeze_step3_candidates(
                 structure_valid=int(c.structure_valid),
                 reason=c.reason,
                 evaluated_at=decided_at,
+                tradable=is_tradable,
+                rejection_tag=rejection_tag,
             )
         )
 
     db.commit()
-
     logger.info(
         "[STEP3][STATE][FREEZE_SUCCESS] trade_date=%s persisted=%d",
         trade_date,
         len(qualified),
     )
-
     return Step3FreezeResponse(
         snapshot=Step3ExecutionSnapshot(
             trade_date=trade_date,
