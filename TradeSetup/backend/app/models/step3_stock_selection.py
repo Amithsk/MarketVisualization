@@ -25,7 +25,7 @@ This guarantees:
 - STEP-4 purity (no structural recalculation)
 """
 
-from sqlalchemy import Column, Date, DateTime, String, Text, Float, Integer
+from sqlalchemy import Column, Date, DateTime, String, Text, Float, Integer,Boolean
 from sqlalchemy.sql import func
 from backend.app.db.base import Base
 
@@ -96,6 +96,13 @@ class Step3StockSelection(Base):
     evaluated_at = Column(DateTime, nullable=False)
 
     # =====================================================
+    # ML / Decision Tracking (NEW — ADDED)
+    # =====================================================
+
+    tradable = Column(Boolean, nullable=False, default=False)
+    rejection_tag = Column(String(50), nullable=True)
+
+    # =====================================================
     # Audit Metadata
     # =====================================================
 
@@ -121,5 +128,7 @@ class Step3StockSelection(Base):
             f"gap_low={self.gap_low}, "
             f"intraday_high={self.intraday_high}, "
             f"last_higher_low={self.last_higher_low}"
+            f"tradable={self.tradable}, "
+            f"rejection_tag={self.rejection_tag}"
             f")>"
         )
