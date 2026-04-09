@@ -1,16 +1,34 @@
-# MarketVisualization
-The goal of this project is to provide a single control interface where market participants can analyze data patterns, compare actual vs predicted performance, and make more informed trading or portfolio decisions through clear, interactive visualizations
+# 📈 Intraday Trading Decision Intelligence Platform
 
-#Key Objectives
+A rule-based, system-driven intraday trading platform designed to eliminate discretionary bias and enforce structured decision-making.
 
-Consolidation — unify ETF, intraday, and prediction data under one visualization layer.
+This project transforms raw market data into deterministic outputs:
+- Market context
+- Trade permission
+- Stock selection
+- Risk-controlled execution
 
-Visualization — provide dashboards for performance tracking, gainers/losers, circuit hits, liquidity, and AI predictions.
+---
 
-Traceability — ensure every metric is traceable to a database field (no black-box visuals).
+## Problem Statement
 
-Interactivity — enable drill-downs, filtering, and cross-dashboard comparisons.
+Retail intraday trading is highly discretionary and inconsistent:
+- Decisions vary day-to-day
+- No structured validation of market conditions
+- Risk management is often manual and error-prone
 
-Insight Generation — integrate ML/AI-driven predictions, error tracking, and confidence metrics.
+This platform solves that by introducing a **step-based decision engine**.
 
-Audit & Monitoring — visualize pipeline ingestion health, missing data, and update freshness.
+---
+
+## 🧠 Core Idea
+
+Instead of predicting markets, the system answers:
+
+-  *Should you trade today?*
+-  *How much are you allowed to trade?*
+-  *Which stocks qualify?*
+-  *How much risk should you take?*
+
+---
+
