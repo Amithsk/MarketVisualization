@@ -16,32 +16,56 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   return (
-    <div className="p-6">
-      <CalendarHeader
-        month={currentMonth}
-        onPrev={goPrev}
-        onNext={goNext}
-        onToday={goToday}
-      />
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
 
-      <WeekdayHeader />
-
-      <CalendarGrid>
-        {days.map((d) => (
-          <CalendarCell
-            key={d.date}
-            day={d}
-            onClick={() => setSelectedDate(d.date)}
+        {/* ============================= */}
+        {/* CALENDAR HEADER */}
+        {/* ============================= */}
+        <div className="bg-white rounded-xl border shadow-sm p-4">
+          <CalendarHeader
+            month={currentMonth}
+            onPrev={goPrev}
+            onNext={goNext}
+            onToday={goToday}
           />
-        ))}
-      </CalendarGrid>
+        </div>
 
-      {selectedDate && (
-        <TradeDrawer
-          tradeDate={selectedDate}
-          onClose={() => setSelectedDate(null)}
-        />
-      )}
+        {/* ============================= */}
+        {/* WEEK / MONTH GRID */}
+        {/* ============================= */}
+        <div className="bg-white rounded-xl border shadow-sm p-4 space-y-4">
+
+          <WeekdayHeader />
+
+          <CalendarGrid>
+            {days.map((d) => (
+              <CalendarCell
+                key={d.date}
+                day={d}
+                onClick={() => setSelectedDate(d.date)}
+              />
+            ))}
+          </CalendarGrid>
+
+        </div>
+
+        {/* ============================= */}
+        {/* TRADE JOURNAL DRAWER */}
+        {/* ============================= */}
+        {selectedDate && (
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+
+            <TradeDrawer
+              tradeDate={selectedDate}
+              onClose={() => setSelectedDate(null)}
+            />
+
+          </div>
+        )}
+
+      </div>
     </div>
   )
 }
+
