@@ -1,3 +1,4 @@
+//TradeJournal/frontend/components/trade/TradePlanCard.tsx
 "use client"
 
 import { TradePlan } from "@/types/trade"
@@ -16,15 +17,29 @@ export default function TradePlanCard({ plan }: Props) {
         </span>
 
         <span
-          className={`text-xs rounded px-2 py-0.5 ${
-            plan.plan_status === "EXECUTED"
-              ? "bg-green-100 text-green-700"
-              : plan.plan_status === "PLANNED"
-              ? "bg-blue-100 text-blue-700"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {plan.plan_status}
+           className={`text-xs rounded px-2 py-0.5 ${
+            plan.plan_status === "NOT_TAKEN"
+            ? "bg-gray-100 text-gray-600"
+            : plan.trade_state?.is_reviewed
+            ? "bg-purple-100 text-purple-700"
+            : plan.trade_state?.is_exited
+            ? "bg-yellow-100 text-yellow-700"
+            : plan.trade_state?.is_executed
+             ? "bg-green-100 text-green-700"
+            : "bg-blue-100 text-blue-700"
+             }`}
+            >
+          {
+            plan.plan_status === "NOT_TAKEN"
+              ? "NOT TAKEN"
+           : plan.trade_state?.is_reviewed
+           ? "COMPLETE"
+           : plan.trade_state?.is_exited
+           ? "REVIEW"
+           : plan.trade_state?.is_executed
+           ? "LIVE"
+          : "PLANNED"
+          }
         </span>
       </div>
 

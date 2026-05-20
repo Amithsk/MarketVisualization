@@ -1,4 +1,4 @@
-// frontend/types/calendar.ts
+// TradeJournal/frontend/types/calendar.ts
 
 export type DayStatus = "COMPLETE" | "INCOMPLETE" | "NO_TRADES"
 
