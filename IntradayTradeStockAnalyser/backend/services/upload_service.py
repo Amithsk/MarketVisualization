@@ -4,6 +4,7 @@ from typing import List
 from backend.models.candle_model import Candle
 from backend.services.normalization_service import NormalizationService
 from backend.validators.candle_validator import CandleValidator
+from backend.utils.replay_store import (ReplayStore)
 
 
 class UploadService:
@@ -97,5 +98,12 @@ class UploadService:
         )
 
         CandleValidator.validate_candles(candles)
+
+        # -----------------------------------
+        # Store replay candles in memory
+        # for replay API usage
+        # -----------------------------------
+
+        ReplayStore.set_stock_candles(candles)
 
         return candles
