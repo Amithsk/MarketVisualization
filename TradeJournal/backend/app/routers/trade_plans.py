@@ -1,3 +1,5 @@
+#/TradeJournal/backend/app/routers/trade_plans.py
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -57,6 +59,10 @@ def mark_not_taken(
     return {"status": "NOT_TAKEN"}
 
 
+# --------------------------------------------------
+# LIST PLANS WITH TRADE STATE
+# --------------------------------------------------
+
 @router.get("")
 def list_plans(
     trade_date: str,
@@ -69,4 +75,77 @@ def list_plans(
         .all()
     )
 
-    return plans
+    enriched_plans = []
+
+    for plan in plans:
+
+        # --------------------------------------------------
+        # TRADE EXECUTION STATE
+        # --------------------------------------------------
+
+        is_executed = plan.trade_id is not None
+
+        is_exited = False
+        is_reviewed = False
+
+        # --------------------------------------------------
+        # CHECK EXIT + REVIEW STATE
+        # --------------------------------------------------
+
+        if plan.trade:
+
+            # EXITED?
+            is_exited = plan.trade.exit_timestamp is not None
+
+            # REVIEWED?
+            review_exists = (
+                db.query(models.TradeExecutionReview)
+                .filter(
+                    models.TradeExecutionReview.trade_id == plan.trade.id
+                )
+                .first()
+            )
+
+            is_reviewed = review_exists is not None
+
+        # --------------------------------------------------
+        # ENRICHED RESPONSE
+        # --------------------------------------------------
+
+        enriched_plans.append({
+            "id": plan.id,
+            "trade_id": plan.trade_id,
+
+            "symbol": plan.symbol,
+
+            "plan_date": plan.plan_date,
+            "trade_mode": plan.trade_mode,
+            "strategy": plan.strategy,
+            "position_type": plan.position_type,
+
+            "setup_description": plan.setup_description,
+            "entry_trigger": plan.entry_trigger,
+
+            "planned_entry_price": plan.planned_entry_price,
+            "planned_stop_price": plan.planned_stop_price,
+            "planned_target_price": plan.planned_target_price,
+
+            "planned_risk_amount": plan.planned_risk_amount,
+            "planned_position_size": plan.planned_position_size,
+
+            "plan_status": plan.plan_status.value,
+
+            "not_taken_reason": plan.not_taken_reason,
+
+            "created_at": plan.created_at,
+            "updated_at": plan.updated_at,
+
+            # ✅ NEW
+            "trade_state": {
+                "is_executed": is_executed,
+                "is_exited": is_exited,
+                "is_reviewed": is_reviewed,
+            }
+        })
+
+    return enriched_plans

@@ -32,15 +32,41 @@ def get_calendar_summary(
     """
 
     results = (
-        db.query(
-            cast(models.TradeLog.timestamp, Date).label("trade_date"),
-            func.count(models.TradeLog.id).label("trade_count"),
-            func.coalesce(func.sum(models.TradeLog.pnl_amount), 0).label("pnl"),
-        )
-        .filter(func.year(models.TradeLog.timestamp) == year)
-        .filter(func.month(models.TradeLog.timestamp) == month)
-        .group_by(cast(models.TradeLog.timestamp, Date))
-        .all()
+         db.query(
+        models.TradePlan.plan_date.label("trade_date"),
+
+        func.count(models.TradePlan.id).label("trade_count"),
+
+        func.coalesce(
+            func.sum(models.TradeLog.pnl_amount),
+            0
+        ).label("pnl"),
+    )
+
+    # --------------------------------------------------
+    # JOIN trade_log (optional)
+    # because PLANNED trades may not have trade_id yet
+    # --------------------------------------------------
+    .outerjoin(
+        models.TradeLog,
+        models.TradePlan.trade_id == models.TradeLog.id
+    )
+
+    # --------------------------------------------------
+    # BUSINESS DATE FILTERING
+    # IMPORTANT:
+    # Use plan_date ONLY
+    # --------------------------------------------------
+    .filter(func.year(models.TradePlan.plan_date) == year)
+
+    .filter(func.month(models.TradePlan.plan_date) == month)
+
+    # --------------------------------------------------
+    # GROUP BY BUSINESS DATE
+    # --------------------------------------------------
+    .group_by(models.TradePlan.plan_date)
+
+    .all()
     )
 
     summary = {}

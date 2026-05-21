@@ -1,3 +1,4 @@
+//TradeJournal/frontend/hooks/useTradeActions.ts
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
@@ -107,9 +108,14 @@ export function useTradeActions(tradingDate: string) {
 
   /* ---------------- DERIVED UI RULES ---------------- */
 
-  const executedPlans = plans.filter(
-    (p) => p.plan_status === "EXECUTED"
-  )
+   
+  const plannedTrades = plans.filter((p) =>!p.trade_state?.is_executed && p.plan_status === "PLANNED")
+
+  const activeTrades = plans.filter((p) =>p.trade_state?.is_executed &&!p.trade_state?.is_exited)
+
+  const pendingReviews = plans.filter((p) =>p.trade_state?.is_exited &&!p.trade_state?.is_reviewed)
+
+  const completedTrades = plans.filter((p) => p.trade_state?.is_reviewed)
 
   const canExecuteMoreTrades = true
 
@@ -118,7 +124,10 @@ export function useTradeActions(tradingDate: string) {
   return {
     plans,
 
-    executedPlans,
+    plannedTrades,
+    activeTrades,
+    pendingReviews,
+    completedTrades,
     canExecuteMoreTrades,
 
     loading,

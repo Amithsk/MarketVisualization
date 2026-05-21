@@ -55,3 +55,51 @@ class TradeReviewPayload(BaseModel):
     market_context: str
     learning_insight: str
     trade_grade: str
+
+# --------------------------------------------------
+# TRADE PLAN RESPONSE STATE
+# --------------------------------------------------
+
+class TradeState(BaseModel):
+    is_executed: bool
+    is_exited: bool
+    is_reviewed: bool
+
+
+# --------------------------------------------------
+# TRADE PLAN RESPONSE
+# --------------------------------------------------
+
+class TradePlanResponse(BaseModel):
+    id: int
+
+    trade_id: Optional[int]
+
+    symbol: str
+
+    plan_date: date
+    trade_mode: str
+    strategy: str
+    position_type: str
+
+    setup_description: str
+    entry_trigger: Optional[str]
+
+    planned_entry_price: Optional[float]
+    planned_stop_price: Optional[float]
+    planned_target_price: Optional[float]
+
+    planned_risk_amount: Optional[float]
+    planned_position_size: int
+
+    plan_status: str
+
+    not_taken_reason: Optional[str]
+
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    trade_state: TradeState
+
+    class Config:
+        from_attributes = True
