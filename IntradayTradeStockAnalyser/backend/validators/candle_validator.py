@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
 
-from models.candle_model import Candle
+from backend.models.candle_model import Candle
 
 
 class CandleValidator:

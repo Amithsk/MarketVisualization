@@ -6,7 +6,7 @@ import os
 import shutil
 import uuid
 
-from services.upload_service import UploadService
+from  backend.services.upload_service import UploadService
 
 
 router = APIRouter()

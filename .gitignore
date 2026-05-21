@@ -5,3 +5,13 @@ TradeJournal/backend/app/__pycache__
 TradeJournal/backend/app/routers/__pycache__
 Code/__pycache__
 Code/utils/__pycache__
+IntradayTradeStockAnalyser/backend/api/__pycache__
+IntradayTradeStockAnalyser/backend/services/__pycache__
+IntradayTradeStockAnalyser/backend/__pycache__
+IntradayTradeStockAnalyser/backend/utils/__pycache__
+IntradayTradeStockAnalyser/backend/repositories/__pycache__
+IntradayTradeStockAnalyser/backend/validators/__pycache__
+IntradayTradeStockAnalyser/backend/app/__pycache__
+IntradayTradeStockAnalyser/backend/models/__pycache__
+
+    

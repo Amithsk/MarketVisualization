@@ -2,7 +2,7 @@
 import pandas as pd
 from typing import List
 
-from models.candle_model import Candle
+from backend.models.candle_model import Candle
 
 
 class NormalizationService:

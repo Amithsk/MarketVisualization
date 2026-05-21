@@ -1,9 +1,9 @@
 import pandas as pd
 from typing import List
 
-from models.candle_model import Candle
-from services.normalization_service import NormalizationService
-from validators.candle_validator import CandleValidator
+from backend.models.candle_model import Candle
+from backend.services.normalization_service import NormalizationService
+from backend.validators.candle_validator import CandleValidator
 
 
 class UploadService:
