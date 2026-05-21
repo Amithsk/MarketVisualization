@@ -14,6 +14,9 @@ export default function TradePlanCard({ plan }: Props) {
       <div className="flex items-center justify-between">
         <span className="font-semibold text-sm">
           {plan.strategy}
+          <div className="text-xs text-gray-500">
+          {plan.symbol}
+        </div>
         </span>
 
         <span
