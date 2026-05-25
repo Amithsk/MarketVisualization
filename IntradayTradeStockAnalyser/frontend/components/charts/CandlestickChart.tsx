@@ -143,22 +143,21 @@ export default function CandlestickChart({
         // Format volume data
         // -----------------------------------
 
-        const formattedVolume =
-            candles.map((candle) => ({
+        const formattedVolume = candles.map(
+            (candle) => ({
 
-                time:
-                    candle.time
-                        .replace(" ", "T")
-                        .slice(0, 19),
+        time: Math.floor(
+            new Date(candle.time).getTime() / 1000
+        ) as UTCTimestamp,
 
-                value: candle.volume,
+        value: candle.volume,
 
-                color:
-                    candle.close >= candle.open
-                        ? "#22C55E"
-                        : "#EF4444",
-
-            }));
+        color:
+            candle.close >= candle.open
+                ? "#26a69a"
+                : "#ef5350",
+             })
+            );
 
         // -----------------------------------
         // Set chart data
