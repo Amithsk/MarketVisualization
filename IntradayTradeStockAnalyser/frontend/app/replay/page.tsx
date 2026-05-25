@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import SynchronizedCharts from
     "../../components/charts/SynchronizedCharts";
 
@@ -8,6 +10,9 @@ import TradeDateSelector from
 
 import StockSelector from
     "../../components/selectors/StockSelector";
+
+import UploadPanel from
+    "../../components/upload/UploadPanel";
 
 import { useReplayData }
     from "../../hooks/useReplayData";
@@ -56,6 +61,22 @@ export default function ReplayPage() {
         fetchReplayData
 
     } = useReplayData();
+
+    // -----------------------------------
+    // Upload Status
+    // -----------------------------------
+
+    const [uploadSuccess, setUploadSuccess] =
+        useState(false);
+
+    // -----------------------------------
+    // Upload Success
+    // -----------------------------------
+
+    const handleUploadSuccess = () => {
+
+        setUploadSuccess(true);
+    };
 
     // -----------------------------------
     // Load Replay
@@ -195,7 +216,8 @@ export default function ReplayPage() {
 
                     disabled={
                         !selectedDate ||
-                        !selectedStock
+                        !selectedStock ||
+                        !uploadSuccess
                     }
 
                     className="
@@ -216,6 +238,68 @@ export default function ReplayPage() {
                 </button>
 
             </div>
+
+            {/* -------------------------------- */}
+            {/* Upload Panel */}
+            {/* -------------------------------- */}
+
+            <div
+                className="
+                    mb-6
+                "
+            >
+
+                <UploadPanel
+
+                    selectedStock={
+                        selectedStock
+                    }
+
+                    disabled={
+                        !selectedDate ||
+                        !selectedStock
+                    }
+
+                    onUploadSuccess={
+                        handleUploadSuccess
+                    }
+
+                />
+
+            </div>
+
+            {/* -------------------------------- */}
+            {/* Upload Helper */}
+            {/* -------------------------------- */}
+
+            {
+
+                !uploadSuccess
+
+                &&
+
+                selectedDate
+
+                &&
+
+                selectedStock
+
+                && (
+
+                    <div
+                        className="
+                            mb-4
+                            text-yellow-400
+                            text-sm
+                        "
+                    >
+
+                        Upload stock candle CSV
+                        before loading replay.
+
+                    </div>
+                )
+            }
 
             {/* -------------------------------- */}
             {/* LOADING */}

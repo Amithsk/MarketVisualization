@@ -43,6 +43,12 @@ class ReplayService:
             ReplayStore
             .get_stock_candles()
         )
+        stock_candles = [
+
+        candle.to_dict()
+
+        for candle in stock_candles
+        ]
 
         return {
 
