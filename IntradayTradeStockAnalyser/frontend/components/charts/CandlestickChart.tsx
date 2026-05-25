@@ -1,3 +1,4 @@
+//IntradayTradeStockAnalyser/frontend/components/charts/CandlestickChart.tsx
 "use client";
 
 import {
@@ -19,6 +20,48 @@ type Props = {
     candles: Candle[];
     title: string;
 };
+
+// -----------------------------------
+// IST SAFE TIMESTAMP
+// -----------------------------------
+
+function createISTTimestamp(
+    dateTime: string
+): number {
+
+    const [
+        datePart,
+        timePart
+    ] = dateTime.split(" ");
+
+    const [
+        year,
+        month,
+        day
+    ] = datePart
+        .split("-")
+        .map(Number);
+
+    const [
+        hours,
+        minutes,
+        seconds
+    ] = timePart
+        .split(":")
+        .map(Number);
+
+    return Math.floor(
+
+        Date.UTC(
+            year,
+            month - 1,
+            day,
+            hours,
+            minutes,
+            seconds
+        ) / 1000
+    );
+}
 
 export default function CandlestickChart({
     candles,
@@ -75,8 +118,11 @@ export default function CandlestickChart({
                 },
 
                 timeScale: {
+
                     borderColor: "#374151",
+
                     timeVisible: true,
+
                     secondsVisible: false,
                 },
             }
@@ -124,40 +170,48 @@ export default function CandlestickChart({
         // Format candle data
         // -----------------------------------
 
-        const formattedCandles = candles.map((candle) => ({
-        time: Math.floor(
-            new Date(candle.time).getTime() / 1000
-        )as UTCTimestamp,
+        const formattedCandles = candles.map(
 
-        open: candle.open,
+            (candle) => ({
 
-        high: candle.high,
+                time:
+                    createISTTimestamp(
+                        candle.time
+                    ) as UTCTimestamp,
 
-        low: candle.low,
+                open: candle.open,
 
-        close: candle.close,
-       })
-     );
+                high: candle.high,
+
+                low: candle.low,
+
+                close: candle.close,
+            })
+        );
 
         // -----------------------------------
         // Format volume data
         // -----------------------------------
 
         const formattedVolume = candles.map(
+
             (candle) => ({
 
-        time: Math.floor(
-            new Date(candle.time).getTime() / 1000
-        ) as UTCTimestamp,
+                time:
+                    createISTTimestamp(
+                        candle.time
+                    ) as UTCTimestamp,
 
-        value: candle.volume,
+                value: candle.volume,
 
-        color:
-            candle.close >= candle.open
-                ? "#26a69a"
-                : "#ef5350",
-             })
-            );
+                color:
+                    candle.close >= candle.open
+
+                        ? "#26a69a"
+
+                        : "#ef5350",
+            })
+        );
 
         // -----------------------------------
         // Set chart data
@@ -172,7 +226,7 @@ export default function CandlestickChart({
         );
 
         // -----------------------------------
-        // Fit chart
+        // Fit content
         // -----------------------------------
 
         chart.timeScale().fitContent();
@@ -184,18 +238,16 @@ export default function CandlestickChart({
         const handleResize = () => {
 
             if (
-                chartContainerRef.current
+                !chartContainerRef.current
             ) {
-
-                chart.applyOptions({
-
-                    width:
-                        chartContainerRef.current
-                            .clientWidth
-
-                });
-
+                return;
             }
+
+            chart.applyOptions({
+                width:
+                    chartContainerRef.current
+                        .clientWidth,
+            });
         };
 
         window.addEventListener(
@@ -221,35 +273,37 @@ export default function CandlestickChart({
 
     return (
 
-        <div className="w-full">
+        <div
+            className="
+                w-full
+            "
+        >
 
-            {/* -------------------------- */}
-            {/* Chart title */}
-            {/* -------------------------- */}
+            {/* -------------------------------- */}
+            {/* Title */}
+            {/* -------------------------------- */}
 
             <div
                 className="
-                    mb-2
                     text-sm
                     font-semibold
+                    mb-2
                     text-gray-300
                 "
             >
+
                 {title}
+
             </div>
 
-            {/* -------------------------- */}
-            {/* Chart container */}
-            {/* -------------------------- */}
+            {/* -------------------------------- */}
+            {/* Chart */}
+            {/* -------------------------------- */}
 
             <div
                 ref={chartContainerRef}
                 className="
                     w-full
-                    rounded-lg
-                    border
-                    border-gray-800
-                    overflow-hidden
                 "
             />
 
