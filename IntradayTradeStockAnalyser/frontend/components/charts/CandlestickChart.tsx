@@ -11,7 +11,8 @@ import {
 
 import {
     useEffect,
-    useRef
+    useRef,
+    useState
 } from "react";
 
 import { Candle } from "../../types/candle";
@@ -70,6 +71,13 @@ export default function CandlestickChart({
 
     const chartContainerRef =
         useRef<HTMLDivElement | null>(null);
+
+    // -----------------------------------
+    // Hover State
+    // -----------------------------------
+
+    const [hoverData, setHoverData] =
+        useState<any>(null);
 
     useEffect(() => {
 
@@ -226,6 +234,74 @@ export default function CandlestickChart({
         );
 
         // -----------------------------------
+        // Crosshair Hover
+        // -----------------------------------
+
+        chart.subscribeCrosshairMove(
+
+            (param) => {
+
+                if (
+                    !param.point ||
+                    !param.time
+                ) {
+
+                    setHoverData(null);
+
+                    return;
+                }
+
+                const data =
+                    param.seriesData.get(
+                        candleSeries
+                    );
+
+                if (!data) {
+
+                    setHoverData(null);
+
+                    return;
+                }
+
+                const candleData: any =
+                    data;
+
+                const matchedCandle =
+                    candles.find(
+
+                        (candle) =>
+
+                            createISTTimestamp(
+                                candle.time
+                            ) === param.time
+                    );
+
+                setHoverData({
+
+                    time:
+                        matchedCandle?.time ||
+
+                        "",
+
+                    open:
+                        candleData.open,
+
+                    high:
+                        candleData.high,
+
+                    low:
+                        candleData.low,
+
+                    close:
+                        candleData.close,
+
+                    volume:
+                        matchedCandle?.volume || 0
+                });
+            }
+        );
+
+        // -----------------------------------
         // Fit content
         // -----------------------------------
 
@@ -295,6 +371,131 @@ export default function CandlestickChart({
                 {title}
 
             </div>
+
+            {/* -------------------------------- */}
+            {/* Hover OHLC */}
+            {/* -------------------------------- */}
+
+            {
+
+                hoverData && (
+
+                    <div
+                        className="
+                            mb-2
+                            text-xs
+                            text-gray-300
+                            flex
+                            gap-4
+                            flex-wrap
+                        "
+                    >
+
+                        <div>
+
+                            Time:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-white
+                                "
+                            >
+
+                                {hoverData.time}
+
+                            </span>
+
+                        </div>
+
+                        <div>
+
+                            O:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-green-400
+                                "
+                            >
+
+                                {hoverData.open}
+
+                            </span>
+
+                        </div>
+
+                        <div>
+
+                            H:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-green-400
+                                "
+                            >
+
+                                {hoverData.high}
+
+                            </span>
+
+                        </div>
+
+                        <div>
+
+                            L:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-red-400
+                                "
+                            >
+
+                                {hoverData.low}
+
+                            </span>
+
+                        </div>
+
+                        <div>
+
+                            C:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-white
+                                "
+                            >
+
+                                {hoverData.close}
+
+                            </span>
+
+                        </div>
+
+                        <div>
+
+                            Vol:
+
+                            <span
+                                className="
+                                    ml-1
+                                    text-cyan-400
+                                "
+                            >
+
+                                {hoverData.volume}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+                )
+            }
 
             {/* -------------------------------- */}
             {/* Chart */}
