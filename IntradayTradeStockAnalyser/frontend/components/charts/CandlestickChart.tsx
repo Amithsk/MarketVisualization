@@ -1,4 +1,5 @@
 //IntradayTradeStockAnalyser/frontend/components/charts/CandlestickChart.tsx
+//IntradayTradeStockAnalyser/frontend/components/charts/CandlestickChart.tsx
 "use client";
 
 import {
@@ -95,86 +96,68 @@ export default function CandlestickChart({
 
     const [hoverData, setHoverData] =
         useState<any>(null);
+
     // -----------------------------------
-// Synchronized Hover Effect
-// -----------------------------------
+    // Synchronized Hover Effect
+    // -----------------------------------
 
     useEffect(() => {
 
-    console.log(
-        "SYNC EFFECT:",
-        {
-            chart: title,
-            synchronizedTimestamp
+        if (
+            synchronizedTimestamp === null
+        ) {
+            return;
         }
-    );
 
-    if (
-        synchronizedTimestamp === null
-    ) {
-        return;
-    } 
+        const matchedCandle =
+            candles.find(
 
-    const matchedCandle =
-    candles.find(
+                (candle) => {
 
-        (candle) => {
+                    const convertedTimestamp =
+                        createISTTimestamp(
+                            candle.time
+                        );
 
-            const convertedTimestamp =
-                createISTTimestamp(
-                    candle.time
-                );
+                    return (
 
-            console.log(
-                "MATCH CHECK:",
-                {
-                    chart: title,
-                    candleTime:
-                        candle.time,
-                    convertedTimestamp,
-                    synchronizedTimestamp
+                        convertedTimestamp ===
+                        synchronizedTimestamp
+                    );
                 }
             );
 
-            return (
-
-                convertedTimestamp ===
-                synchronizedTimestamp
-            );
+        if (!matchedCandle) {
+            return;
         }
-    );
 
-    if (!matchedCandle) {
-        return;
-    }
+        setHoverData({
 
-    setHoverData({
+            time:
+                matchedCandle.time,
 
-        time:
-            matchedCandle.time,
+            open:
+                matchedCandle.open,
 
-        open:
-            matchedCandle.open,
+            high:
+                matchedCandle.high,
 
-        high:
-            matchedCandle.high,
+            low:
+                matchedCandle.low,
 
-        low:
-            matchedCandle.low,
+            close:
+                matchedCandle.close,
 
-        close:
-            matchedCandle.close,
+            volume:
+                matchedCandle.volume
+        });
 
-        volume:
-            matchedCandle.volume
-    });
+    }, [
 
-        }, [
+        synchronizedTimestamp,
 
-    synchronizedTimestamp,
-
-    candles
-    ]);    
+        candles
+    ]);
 
     useEffect(() => {
 
@@ -363,19 +346,10 @@ export default function CandlestickChart({
 
                 if (onCrosshairMove) {
 
-            console.log(
-                "EMIT CROSSHAIR:",
-                {
-                chart: title,
-                paramTime: param.time,
-                numericTime: Number(param.time)
+                    onCrosshairMove(
+                        Number(param.time)
+                    );
                 }
-                );
-
-                onCrosshairMove(
-                Number(param.time)
-                );
-             }
 
                 // -----------------------------------
                 // Get candle data
@@ -402,8 +376,6 @@ export default function CandlestickChart({
 
                 const matchedCandle =
                     candles.find(
-
-                        
 
                         (candle) =>
 
@@ -485,11 +457,14 @@ export default function CandlestickChart({
             chart.remove();
         };
 
-    }, [candles,
+    }, [
 
-    onCrosshairMove,
+        candles,
 
-    synchronizedTimestamp]);
+        onCrosshairMove,
+
+        synchronizedTimestamp
+    ]);
 
     return (
 

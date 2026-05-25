@@ -50,11 +50,6 @@ export default function SynchronizedCharts({
         timestamp: number | null
     ) => {
 
-        console.log(
-            "SYNC TIMESTAMP UPDATE:",
-            timestamp
-        );
-
         setSynchronizedTimestamp(
             timestamp
         );
