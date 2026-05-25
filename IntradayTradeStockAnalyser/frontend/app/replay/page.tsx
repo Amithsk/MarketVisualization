@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import {
+    useState,
+    useEffect
+} from "react";
 
 import SynchronizedCharts from
     "../../components/charts/SynchronizedCharts";
@@ -68,6 +71,17 @@ export default function ReplayPage() {
 
     const [uploadSuccess, setUploadSuccess] =
         useState(false);
+
+    // -----------------------------------
+    // Reset Upload State
+    // On Stock Change
+    // -----------------------------------
+
+    useEffect(() => {
+
+        setUploadSuccess(false);
+
+    }, [selectedStock]);
 
     // -----------------------------------
     // Upload Success
