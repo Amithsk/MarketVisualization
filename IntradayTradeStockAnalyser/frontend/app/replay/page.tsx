@@ -1,49 +1,72 @@
-//IntradayTradeStockAnalyser/frontend/app/replay/page.tsx
 "use client";
-
-import { useState } from "react";
 
 import SynchronizedCharts from
     "../../components/charts/SynchronizedCharts";
 
+import TradeDateSelector from
+    "../../components/selectors/TradeDateSelector";
+
+import StockSelector from
+    "../../components/selectors/StockSelector";
+
 import { useReplayData }
     from "../../hooks/useReplayData";
+
+import { useTradeSelection }
+    from "../../hooks/useTradeSelection";
 
 export default function ReplayPage() {
 
     // -----------------------------------
-    // Local state
+    // Trade Selection
     // -----------------------------------
 
-    const [tradeDate, setTradeDate] =
-        useState("");
+    const {
 
-    const [stock, setStock] =
-        useState("");
+        tradeDates,
+
+        selectedDate,
+
+        selectTradeDate,
+
+        stocks,
+
+        selectedStock,
+
+        setSelectedStock,
+
+        loading: tradeLoading,
+
+        error: tradeError
+
+    } = useTradeSelection();
 
     // -----------------------------------
-    // Replay hook
+    // Replay Hook
     // -----------------------------------
 
     const {
 
         replayData,
 
-        loading,
+        loading: replayLoading,
 
-        error,
+        error: replayError,
 
         fetchReplayData
 
     } = useReplayData();
 
     // -----------------------------------
-    // Load replay
+    // Load Replay
     // -----------------------------------
 
     const handleLoadReplay = async () => {
 
-        if (!tradeDate || !stock) {
+        if (
+            !selectedDate ||
+            !selectedStock
+        ) {
 
             alert(
                 "Select trade date and stock"
@@ -54,9 +77,11 @@ export default function ReplayPage() {
 
         await fetchReplayData({
 
-            tradeDate,
+            tradeDate:
+                selectedDate,
 
-            stock
+            stock:
+                selectedStock
         });
     };
 
@@ -106,105 +131,78 @@ export default function ReplayPage() {
                 "
             >
 
-                {/* Trade Date */}
+                {/* -------------------------------- */}
+                {/* Trade Date Selector */}
+                {/* -------------------------------- */}
 
-                <div
-                    className="
-                        flex
-                        flex-col
-                    "
-                >
+                <TradeDateSelector
 
-                    <label
-                        className="
-                            text-sm
-                            mb-1
-                            text-gray-400
-                        "
-                    >
-                        Trade Date
-                    </label>
+                    tradeDates={
+                        tradeDates
+                    }
 
-                    <input
-                        type="text"
+                    selectedDate={
+                        selectedDate
+                    }
 
-                        value={tradeDate}
+                    onSelectDate={
+                        selectTradeDate
+                    }
 
-                        onChange={(e) =>
-                            setTradeDate(
-                                e.target.value
-                            )
-                        }
+                    loading={
+                        tradeLoading
+                    }
 
-                        placeholder="2026-05-18"
+                />
 
-                        className="
-                            bg-gray-900
-                            border
-                            border-gray-700
-                            rounded-md
-                            px-3
-                            py-2
-                            text-sm
-                        "
-                    />
+                {/* -------------------------------- */}
+                {/* Stock Selector */}
+                {/* -------------------------------- */}
 
-                </div>
+                <StockSelector
 
-                {/* Stock */}
+                    stocks={
+                        stocks
+                    }
 
-                <div
-                    className="
-                        flex
-                        flex-col
-                    "
-                >
+                    selectedStock={
+                        selectedStock
+                    }
 
-                    <label
-                        className="
-                            text-sm
-                            mb-1
-                            text-gray-400
-                        "
-                    >
-                        Stock
-                    </label>
+                    onSelectStock={
+                        setSelectedStock
+                    }
 
-                    <input
-                        type="text"
+                    disabled={
+                        !selectedDate
+                    }
 
-                        value={stock}
+                    loading={
+                        tradeLoading
+                    }
 
-                        onChange={(e) =>
-                            setStock(
-                                e.target.value
-                            )
-                        }
+                />
 
-                        placeholder="POLYCAB"
-
-                        className="
-                            bg-gray-900
-                            border
-                            border-gray-700
-                            rounded-md
-                            px-3
-                            py-2
-                            text-sm
-                        "
-                    />
-
-                </div>
-
+                {/* -------------------------------- */}
                 {/* Load Replay */}
+                {/* -------------------------------- */}
 
                 <button
 
-                    onClick={handleLoadReplay}
+                    onClick={
+                        handleLoadReplay
+                    }
+
+                    disabled={
+                        !selectedDate ||
+                        !selectedStock
+                    }
 
                     className="
                         bg-blue-600
                         hover:bg-blue-700
+                        disabled:bg-gray-700
+                        disabled:cursor-not-allowed
                         px-4
                         py-2
                         rounded-md
@@ -225,7 +223,9 @@ export default function ReplayPage() {
 
             {
 
-                loading && (
+                (tradeLoading || replayLoading)
+
+                && (
 
                     <div
                         className="
@@ -234,7 +234,7 @@ export default function ReplayPage() {
                         "
                     >
 
-                        Loading replay...
+                        Loading...
 
                     </div>
                 )
@@ -246,7 +246,9 @@ export default function ReplayPage() {
 
             {
 
-                error && (
+                (tradeError || replayError)
+
+                && (
 
                     <div
                         className="
@@ -255,7 +257,11 @@ export default function ReplayPage() {
                         "
                     >
 
-                        {error}
+                        {
+
+                            tradeError ||
+                            replayError
+                        }
 
                     </div>
                 )
@@ -281,7 +287,9 @@ export default function ReplayPage() {
                                 .stock_candles
                         }
 
-                        stockName={stock}
+                        stockName={
+                            selectedStock
+                        }
 
                     />
                 )
