@@ -18,8 +18,18 @@ import {
 import { Candle } from "../../types/candle";
 
 type Props = {
+
     candles: Candle[];
+
     title: string;
+
+    onCrosshairMove?: (
+        timestamp: number | null
+    ) => void;
+
+    synchronizedTimestamp?: (
+        number | null
+    );
 };
 
 // -----------------------------------
@@ -65,8 +75,15 @@ function createISTTimestamp(
 }
 
 export default function CandlestickChart({
+
     candles,
-    title
+
+    title,
+
+    onCrosshairMove,
+
+    synchronizedTimestamp
+
 }: Props) {
 
     const chartContainerRef =
@@ -78,6 +95,86 @@ export default function CandlestickChart({
 
     const [hoverData, setHoverData] =
         useState<any>(null);
+    // -----------------------------------
+// Synchronized Hover Effect
+// -----------------------------------
+
+    useEffect(() => {
+
+    console.log(
+        "SYNC EFFECT:",
+        {
+            chart: title,
+            synchronizedTimestamp
+        }
+    );
+
+    if (
+        synchronizedTimestamp === null
+    ) {
+        return;
+    } 
+
+    const matchedCandle =
+    candles.find(
+
+        (candle) => {
+
+            const convertedTimestamp =
+                createISTTimestamp(
+                    candle.time
+                );
+
+            console.log(
+                "MATCH CHECK:",
+                {
+                    chart: title,
+                    candleTime:
+                        candle.time,
+                    convertedTimestamp,
+                    synchronizedTimestamp
+                }
+            );
+
+            return (
+
+                convertedTimestamp ===
+                synchronizedTimestamp
+            );
+        }
+    );
+
+    if (!matchedCandle) {
+        return;
+    }
+
+    setHoverData({
+
+        time:
+            matchedCandle.time,
+
+        open:
+            matchedCandle.open,
+
+        high:
+            matchedCandle.high,
+
+        low:
+            matchedCandle.low,
+
+        close:
+            matchedCandle.close,
+
+        volume:
+            matchedCandle.volume
+    });
+
+        }, [
+
+    synchronizedTimestamp,
+
+    candles
+    ]);    
 
     useEffect(() => {
 
@@ -241,15 +338,48 @@ export default function CandlestickChart({
 
             (param) => {
 
+                // -----------------------------------
+                // Invalid hover state
+                // -----------------------------------
+
                 if (
                     !param.point ||
                     !param.time
                 ) {
 
+                    if (onCrosshairMove) {
+
+                        onCrosshairMove(null);
+                    }
+
                     setHoverData(null);
 
                     return;
                 }
+
+                // -----------------------------------
+                // Emit timestamp
+                // -----------------------------------
+
+                if (onCrosshairMove) {
+
+            console.log(
+                "EMIT CROSSHAIR:",
+                {
+                chart: title,
+                paramTime: param.time,
+                numericTime: Number(param.time)
+                }
+                );
+
+                onCrosshairMove(
+                Number(param.time)
+                );
+             }
+
+                // -----------------------------------
+                // Get candle data
+                // -----------------------------------
 
                 const data =
                     param.seriesData.get(
@@ -266,8 +396,14 @@ export default function CandlestickChart({
                 const candleData: any =
                     data;
 
+                // -----------------------------------
+                // Match candle
+                // -----------------------------------
+
                 const matchedCandle =
                     candles.find(
+
+                        
 
                         (candle) =>
 
@@ -275,6 +411,10 @@ export default function CandlestickChart({
                                 candle.time
                             ) === param.time
                     );
+
+                // -----------------------------------
+                // Update hover
+                // -----------------------------------
 
                 setHoverData({
 
@@ -345,7 +485,11 @@ export default function CandlestickChart({
             chart.remove();
         };
 
-    }, [candles]);
+    }, [candles,
+
+    onCrosshairMove,
+
+    synchronizedTimestamp]);
 
     return (
 

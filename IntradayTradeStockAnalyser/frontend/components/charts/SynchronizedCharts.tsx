@@ -1,8 +1,13 @@
+//IntradayTradeStockAnalyser/frontend/components/charts/SynchronizedCharts.tsx
 "use client";
 
-import CandlestickChart from "./CandlestickChart";
+import { useState } from "react";
 
-import { Candle } from "../../types/candle";
+import CandlestickChart from
+    "./CandlestickChart";
+
+import { Candle }
+    from "../../types/candle";
 
 type Props = {
 
@@ -23,6 +28,38 @@ export default function SynchronizedCharts({
 
 }: Props) {
 
+    // -----------------------------------
+    // Shared Crosshair Timestamp
+    // -----------------------------------
+
+    const [
+
+        synchronizedTimestamp,
+
+        setSynchronizedTimestamp
+
+    ] = useState<number | null>(
+        null
+    );
+
+    // -----------------------------------
+    // Crosshair Handler
+    // -----------------------------------
+
+    const handleCrosshairMove = (
+        timestamp: number | null
+    ) => {
+
+        console.log(
+            "SYNC TIMESTAMP UPDATE:",
+            timestamp
+        );
+
+        setSynchronizedTimestamp(
+            timestamp
+        );
+    };
+
     return (
 
         <div
@@ -39,8 +76,21 @@ export default function SynchronizedCharts({
             {/* -------------------------------- */}
 
             <CandlestickChart
-                candles={niftyCandles}
+
+                candles={
+                    niftyCandles
+                }
+
                 title="NIFTY 50"
+
+                onCrosshairMove={
+                    handleCrosshairMove
+                }
+
+                synchronizedTimestamp={
+                    synchronizedTimestamp
+                }
+
             />
 
             {/* -------------------------------- */}
@@ -48,8 +98,23 @@ export default function SynchronizedCharts({
             {/* -------------------------------- */}
 
             <CandlestickChart
-                candles={stockCandles}
-                title={stockName}
+
+                candles={
+                    stockCandles
+                }
+
+                title={
+                    stockName
+                }
+
+                onCrosshairMove={
+                    handleCrosshairMove
+                }
+
+                synchronizedTimestamp={
+                    synchronizedTimestamp
+                }
+
             />
 
         </div>
