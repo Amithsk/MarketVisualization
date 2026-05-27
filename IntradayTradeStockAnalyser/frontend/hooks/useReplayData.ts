@@ -1,9 +1,16 @@
 //IntradayTradeStockAnalyser/frontend/hooks/useReplayData.ts
+
 "use client";
 
 import { useState } from "react";
 
-import { ReplayData } from "../types/replay";
+import {
+    ReplayData
+} from "../types/replay";
+
+import {
+    fetchReplayData as fetchReplayApiData
+} from "../services/replayApi";
 
 type ReplayParams = {
 
@@ -38,41 +45,22 @@ export function useReplayData() {
 
             setError(null);
 
-            console.log(
-                "Fetching replay data..."
-            );
-
-            const response = await fetch(
-
-                `http://127.0.0.1:8000/api/v1/replay?trade_date=${tradeDate}&stock=${stock}`
-
-            );
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "Failed to fetch replay data"
+            const replayPayload =
+                await fetchReplayApiData(
+                    tradeDate,
+                    stock
                 );
-            }
-
-            const result =
-                await response.json();
-
-            console.log(
-                "Replay payload:",
-                result
-            );
 
             setReplayData(
-                result.replay_data
+                replayPayload
             );
 
         } catch (err: any) {
 
-            console.error(err);
-
             setError(
+
                 err.message ||
+
                 "Replay fetch failed"
             );
 

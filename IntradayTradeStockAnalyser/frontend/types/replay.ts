@@ -1,4 +1,5 @@
 //IntradayTradeStockAnalyser/frontend/types/replay.ts
+
 import { Candle } from "./candle";
 
 export type ReplayTradeData = {
@@ -20,6 +21,141 @@ export type ReplayTradeData = {
     plan_status: string;
 };
 
+export type MarketContext = {
+
+    preopen_price: number | null;
+
+    gap_pct: number | null;
+
+    gap_class: string | null;
+
+    prior_range_size: string | null;
+
+    prior_day_overlap: string | null;
+
+    prior_structure_state: string | null;
+
+    final_market_context: string | null;
+
+    final_reason: string | null;
+};
+
+export type MarketBehavior = {
+
+    index_open_behavior: string | null;
+
+    early_volatility: string | null;
+
+    market_participation: string | null;
+
+    trade_allowed: boolean | null;
+};
+
+export type MarketOpenBehavior = {
+
+    ir_high: number | null;
+
+    ir_low: number | null;
+
+    ir_range: number | null;
+
+    ir_ratio: number | null;
+
+    volatility_state: string | null;
+
+    vwap_cross_count: number | null;
+
+    vwap_state: string | null;
+
+    range_hold_status: string | null;
+
+    trade_permission: string | null;
+
+    reason: string | null;
+};
+
+export type ExecutionControl = {
+
+    market_context: string | null;
+
+    trade_permission: string | null;
+
+    allowed_strategies: string[];
+
+    max_trades_allowed: number | null;
+
+    execution_allowed: boolean | null;
+};
+
+export type StockSelectionContext = {
+
+    direction: string | null;
+
+    strategy_used: string | null;
+
+    rs_value: number | null;
+
+    gap_high: number | null;
+
+    gap_low: number | null;
+
+    intraday_high: number | null;
+
+    intraday_low: number | null;
+
+    last_higher_low: number | null;
+
+    yesterday_close: number | null;
+
+    vwap_value: number | null;
+
+    structure_valid: boolean | null;
+
+    reason: string | null;
+
+    tradable: boolean | null;
+
+    rejection_tag: string | null;
+};
+
+export type TradeConstruction = {
+
+    strategy_used: string | null;
+
+    direction: string | null;
+
+    structure_valid: boolean | null;
+
+    entry_price: number | null;
+
+    stop_loss: number | null;
+
+    risk_per_share: number | null;
+
+    quantity: number | null;
+
+    target_price: number | null;
+
+    trade_status: string | null;
+
+    block_reason: string | null;
+};
+
+export type NarrativeContext = {
+
+    market_summary: string | null;
+
+    strategy_summary: string | null;
+
+    execution_summary: string | null;
+
+    relative_strength_summary: string | null;
+
+    trade_construction_summary: string | null;
+
+    learning_insight: string | null;
+};
+
 export type ReplayData = {
 
     trade_data: ReplayTradeData;
@@ -27,4 +163,18 @@ export type ReplayData = {
     stock_candles: Candle[];
 
     nifty_candles: Candle[];
+
+    market_context: MarketContext;
+
+    market_behavior: MarketBehavior;
+
+    market_open_behavior: MarketOpenBehavior;
+
+    execution_control: ExecutionControl;
+
+    stock_selection_context: StockSelectionContext;
+
+    trade_construction: TradeConstruction;
+
+    narrative_context: NarrativeContext;
 };
