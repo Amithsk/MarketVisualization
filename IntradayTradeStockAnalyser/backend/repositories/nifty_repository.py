@@ -1,4 +1,7 @@
-#IntradayTradeStockAnalyser/backend/repositories/nifty_repository.py
+# IntradayTradeStockAnalyser/backend/repositories/nifty_repository.py
+
+from types import SimpleNamespace
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -43,23 +46,25 @@ class NiftyRepository:
 
         for row in rows:
 
-            candles.append({
+            candle = SimpleNamespace(
 
-                "time": row[0].strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
+                time=row[0],
 
-                "open": row[1],
+                open=float(row[1]),
 
-                "high": row[2],
+                high=float(row[2]),
 
-                "low": row[3],
+                low=float(row[3]),
 
-                "close": row[4],
+                close=float(row[4]),
 
-                # NIFTY volume unavailable currently
-                "volume": 0
+                # NIFTY volume unavailable
+                volume=0,
 
-            })
+                # Placeholder VWAP
+                vwap=0
+            )
+
+            candles.append(candle)
 
         return candles
