@@ -1,3 +1,5 @@
+//IntradayTradeStockAnalyser/frontend/app/replay/page.tsx
+
 "use client";
 
 import {
@@ -22,6 +24,21 @@ import { useReplayData }
 
 import { useTradeSelection }
     from "../../hooks/useTradeSelection";
+
+import MarketBiasCard from
+    "../../components/replay/MarketBiasCard";
+
+import TradePermissionBanner from
+    "../../components/replay/TradePermissionBanner";
+
+import RelativeStrengthBadge from
+    "../../components/replay/RelativeStrengthBadge";
+
+import StrategyContextPanel from
+    "../../components/replay/StrategyContextPanel";
+
+import LearningInsightPanel from
+    "../../components/replay/LearningInsightPanel";
 
 export default function ReplayPage() {
 
@@ -147,7 +164,9 @@ export default function ReplayPage() {
                         font-bold
                     "
                 >
+
                     Replay System
+
                 </h1>
 
             </div>
@@ -288,17 +307,11 @@ export default function ReplayPage() {
 
             {
 
-                !uploadSuccess
+                !uploadSuccess &&
 
-                &&
+                selectedDate &&
 
-                selectedDate
-
-                &&
-
-                selectedStock
-
-                && (
+                selectedStock && (
 
                     <div
                         className="
@@ -321,9 +334,7 @@ export default function ReplayPage() {
 
             {
 
-                (tradeLoading || replayLoading)
-
-                && (
+                (tradeLoading || replayLoading) && (
 
                     <div
                         className="
@@ -344,9 +355,7 @@ export default function ReplayPage() {
 
             {
 
-                (tradeError || replayError)
-
-                && (
+                (tradeError || replayError) && (
 
                     <div
                         className="
@@ -362,6 +371,147 @@ export default function ReplayPage() {
                         }
 
                     </div>
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* MARKET CONTEXT */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <MarketBiasCard
+
+                        marketContext={
+                            replayData
+                                .market_context
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* TRADE PERMISSION */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <TradePermissionBanner
+
+                        tradePermission={
+                            replayData
+                                .execution_control
+                                .trade_permission
+                        }
+
+                        executionAllowed={
+                            replayData
+                                .execution_control
+                                .execution_allowed
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* RELATIVE STRENGTH */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <RelativeStrengthBadge
+
+                        rsValue={
+                            replayData
+                                .stock_selection_context
+                                .rs_value
+                        }
+
+                        tradable={
+                            replayData
+                                .stock_selection_context
+                                .tradable
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* STRATEGY CONTEXT */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <StrategyContextPanel
+
+                        strategyUsed={
+                            replayData
+                                .stock_selection_context
+                                .strategy_used
+                        }
+
+                        structureValid={
+                            replayData
+                                .stock_selection_context
+                                .structure_valid
+                        }
+
+                        reason={
+                            replayData
+                                .stock_selection_context
+                                .reason
+                        }
+
+                        strategySummary={
+                            replayData
+                                .narrative_context
+                                .strategy_summary
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* LEARNING INSIGHT */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <LearningInsightPanel
+
+                        learningInsight={
+                            replayData
+                                .narrative_context
+                                .learning_insight
+                        }
+
+                        executionSummary={
+                            replayData
+                                .narrative_context
+                                .execution_summary
+                        }
+
+                        tradeConstructionSummary={
+                            replayData
+                                .narrative_context
+                                .trade_construction_summary
+                        }
+
+                    />
                 )
             }
 
