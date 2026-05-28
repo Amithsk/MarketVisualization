@@ -12,7 +12,10 @@ IntradayTradeStockAnalyser/backend/utils/__pycache__
 IntradayTradeStockAnalyser/backend/repositories/__pycache__
 IntradayTradeStockAnalyser/backend/validators/__pycache__
 IntradayTradeStockAnalyser/backend/app/__pycache__
+IntradayTradeStockAnalyser/backend/services/event_detection/__pycache__
 IntradayTradeStockAnalyser/backend/models/__pycache__
+IntradayTradeStockAnalyser/backend/constants/__pycache__
 IntradayTradeStockAnalyser/frontend/.next
+
 
     
