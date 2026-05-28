@@ -2,19 +2,19 @@
 
 from sqlalchemy.orm import Session
 
-from repositories.event_repository import (
+from backend.repositories.event_repository import (
     EventRepository,
 )
 
-from repositories.nifty_repository import (
+from backend.repositories.nifty_repository import (
     NiftyRepository,
 )
 
-from services.event_detection.market_event_engine import (
+from backend.services.event_detection.market_event_engine import (
     generate_market_events,
 )
 
-from utils.replay_store import (
+from backend.utils.replay_store import (
     ReplayStore,
 )
 
@@ -71,6 +71,7 @@ class MarketEventService:
 
         EventRepository.save_market_events(
             db=db,
+            trade_date=trade_date,
             events=market_events,
         )
 

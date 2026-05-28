@@ -2,8 +2,8 @@
 
 from typing import List
 
-from constants.event_types import EventType
-from models.market_event import (
+from backend.constants.event_types import EventType
+from backend.models.market_event import (
     EventValidation,
     MarketEvent,
     NiftyContext,

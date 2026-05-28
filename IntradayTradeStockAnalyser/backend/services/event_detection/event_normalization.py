@@ -2,7 +2,7 @@
 
 from typing import List
 
-from models.market_event import MarketEvent
+from backend.models.market_event import MarketEvent
 
 
 DEFAULT_EXPLANATION = (

@@ -2,8 +2,8 @@
 
 from typing import List
 
-from constants.event_types import EventType
-from models.market_event import (
+from backend.constants.event_types import EventType
+from backend.models.market_event import (
     EventValidation,
     MarketEvent,
     NiftyContext,
@@ -27,12 +27,12 @@ def detect_breakout_events(
     detected_events: List[MarketEvent] = []
 
     volume_event_timestamps = {
-        event.time
+        event.timestamp
         for event in volume_events
     }
 
     relative_strength_timestamps = {
-        event.time
+        event.timestamp
         for event in relative_strength_events
         if (
             event.event_type

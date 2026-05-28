@@ -18,6 +18,18 @@ from backend.services.replay_narrative_service import (
     ReplayNarrativeService
 )
 
+from backend.utils.debug_logger import (
+    log_count,
+    log_info,
+    log_object,
+    log_step,
+    log_error,
+)
+
+from backend.services.market_event_service import (
+    MarketEventService
+)
+
 
 class ReplayService:
 
@@ -28,117 +40,363 @@ class ReplayService:
         stock: str
     ):
 
-        trade_data = (
-            ReplayRepository
-            .get_trade_metadata(
-                db,
-                trade_date,
+        try:
+
+            log_step(
+                "FETCHING REPLAY DATA"
+            )
+
+            log_info(
+                "Trade Date",
+                trade_date
+            )
+
+            log_info(
+                "Stock",
                 stock
             )
-        )
 
-        nifty_candles = (
-            NiftyService
-            .get_nifty_candles(
-                db,
-                trade_date
+            trade_data = (
+                ReplayRepository
+                .get_trade_metadata(
+                    db,
+                    trade_date,
+                    stock
+                )
             )
-        )
 
-        stock_candles = (
-            ReplayStore
-            .get_stock_candles()
-        )
-
-        stock_candles = [
-
-            candle.to_dict()
-
-            for candle in stock_candles
-        ]
-
-        market_context = (
-            ReplayRepository
-            .get_market_context(
-                db,
-                trade_date
+            log_object(
+                "Trade Metadata",
+                trade_data
             )
-        )
 
-        market_behavior = (
-            ReplayRepository
-            .get_market_behavior(
-                db,
-                trade_date
+            nifty_candles = (
+                NiftyService
+                .get_nifty_candles(
+                    db,
+                    trade_date
+                )
             )
-        )
 
-        market_open_behavior = (
-            ReplayRepository
-            .get_market_open_behavior(
-                db,
-                trade_date
+            log_count(
+                "NIFTY Candles",
+                nifty_candles
             )
-        )
 
-        execution_control = (
-            ReplayRepository
-            .get_execution_control(
-                db,
-                trade_date
+            if nifty_candles:
+
+                log_object(
+                    "First NIFTY Candle",
+                    vars(nifty_candles[0])
+                )
+
+            stock_candles = (
+                ReplayStore
+                .get_stock_candles()
             )
-        )
 
-        stock_selection_context = (
-            ReplayRepository
-            .get_stock_selection_context(
-                db,
-                trade_date,
-                stock
+            log_count(
+                "ReplayStore Stock Candles",
+                stock_candles
             )
-        )
 
-        trade_construction = (
-            ReplayRepository
-            .get_trade_construction(
-                db,
-                trade_date,
-                stock
+            if stock_candles:
+
+                log_object(
+                    "First ReplayStore Candle",
+                    vars(stock_candles[0])
+                )
+
+            stock_candles = [
+
+                candle.to_dict()
+
+                for candle in stock_candles
+            ]
+
+            log_count(
+                "Serialized Stock Candles",
+                stock_candles
             )
-        )
 
-        narrative_context = (
-            ReplayNarrativeService
-            .build_replay_narrative(
-                market_context=market_context,
-                market_behavior=market_behavior,
-                market_open_behavior=market_open_behavior,
-                execution_control=execution_control,
-                stock_selection_context=stock_selection_context,
-                trade_construction=trade_construction
+            if stock_candles:
+
+                log_object(
+                    "First Serialized Stock Candle",
+                    stock_candles[0]
+                )
+
+            # =========================================
+            # MARKET EVENT GENERATION
+            # =========================================
+
+            log_step(
+                "GENERATING MARKET EVENTS"
             )
-        )
 
-        return {
+            market_events = (
+                MarketEventService
+                .generate_and_store_market_events(
+                    db=db,
+                    symbol=stock,
+                    trade_date=trade_date,
+                )
+            )
 
-            "trade_data": trade_data,
+            log_count(
+                "Generated Market Events",
+                market_events
+            )
 
-            "stock_candles": stock_candles,
+            if market_events:
 
-            "nifty_candles": nifty_candles,
+                log_object(
+                    "First Market Event",
+                    vars(market_events[0])
+                )
 
-            "market_context": market_context,
+            serialized_market_events = [
 
-            "market_behavior": market_behavior,
+                {
 
-            "market_open_behavior": market_open_behavior,
+                    "id": event.id,
 
-            "execution_control": execution_control,
+                    "stock_symbol": event.symbol,
 
-            "stock_selection_context": stock_selection_context,
+                    "event_type": (
+                        event.event_type.value
+                    ),
 
-            "trade_construction": trade_construction,
+                    "time": str(
+                        event.timestamp
+                    ),
 
-            "narrative_context": narrative_context
+                    "candle_index": (
+                        event.candle_index
+                    ),
 
-        }
+                    "price": event.price,
+
+                    "strength_score": (
+                        event.strength_score
+                    ),
+
+                    "explanation": (
+                        event.explanation
+                    ),
+
+                    "trading_implication": (
+                        event.trading_implication
+                    ),
+
+                    "event_metadata": (
+                        event.event_metadata
+                    ),
+
+                    "validation": vars(
+                        event.validation
+                    ),
+
+                    "nifty_context": vars(
+                        event.nifty_context
+                    ),
+                }
+
+                for event in market_events
+            ]
+
+            log_count(
+                "Serialized Market Events",
+                serialized_market_events
+            )
+
+            if serialized_market_events:
+
+                log_object(
+                    "First Serialized Market Event",
+                    serialized_market_events[0]
+                )
+
+            # =========================================
+            # MARKET CONTEXT
+            # =========================================
+
+            market_context = (
+                ReplayRepository
+                .get_market_context(
+                    db,
+                    trade_date
+                )
+            )
+
+            log_object(
+                "Market Context",
+                market_context
+            )
+
+            market_behavior = (
+                ReplayRepository
+                .get_market_behavior(
+                    db,
+                    trade_date
+                )
+            )
+
+            log_object(
+                "Market Behavior",
+                market_behavior
+            )
+
+            market_open_behavior = (
+                ReplayRepository
+                .get_market_open_behavior(
+                    db,
+                    trade_date
+                )
+            )
+
+            log_object(
+                "Market Open Behavior",
+                market_open_behavior
+            )
+
+            execution_control = (
+                ReplayRepository
+                .get_execution_control(
+                    db,
+                    trade_date
+                )
+            )
+
+            log_object(
+                "Execution Control",
+                execution_control
+            )
+
+            stock_selection_context = (
+                ReplayRepository
+                .get_stock_selection_context(
+                    db,
+                    trade_date,
+                    stock
+                )
+            )
+
+            log_object(
+                "Stock Selection Context",
+                stock_selection_context
+            )
+
+            trade_construction = (
+                ReplayRepository
+                .get_trade_construction(
+                    db,
+                    trade_date,
+                    stock
+                )
+            )
+
+            log_object(
+                "Trade Construction",
+                trade_construction
+            )
+
+            narrative_context = (
+                ReplayNarrativeService
+                .build_replay_narrative(
+                    market_context=market_context,
+                    market_behavior=market_behavior,
+                    market_open_behavior=market_open_behavior,
+                    execution_control=execution_control,
+                    stock_selection_context=stock_selection_context,
+                    trade_construction=trade_construction
+                )
+            )
+
+            log_object(
+                "Narrative Context",
+                narrative_context
+            )
+
+            replay_payload = {
+
+                "trade_data": trade_data,
+
+                "stock_candles": stock_candles,
+
+                "nifty_candles": [
+
+                    {
+                        **vars(candle),
+
+                        "time": (
+                            candle.time.strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                            if candle.time
+                            else None
+                        )
+                    }
+
+                    for candle in nifty_candles
+                ],
+
+                # =====================================
+                # MARKET EVENTS
+                # =====================================
+
+                "market_events": (
+                    serialized_market_events
+                ),
+
+                "market_context": market_context,
+
+                "market_behavior": market_behavior,
+
+                "market_open_behavior": market_open_behavior,
+
+                "execution_control": execution_control,
+
+                "stock_selection_context": stock_selection_context,
+
+                "trade_construction": trade_construction,
+
+                "narrative_context": narrative_context
+
+            }
+
+            log_step(
+                "REPLAY PAYLOAD GENERATED"
+            )
+
+            log_info(
+                "Replay Payload Keys",
+                list(replay_payload.keys())
+            )
+
+            log_count(
+                "Replay Payload Stock Candles",
+                replay_payload["stock_candles"]
+            )
+
+            log_count(
+                "Replay Payload NIFTY Candles",
+                replay_payload["nifty_candles"]
+            )
+
+            log_count(
+                "Replay Payload Market Events",
+                replay_payload["market_events"]
+            )
+
+            return replay_payload
+
+        except Exception as error:
+
+            log_step(
+                "REPLAY API FAILED"
+            )
+
+            log_error(error)
+
+            raise

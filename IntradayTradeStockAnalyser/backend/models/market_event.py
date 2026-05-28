@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from constants.event_types import EventType
+from backend.constants.event_types import EventType
 
 
 @dataclass

@@ -2,8 +2,8 @@
 
 from typing import List
 
-from constants.event_types import EventType
-from models.market_event import MarketEvent
+from backend.constants.event_types import EventType
+from backend.models.market_event import MarketEvent
 
 
 MIN_EVENT_STRENGTH_SCORE = 60

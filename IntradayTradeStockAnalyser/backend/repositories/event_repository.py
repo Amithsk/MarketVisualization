@@ -6,7 +6,17 @@ from typing import List
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from models.market_event import MarketEvent
+from backend.models.market_event import MarketEvent
+
+from backend.utils.debug_logger import (
+    log_count,
+    log_error,
+    log_info,
+    log_object,
+    log_step,
+)
+
+
 
 
 class EventRepository:
@@ -14,119 +24,186 @@ class EventRepository:
     @staticmethod
     def save_market_events(
         db: Session,
+        trade_date: str,
         events: List[MarketEvent],
     ) -> None:
 
-        if not events:
-            return
+        try:
 
-        query = text("""
-
-            INSERT INTO
-            stocktradesanalysis_detected_events (
-
-                event_id,
-                symbol,
-                event_type,
-                candle_time,
-                candle_index,
-                price,
-                strength_score,
-
-                nifty_direction,
-                relative_strength_score,
-
-                above_vwap,
-                volume_expansion,
-                orb_valid,
-
-                explanation,
-                trading_implication,
-
-                event_metadata
-
-            )
-            VALUES (
-
-                :event_id,
-                :symbol,
-                :event_type,
-                :candle_time,
-                :candle_index,
-                :price,
-                :strength_score,
-
-                :nifty_direction,
-                :relative_strength_score,
-
-                :above_vwap,
-                :volume_expansion,
-                :orb_valid,
-
-                :explanation,
-                :trading_implication,
-
-                :event_metadata
-
+            log_step(
+                "SAVING MARKET EVENTS"
             )
 
-        """)
+            log_count(
+                "Events To Save",
+                events,
+            )
 
-        values = []
+            if not events:
 
-        for event in events:
+                log_info(
+                    "Save Status",
+                    "No events available to save"
+                )
 
-            values.append({
+                return
 
-                "event_id": event.id,
+            query = text("""
 
-                "symbol": event.symbol,
+                INSERT INTO
+                stocktradeanalysis_detected_events(
 
-                "event_type": event.event_type.value,
+                    event_id,
+                    trade_date,
+                    stock_symbol,
+                    event_type,
+                    candle_time,
+                    candle_index,
+                    price,
+                    strength_score,
 
-                "candle_time": event.timestamp,
+                    nifty_direction,
+                    relative_strength_score,
 
-                "candle_index": event.candle_index,
+                    above_vwap,
+                    volume_expansion,
+                    orb_valid,
 
-                "price": event.price,
+                    explanation,
+                    trading_implication,
 
-                "strength_score": event.strength_score,
+                    event_metadata
 
-                "nifty_direction": (
-                    event.nifty_context.direction
-                ),
+                )
+                VALUES (
 
-                "relative_strength_score": (
-                    event.nifty_context
-                    .relative_strength_score
-                ),
+                    :event_id,
+                    :trade_date,
+                    :stock_symbol,
+                    :event_type,
+                    :candle_time,
+                    :candle_index,
+                    :price,
+                    :strength_score,
 
-                "above_vwap": (
-                    event.validation.above_vwap
-                ),
+                    :nifty_direction,
+                    :relative_strength_score,
 
-                "volume_expansion": (
-                    event.validation
-                    .volume_expansion
-                ),
+                    :above_vwap,
+                    :volume_expansion,
+                    :orb_valid,
 
-                "orb_valid": (
-                    event.validation.orb_valid
-                ),
+                    :explanation,
+                    :trading_implication,
 
-                "explanation": (
-                    event.explanation
-                ),
+                    :event_metadata
 
-                "trading_implication": (
-                    event.trading_implication
-                ),
+                )
 
-                "event_metadata": json.dumps(
-                    event.event_metadata
-                ),
-            })
+            """)
 
-        db.execute(query, values)
+            values = []
 
-        db.commit()
+            for event in events:
+
+                event_payload = {
+
+                    "event_id": event.id,
+                    
+                    "trade_date": trade_date,
+
+                    "stock_symbol": event.symbol,
+
+                    "event_type": event.event_type.value,
+
+                    "candle_time": event.timestamp,
+
+                    "candle_index": event.candle_index,
+
+                    "price": event.price,
+
+                    "strength_score": event.strength_score,
+
+                    "nifty_direction": (
+                        event.nifty_context.direction
+                    ),
+
+                    "relative_strength_score": (
+                        event.nifty_context
+                        .relative_strength_score
+                    ),
+
+                    "above_vwap": (
+                        event.validation.above_vwap
+                    ),
+
+                    "volume_expansion": (
+                        event.validation
+                        .volume_expansion
+                    ),
+
+                    "orb_valid": (
+                        event.validation.orb_valid
+                    ),
+
+                    "explanation": (
+                        event.explanation
+                    ),
+
+                    "trading_implication": (
+                        event.trading_implication
+                    ),
+
+                    "event_metadata": json.dumps(
+                        event.event_metadata
+                    ),
+                }
+
+                values.append(
+                    event_payload
+                )
+
+            log_count(
+                "Prepared DB Payload",
+                values
+            )
+
+            if values:
+
+                log_object(
+                    "First Event Payload",
+                    values[0]
+                )
+
+            db.execute(
+                query,
+                values
+            )
+
+            log_info(
+                "DB Execute Status",
+                "Insert query executed"
+            )
+
+            db.commit()
+
+            log_info(
+                "DB Commit Status",
+                "Transaction committed successfully"
+            )
+
+            log_step(
+                "MARKET EVENTS SAVED SUCCESSFULLY"
+            )
+
+        except Exception as error:
+
+            db.rollback()
+
+            log_step(
+                "EVENT SAVE FAILED"
+            )
+
+            log_error(error)
+
+            raise

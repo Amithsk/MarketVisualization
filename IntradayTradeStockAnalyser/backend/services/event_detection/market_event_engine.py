@@ -2,45 +2,45 @@
 
 from typing import List
 
-from models.market_event import MarketEvent
+from backend.models.market_event import MarketEvent
 
-from services.event_detection.breakout_detector import (
+from backend.services.event_detection.breakout_detector import (
     detect_breakout_events,
 )
 
-from services.event_detection.event_normalization import (
+from backend.services.event_detection.event_normalization import (
     normalize_market_events,
 )
 
-from services.event_detection.event_scoring import (
+from backend.services.event_detection.event_scoring import (
     calculate_event_score,
 )
 
-from services.event_detection.event_validation import (
+from backend.services.event_detection.event_validation import (
     validate_market_events,
 )
 
-from services.event_detection.momentum_continuation_detector import (
+from backend.services.event_detection.momentum_continuation_detector import (
     detect_momentum_continuation_events,
 )
 
-from services.event_detection.orb_detector import (
+from backend.services.event_detection.orb_detector import (
     detect_orb_events,
 )
 
-from services.event_detection.pullback_continuation_detector import (
+from backend.services.event_detection.pullback_continuation_detector import (
     detect_pullback_continuation_events,
 )
 
-from services.event_detection.relative_strength_detector import (
+from backend.services.event_detection.relative_strength_detector import (
     detect_relative_strength_events,
 )
 
-from services.event_detection.volume_expansion_detector import (
+from backend.services.event_detection.volume_expansion_detector import (
     detect_volume_expansion_events,
 )
 
-from services.event_detection.vwap_event_detector import (
+from backend.services.event_detection.vwap_event_detector import (
     detect_vwap_events,
 )
 

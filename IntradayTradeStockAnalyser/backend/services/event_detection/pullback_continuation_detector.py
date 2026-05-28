@@ -2,8 +2,8 @@
 
 from typing import List
 
-from constants.event_types import EventType
-from models.market_event import (
+from backend.constants.event_types import EventType
+from backend.models.market_event import (
     EventValidation,
     MarketEvent,
     NiftyContext,
@@ -24,7 +24,7 @@ def detect_pullback_continuation_events(
     detected_events: List[MarketEvent] = []
 
     breakout_timestamps = {
-        event.time
+        event.timestamp
         for event in breakout_events
         if event.event_type == EventType.BREAKOUT
     }

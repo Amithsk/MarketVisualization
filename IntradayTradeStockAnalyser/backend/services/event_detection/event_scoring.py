@@ -1,6 +1,6 @@
 #/IntradayTradeStockAnalyser/backend/services/event_detection/event_scoring.py
 
-from models.market_event import MarketEvent
+from backend.models.market_event import MarketEvent
 
 
 BASE_SCORE = 50
