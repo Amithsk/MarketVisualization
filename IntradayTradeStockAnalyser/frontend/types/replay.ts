@@ -156,6 +156,53 @@ export type NarrativeContext = {
     learning_insight: string | null;
 };
 
+// ============================================
+// MARKET EVENT TYPES
+// ============================================
+
+export type EventValidation = {
+
+    above_vwap: boolean;
+
+    volume_expansion: boolean;
+
+    orb_valid: boolean;
+};
+
+export type NiftyContext = {
+
+    direction: string;
+
+    relative_strength_score: number;
+};
+
+export type MarketEvent = {
+
+    id: string;
+
+    stock_symbol: string;
+
+    time: string;
+
+    event_type: string;
+
+    candle_index: number;
+
+    price: number;
+
+    strength_score: number;
+
+    explanation: string;
+
+    trading_implication: string;
+
+    nifty_context: NiftyContext;
+
+    validation: EventValidation;
+
+    event_metadata: Record<string, any>;
+};
+
 export type ReplayData = {
 
     trade_data: ReplayTradeData;
@@ -163,6 +210,8 @@ export type ReplayData = {
     stock_candles: Candle[];
 
     nifty_candles: Candle[];
+
+    market_events: MarketEvent[];
 
     market_context: MarketContext;
 

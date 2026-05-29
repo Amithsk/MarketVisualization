@@ -525,18 +525,23 @@ export default function ReplayPage() {
 
                     <SynchronizedCharts
 
-                        niftyCandles={
-                            replayData
-                                .nifty_candles
+                      niftyCandles={
+                        replayData
+                            .nifty_candles
                         }
 
-                        stockCandles={
+                       stockCandles={
+                    replayData
+                        .stock_candles
+                            }
+
+                        marketEvents={
                             replayData
-                                .stock_candles
+                            .market_events
                         }
 
-                        stockName={
-                            selectedStock
+                         stockName={
+                        selectedStock
                         }
 
                     />

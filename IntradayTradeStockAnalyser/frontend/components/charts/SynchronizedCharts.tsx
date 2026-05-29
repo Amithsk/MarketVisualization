@@ -9,6 +9,8 @@ import CandlestickChart from
 import { Candle }
     from "../../types/candle";
 
+
+
 type Props = {
 
     niftyCandles: Candle[];
