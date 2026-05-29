@@ -423,34 +423,126 @@ export default function CandlestickChart({
     return (
         <div className="relative w-full h-full">
             <div className="text-sm font-semibold mb-2 text-gray-300">{title}</div>
-
             {hoverData && (
-                <div className="mb-2 text-xs text-gray-300 flex gap-4 flex-wrap">
-                    <div>
-                        Time:
-                        <span className="ml-1 text-white">{hoverData.time}</span>
-                    </div>
-                    <div>
-                        O:
-                        <span className="ml-1 text-green-400">{hoverData.open}</span>
-                    </div>
-                    <div>
-                        H:
-                        <span className="ml-1 text-green-400">{hoverData.high}</span>
-                    </div>
-                    <div>
-                        L:
-                        <span className="ml-1 text-red-400">{hoverData.low}</span>
-                    </div>
-                    <div>
-                        C:
-                        <span className="ml-1 text-white">{hoverData.close}</span>
-                    </div>
-                    <div>
-                        Vol:
-                        <span className="ml-1 text-cyan-400">{hoverData.volume}</span>
-                    </div>
+
+                <div
+    className="
+        w-full
+        overflow-x-auto
+    "
+>
+
+    {
+
+        hoverData && (
+
+            <div
+                className="
+                    flex
+                    min-w-max
+                    items-center
+                    gap-6
+                    rounded-md
+                    border
+                    border-gray-800
+                    bg-gray-900
+                    px-4
+                    py-2
+                    text-xs
+                    text-gray-300
+                    mb-3
+                "
+            >
+
+                <div
+                    className="
+                        font-semibold
+                        text-white
+                    "
+                >
+
+                    {title}
+
                 </div>
+
+                <div>
+                    Time:
+                    <span
+                        className="
+                            ml-1
+                            text-white
+                        "
+                    >
+                        {hoverData.time}
+                    </span>
+                </div>
+
+                <div>
+                    O:
+                    <span
+                        className="
+                            ml-1
+                            text-green-400
+                        "
+                    >
+                        {hoverData.open}
+                    </span>
+                </div>
+
+                <div>
+                    H:
+                    <span
+                        className="
+                            ml-1
+                            text-green-400
+                        "
+                    >
+                        {hoverData.high}
+                    </span>
+                </div>
+
+                <div>
+                    L:
+                    <span
+                        className="
+                            ml-1
+                            text-red-400
+                        "
+                    >
+                        {hoverData.low}
+                    </span>
+                </div>
+
+                <div>
+                    C:
+                    <span
+                        className="
+                            ml-1
+                            text-white
+                        "
+                    >
+                        {hoverData.close}
+                    </span>
+                </div>
+
+                <div>
+                    Vol:
+                    <span
+                        className="
+                            ml-1
+                            text-cyan-400
+                        "
+                    >
+                        {hoverData.volume}
+                    </span>
+                </div>
+
+            </div>
+        )
+    }
+
+</div>
+                
             )}
 
             <div ref={chartContainerRef} className="w-full" />

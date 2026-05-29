@@ -446,72 +446,65 @@ export default function ReplayPage() {
             }
 
             {/* -------------------------------- */}
-            {/* STRATEGY CONTEXT */}
+            {/* TOP CONTEXT GRID */}
             {/* -------------------------------- */}
 
             {
 
                 replayData && (
 
-                    <StrategyContextPanel
+                    <div
+                        className="
+                grid
+                grid-cols-1
+                lg:grid-cols-3
+                gap-4
+                mb-6
+            "
+                    >
 
-                        strategyUsed={
-                            replayData
-                                .stock_selection_context
-                                .strategy_used
-                        }
+                        <MarketBiasCard
 
-                        structureValid={
-                            replayData
-                                .stock_selection_context
-                                .structure_valid
-                        }
+                            marketContext={
+                                replayData
+                                    .market_context
+                            }
 
-                        reason={
-                            replayData
-                                .stock_selection_context
-                                .reason
-                        }
+                        />
 
-                        strategySummary={
-                            replayData
-                                .narrative_context
-                                .strategy_summary
-                        }
+                        <TradePermissionBanner
 
-                    />
-                )
-            }
+                            tradePermission={
+                                replayData
+                                    .execution_control
+                                    .trade_permission
+                            }
 
-            {/* -------------------------------- */}
-            {/* LEARNING INSIGHT */}
-            {/* -------------------------------- */}
+                            executionAllowed={
+                                replayData
+                                    .execution_control
+                                    .execution_allowed
+                            }
 
-            {
+                        />
 
-                replayData && (
+                        <RelativeStrengthBadge
 
-                    <LearningInsightPanel
+                            rsValue={
+                                replayData
+                                    .stock_selection_context
+                                    .rs_value
+                            }
 
-                        learningInsight={
-                            replayData
-                                .narrative_context
-                                .learning_insight
-                        }
+                            tradable={
+                                replayData
+                                    .stock_selection_context
+                                    .tradable
+                            }
 
-                        executionSummary={
-                            replayData
-                                .narrative_context
-                                .execution_summary
-                        }
+                        />
 
-                        tradeConstructionSummary={
-                            replayData
-                                .narrative_context
-                                .trade_construction_summary
-                        }
-
-                    />
+                    </div>
                 )
             }
 
@@ -525,23 +518,23 @@ export default function ReplayPage() {
 
                     <SynchronizedCharts
 
-                      niftyCandles={
-                        replayData
-                            .nifty_candles
+                        niftyCandles={
+                            replayData
+                                .nifty_candles
                         }
 
-                       stockCandles={
-                    replayData
-                        .stock_candles
-                            }
+                        stockCandles={
+                            replayData
+                                .stock_candles
+                        }
 
                         marketEvents={
                             replayData
-                            .market_events
+                                .market_events
                         }
 
-                         stockName={
-                        selectedStock
+                        stockName={
+                            selectedStock
                         }
 
                     />
@@ -549,5 +542,7 @@ export default function ReplayPage() {
             }
 
         </div>
+        
     );
+
 }
