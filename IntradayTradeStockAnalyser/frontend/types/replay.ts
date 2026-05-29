@@ -178,31 +178,52 @@ export type NiftyContext = {
 
 export type MarketEvent = {
 
-    id: string;
+    event_id: number;
+
+    trade_date: string;
 
     stock_symbol: string;
 
-    time: string;
+    candle_time: string;
 
     event_type: string;
 
-    candle_index: number;
+    nifty_context: string | null;
 
-    price: number;
+    market_bias: string | null;
 
-    strength_score: number;
+    strategy_relevance: string | null;
 
-    explanation: string;
+    relative_strength: string | null;
 
-    trading_implication: string;
+    vwap_relation: string | null;
 
-    nifty_context: NiftyContext;
+    volume_expansion: boolean | null;
 
-    validation: EventValidation;
+    breakout_strength: number | null;
 
-    event_metadata: Record<string, any>;
+    orb_related: boolean | null;
+
+    event_severity: string | null;
+
+    explanation?: string;
+
+    trading_implication?: string;
+
+    strength_score?: number;
+
+    validation?: EventValidation;
+
+    nifty_context_data?: NiftyContext;
+
+    event_metadata?: Record<string, any>;
+
+    candle_index?: number;
+
+    price?: number;
+
+    created_at?: string;
 };
-
 export type ReplayData = {
 
     trade_data: ReplayTradeData;

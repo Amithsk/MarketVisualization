@@ -50,7 +50,7 @@ class EventRepository:
 
             query = text("""
 
-                INSERT INTO
+                INSERT IGNORE  INTO
                 stocktradeanalysis_detected_events(
 
                     event_id,

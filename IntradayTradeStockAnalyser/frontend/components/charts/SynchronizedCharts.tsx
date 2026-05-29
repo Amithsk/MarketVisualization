@@ -1,4 +1,5 @@
 //IntradayTradeStockAnalyser/frontend/components/charts/SynchronizedCharts.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -9,6 +10,10 @@ import CandlestickChart from
 import { Candle }
     from "../../types/candle";
 
+import {
+    MarketEvent
+}
+from "../../types/replay";
 
 
 type Props = {
@@ -16,6 +21,8 @@ type Props = {
     niftyCandles: Candle[];
 
     stockCandles: Candle[];
+
+    marketEvents: MarketEvent[];
 
     stockName: string;
 };
@@ -25,6 +32,8 @@ export default function SynchronizedCharts({
     niftyCandles,
 
     stockCandles,
+
+    marketEvents,
 
     stockName
 
@@ -42,6 +51,16 @@ export default function SynchronizedCharts({
 
     ] = useState<number | null>(
         null
+    );
+
+    console.log(
+        "[SynchronizedCharts] Market Events:",
+        marketEvents
+    );
+
+    console.log(
+        "[SynchronizedCharts] Market Events Count:",
+        marketEvents?.length || 0
     );
 
     // -----------------------------------
@@ -98,6 +117,10 @@ export default function SynchronizedCharts({
 
                 candles={
                     stockCandles
+                }
+
+                marketEvents={
+                    marketEvents
                 }
 
                 title={

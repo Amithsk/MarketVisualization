@@ -1,5 +1,4 @@
 //IntradayTradeStockAnalyser/frontend/components/charts/CandlestickChart.tsx
-//IntradayTradeStockAnalyser/frontend/components/charts/CandlestickChart.tsx
 "use client";
 
 import {
@@ -7,160 +6,90 @@ import {
     UTCTimestamp,
     ColorType,
     CandlestickSeries,
-    HistogramSeries
+    createSeriesMarkers,
+    HistogramSeries,
 } from "lightweight-charts";
-
-import {
-    useEffect,
-    useRef,
-    useState
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Candle } from "../../types/candle";
+import { MarketEvent } from "../../types/replay";
 
 type Props = {
-
     candles: Candle[];
-
+    marketEvents?: MarketEvent[];
     title: string;
-
-    onCrosshairMove?: (
-        timestamp: number | null
-    ) => void;
-
-    synchronizedTimestamp?: (
-        number | null
-    );
+    onCrosshairMove?: (timestamp: number | null) => void;
+    synchronizedTimestamp?: number | null;
 };
 
 // -----------------------------------
 // IST SAFE TIMESTAMP
 // -----------------------------------
 
-function createISTTimestamp(
-    dateTime: string
-): number {
-
-    const [
-        datePart,
-        timePart
-    ] = dateTime.split(" ");
-
-    const [
-        year,
-        month,
-        day
-    ] = datePart
-        .split("-")
-        .map(Number);
-
-    const [
-        hours,
-        minutes,
-        seconds
-    ] = timePart
-        .split(":")
-        .map(Number);
+function createISTTimestamp(dateTime: string): number {
+    const [datePart, timePart] = dateTime.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes, seconds] = timePart.split(":").map(Number);
 
     return Math.floor(
-
-        Date.UTC(
-            year,
-            month - 1,
-            day,
-            hours,
-            minutes,
-            seconds
-        ) / 1000
+        Date.UTC(year, month - 1, day, hours, minutes, seconds) / 1000
     );
 }
 
 export default function CandlestickChart({
-
     candles,
-
+    marketEvents = [],
     title,
-
     onCrosshairMove,
-
-    synchronizedTimestamp
-
+    synchronizedTimestamp,
 }: Props) {
-
-    const chartContainerRef =
-        useRef<HTMLDivElement | null>(null);
+    const chartContainerRef = useRef<HTMLDivElement | null>(null);
 
     // -----------------------------------
     // Hover State
     // -----------------------------------
 
-    const [hoverData, setHoverData] =
-        useState<any>(null);
+    const [hoverData, setHoverData] = useState<any>(null);
+    const [hoveredEvent, setHoveredEvent] = useState<MarketEvent | null>(null);
+    const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+
+    // -----------------------------------
+    // Event Hover Debug
+    // -----------------------------------
+
+    useEffect(() => {
+        console.log("[EVENT HOVER STATE]", hoveredEvent);
+    }, [hoveredEvent]);
 
     // -----------------------------------
     // Synchronized Hover Effect
     // -----------------------------------
 
     useEffect(() => {
-
-        if (
-            synchronizedTimestamp === null
-        ) {
+        if (synchronizedTimestamp === null) {
             return;
         }
 
-        const matchedCandle =
-            candles.find(
-
-                (candle) => {
-
-                    const convertedTimestamp =
-                        createISTTimestamp(
-                            candle.time
-                        );
-
-                    return (
-
-                        convertedTimestamp ===
-                        synchronizedTimestamp
-                    );
-                }
-            );
+        const matchedCandle = candles.find((candle) => {
+            const convertedTimestamp = createISTTimestamp(candle.time);
+            return convertedTimestamp === synchronizedTimestamp;
+        });
 
         if (!matchedCandle) {
             return;
         }
 
         setHoverData({
-
-            time:
-                matchedCandle.time,
-
-            open:
-                matchedCandle.open,
-
-            high:
-                matchedCandle.high,
-
-            low:
-                matchedCandle.low,
-
-            close:
-                matchedCandle.close,
-
-            volume:
-                matchedCandle.volume
+            time: matchedCandle.time,
+            open: matchedCandle.open,
+            high: matchedCandle.high,
+            low: matchedCandle.low,
+            close: matchedCandle.close,
+            volume: matchedCandle.volume,
         });
-
-    }, [
-
-        synchronizedTimestamp,
-
-        candles
-    ]);
+    }, [synchronizedTimestamp, candles]);
 
     useEffect(() => {
-
         if (!chartContainerRef.current) {
             return;
         }
@@ -169,249 +98,297 @@ export default function CandlestickChart({
         // Create chart
         // -----------------------------------
 
-        const chart = createChart(
-            chartContainerRef.current,
-            {
-                width:
-                    chartContainerRef.current
-                        .clientWidth,
-
-                height: 400,
-
-                layout: {
-                    background: {
-                        type: ColorType.Solid,
-                        color: "#111827",
-                    },
-
-                    textColor: "#D1D5DB",
-                },
-
-                grid: {
-                    vertLines: {
-                        color: "#1F2937",
-                    },
-
-                    horzLines: {
-                        color: "#1F2937",
-                    },
-                },
-
-                crosshair: {
-                    mode: 1,
-                },
-
-                rightPriceScale: {
-                    borderColor: "#374151",
-                },
-
-                timeScale: {
-
-                    borderColor: "#374151",
-
-                    timeVisible: true,
-
-                    secondsVisible: false,
-                },
-            }
-        );
+        const chart = createChart(chartContainerRef.current, {
+            width: chartContainerRef.current.clientWidth,
+            height: 400,
+            layout: {
+                background: { type: ColorType.Solid, color: "#111827" },
+                textColor: "#D1D5DB",
+            },
+            grid: {
+                vertLines: { color: "#1F2937" },
+                horzLines: { color: "#1F2937" },
+            },
+            crosshair: { mode: 1 },
+            rightPriceScale: { borderColor: "#374151" },
+            timeScale: {
+                borderColor: "#374151",
+                timeVisible: true,
+                secondsVisible: false,
+            },
+        });
 
         // -----------------------------------
         // Candlestick series
         // -----------------------------------
 
-        const candleSeries =
-            chart.addSeries(
-                CandlestickSeries,
-                {
-                    upColor: "#22C55E",
-
-                    downColor: "#EF4444",
-
-                    borderVisible: false,
-
-                    wickUpColor: "#22C55E",
-
-                    wickDownColor: "#EF4444",
-                }
-            );
+        const candleSeries = chart.addSeries(CandlestickSeries, {
+            upColor: "#22C55E",
+            downColor: "#EF4444",
+            borderVisible: false,
+            wickUpColor: "#22C55E",
+            wickDownColor: "#EF4444",
+        });
 
         // -----------------------------------
         // Volume series
         // -----------------------------------
 
-        const volumeSeries =
-            chart.addSeries(
-                HistogramSeries,
-                {
-                    priceFormat: {
-                        type: "volume",
-                    },
-
-                    priceScaleId: "",
-
-                    color: "#3B82F6",
-                }
-            );
+        const volumeSeries = chart.addSeries(HistogramSeries, {
+            priceFormat: { type: "volume" },
+            priceScaleId: "",
+            color: "#3B82F6",
+        });
 
         // -----------------------------------
         // Format candle data
         // -----------------------------------
 
-        const formattedCandles = candles.map(
+        const formattedCandles = candles.map((candle) => ({
+            time: createISTTimestamp(
+                candle.time
+            ) as UTCTimestamp,
 
-            (candle) => ({
+            open: candle.open,
 
-                time:
-                    createISTTimestamp(
-                        candle.time
-                    ) as UTCTimestamp,
+            high: candle.high,
 
-                open: candle.open,
+            low: candle.low,
 
-                high: candle.high,
-
-                low: candle.low,
-
-                close: candle.close,
-            })
-        );
+            close: candle.close,
+        }));
 
         // -----------------------------------
         // Format volume data
         // -----------------------------------
 
-        const formattedVolume = candles.map(
-
-            (candle) => ({
-
-                time:
-                    createISTTimestamp(
-                        candle.time
-                    ) as UTCTimestamp,
-
-                value: candle.volume,
-
-                color:
-                    candle.close >= candle.open
-
-                        ? "#26a69a"
-
-                        : "#ef5350",
-            })
-        );
+        const formattedVolume = candles.map((candle) => ({
+            time: createISTTimestamp(candle.time) as UTCTimestamp,
+            value: candle.volume,
+            color: candle.close >= candle.open ? "#26a69a" : "#ef5350",
+        }));
 
         // -----------------------------------
         // Set chart data
         // -----------------------------------
 
-        candleSeries.setData(
-            formattedCandles
-        );
-
-        volumeSeries.setData(
-            formattedVolume
-        );
-
+        candleSeries.setData(formattedCandles);
+        volumeSeries.setData(formattedVolume);
         // -----------------------------------
-        // Crosshair Hover
+        // Create Event Markers
         // -----------------------------------
 
-        chart.subscribeCrosshairMove(
+        if (
+            marketEvents &&
+            marketEvents.length > 0
+        ) {
 
-            (param) => {
+            const markers = marketEvents
+                .map(
+                    (
+                        event: MarketEvent
+                    ) => {
 
-                // -----------------------------------
-                // Invalid hover state
-                // -----------------------------------
+                        const eventTime =
 
-                if (
-                    !param.point ||
-                    !param.time
-                ) {
+                            event.candle_time ||
 
-                    if (onCrosshairMove) {
+                            (event as any).time ||
 
-                        onCrosshairMove(null);
+                            (event as any).timestamp;
+
+                        // -----------------------------------
+                        // Invalid Event Check
+                        // -----------------------------------
+
+                        if (!eventTime) {
+
+                            console.log(
+                                "[INVALID EVENT TIME]",
+                                event
+                            );
+
+                            return null;
+                        }
+
+                        // -----------------------------------
+                        // Match Marker To Exact Candle
+                        // -----------------------------------
+
+                        const matchingCandle =
+                            formattedCandles.find(
+                                (
+                                    candle
+                                ) =>
+                                    candle.time ===
+                                    createISTTimestamp(
+                                        eventTime
+                                    )
+                            );
+
+                        if (!matchingCandle) {
+
+                            console.log(
+                                "[NO MATCHING CANDLE]",
+                                eventTime
+                            );
+
+                            return null;
+                        }
+
+                        // -----------------------------------
+                        // Create Marker
+                        // -----------------------------------
+
+                        return {
+
+                            time:
+                                matchingCandle.time,
+
+                            position:
+                                "aboveBar" as const,
+
+                            color:
+
+                                event.event_type.includes(
+                                    "BREAKOUT"
+                                )
+
+                                    ? "#22c55e"
+
+                                    : event.event_type.includes(
+                                        "REJECTION"
+                                    )
+
+                                        ? "#ef4444"
+
+                                        : event.event_type.includes(
+                                            "VWAP"
+                                        )
+
+                                            ? "#3b82f6"
+
+                                            : "#f59e0b",
+
+                            shape:
+
+                                "circle" as const,
+
+                            text:
+                                event.event_type
+                        };
                     }
+                )
+                .filter(Boolean);
 
-                    setHoverData(null);
+            console.log(
+                "[FIRST CANDLE TIME]",
+                formattedCandles[0]
+            );
 
-                    return;
-                }
 
-                // -----------------------------------
-                // Emit timestamp
-                // -----------------------------------
+            console.log(
+                "[FIRST MARKER TIME]",
+                markers[0]
+            );
 
-                if (onCrosshairMove) {
+            console.log(
+                "[MARKERS APPLIED]",
+                markers
+            );
+            const matchingCandleCheck =
+                formattedCandles.find(
+                    (
+                        candle
+                    ) =>
+                        candle.time ===
+                        markers[0]?.time
+                );
 
-                    onCrosshairMove(
-                        Number(param.time)
-                    );
-                }
+            console.log(
+                "[MATCHING CANDLE]",
+                matchingCandleCheck
+            );
+            createSeriesMarkers(
+                candleSeries,
+                markers as any
+            );
+        }
 
-                // -----------------------------------
-                // Get candle data
-                // -----------------------------------
+        // -----------------------------------
+        // Crosshair Hover (named handler for proper cleanup)
+        // -----------------------------------
 
-                const data =
-                    param.seriesData.get(
-                        candleSeries
-                    );
-
-                if (!data) {
-
-                    setHoverData(null);
-
-                    return;
-                }
-
-                const candleData: any =
-                    data;
-
-                // -----------------------------------
-                // Match candle
-                // -----------------------------------
-
-                const matchedCandle =
-                    candles.find(
-
-                        (candle) =>
-
-                            createISTTimestamp(
-                                candle.time
-                            ) === param.time
-                    );
-
-                // -----------------------------------
-                // Update hover
-                // -----------------------------------
-
-                setHoverData({
-
-                    time:
-                        matchedCandle?.time ||
-
-                        "",
-
-                    open:
-                        candleData.open,
-
-                    high:
-                        candleData.high,
-
-                    low:
-                        candleData.low,
-
-                    close:
-                        candleData.close,
-
-                    volume:
-                        matchedCandle?.volume || 0
-                });
+        const handleCrosshairMove = (param) => {
+            if (!param || !param.time || !param.point) {
+                setHoverData(null);
+                setHoveredEvent(null);
+                return;
             }
-        );
+
+            const candleData = param.seriesData.get(candleSeries) as any;
+            if (!candleData) {
+                setHoverData(null);
+                setHoveredEvent(null);
+                return;
+            }
+
+            setHoverData({
+                time: candles.find((c) => { return (createISTTimestamp(c.time) === Number(param.time)); })?.time,
+                open: candleData.open,
+                high: candleData.high,
+                low: candleData.low,
+                close: candleData.close,
+                volume: candles.find((c) => { return (createISTTimestamp(c.time) === Number(param.time)); })?.volume
+            });
+
+            if (onCrosshairMove) {
+                onCrosshairMove(Number(param.time));
+            }
+
+            const mouseX = param.point.x;
+            const mouseY = param.point.y;
+
+            const matchedEvent = marketEvents.find((event) => {
+                const eventTimestamp = createISTTimestamp(
+                    `${event.trade_date} ${event.candle_time}`
+                );
+
+                const markerX = chart.timeScale().timeToCoordinate(eventTimestamp as any);
+                if (markerX === null) {
+                    return false;
+                }
+
+                const candle = candles.find((c) => {
+                    const candleTimestamp = createISTTimestamp(c.time);
+                    return candleTimestamp === eventTimestamp;
+                });
+
+                if (!candle) {
+                    return false;
+                }
+
+                const markerY = candleSeries.priceToCoordinate(candle.high);
+                if (markerY === null) {
+                    return false;
+                }
+
+                const distanceX = Math.abs(mouseX - markerX);
+                const distanceY = Math.abs(mouseY - markerY);
+
+                return distanceX < 12 && distanceY < 12;
+            });
+
+            if (matchedEvent) {
+                console.log("[EVENT DETECTED]", matchedEvent);
+                setHoveredEvent(matchedEvent);
+                setTooltipPosition({ x: param.point.x, y: param.point.y });
+            } else {
+                setHoveredEvent(null);
+            }
+        };
+
+        chart.subscribeCrosshairMove(handleCrosshairMove);
 
         // -----------------------------------
         // Fit content
@@ -424,209 +401,138 @@ export default function CandlestickChart({
         // -----------------------------------
 
         const handleResize = () => {
-
-            if (
-                !chartContainerRef.current
-            ) {
+            if (!chartContainerRef.current) {
                 return;
             }
-
-            chart.applyOptions({
-                width:
-                    chartContainerRef.current
-                        .clientWidth,
-            });
+            chart.applyOptions({ width: chartContainerRef.current.clientWidth });
         };
 
-        window.addEventListener(
-            "resize",
-            handleResize
-        );
+        window.addEventListener("resize", handleResize);
 
         // -----------------------------------
         // Cleanup
         // -----------------------------------
 
         return () => {
-
-            window.removeEventListener(
-                "resize",
-                handleResize
-            );
-
+            window.removeEventListener("resize", handleResize);
+            chart.unsubscribeCrosshairMove(handleCrosshairMove);
             chart.remove();
         };
-
-    }, [
-
-        candles,
-
-        onCrosshairMove,
-
-        synchronizedTimestamp
-    ]);
+    }, [candles, marketEvents, onCrosshairMove, synchronizedTimestamp]);
 
     return (
+        <div className="relative w-full h-full">
+            <div className="text-sm font-semibold mb-2 text-gray-300">{title}</div>
 
-        <div
-            className="
-                w-full
-            "
-        >
+            {hoverData && (
+                <div className="mb-2 text-xs text-gray-300 flex gap-4 flex-wrap">
+                    <div>
+                        Time:
+                        <span className="ml-1 text-white">{hoverData.time}</span>
+                    </div>
+                    <div>
+                        O:
+                        <span className="ml-1 text-green-400">{hoverData.open}</span>
+                    </div>
+                    <div>
+                        H:
+                        <span className="ml-1 text-green-400">{hoverData.high}</span>
+                    </div>
+                    <div>
+                        L:
+                        <span className="ml-1 text-red-400">{hoverData.low}</span>
+                    </div>
+                    <div>
+                        C:
+                        <span className="ml-1 text-white">{hoverData.close}</span>
+                    </div>
+                    <div>
+                        Vol:
+                        <span className="ml-1 text-cyan-400">{hoverData.volume}</span>
+                    </div>
+                </div>
+            )}
 
-            {/* -------------------------------- */}
-            {/* Title */}
-            {/* -------------------------------- */}
+            <div ref={chartContainerRef} className="w-full" />
 
-            <div
-                className="
-                    text-sm
-                    font-semibold
-                    mb-2
-                    text-gray-300
-                "
-            >
-
-                {title}
-
-            </div>
-
-            {/* -------------------------------- */}
-            {/* Hover OHLC */}
-            {/* -------------------------------- */}
-
-            {
-
-                hoverData && (
+            {hoveredEvent && tooltipPosition && (
+                <div
+                    className="
+                        absolute
+                        z-50
+                        pointer-events-none
+                        bg-zinc-900
+                        border
+                        border-zinc-700
+                        rounded-lg
+                        shadow-2xl
+                        px-4
+                        py-3
+                        text-white
+                        text-xs
+                        min-w-[260px]
+                    "
+                    style={{
+                        left: tooltipPosition.x + 15,
+                        top: tooltipPosition.y - 20,
+                    }}
+                >
+                    <div
+                        className="
+                            text-cyan-400
+                            font-semibold
+                            text-sm
+                            mb-2
+                        "
+                    >
+                        {hoveredEvent.event_type}
+                    </div>
 
                     <div
                         className="
+                            text-zinc-200
+                            leading-relaxed
                             mb-2
-                            text-xs
-                            text-gray-300
-                            flex
-                            gap-4
-                            flex-wrap
                         "
                     >
-
-                        <div>
-
-                            Time:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-white
-                                "
-                            >
-
-                                {hoverData.time}
-
-                            </span>
-
-                        </div>
-
-                        <div>
-
-                            O:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-green-400
-                                "
-                            >
-
-                                {hoverData.open}
-
-                            </span>
-
-                        </div>
-
-                        <div>
-
-                            H:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-green-400
-                                "
-                            >
-
-                                {hoverData.high}
-
-                            </span>
-
-                        </div>
-
-                        <div>
-
-                            L:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-red-400
-                                "
-                            >
-
-                                {hoverData.low}
-
-                            </span>
-
-                        </div>
-
-                        <div>
-
-                            C:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-white
-                                "
-                            >
-
-                                {hoverData.close}
-
-                            </span>
-
-                        </div>
-
-                        <div>
-
-                            Vol:
-
-                            <span
-                                className="
-                                    ml-1
-                                    text-cyan-400
-                                "
-                            >
-
-                                {hoverData.volume}
-
-                            </span>
-
-                        </div>
-
+                        {hoveredEvent.explanation}
                     </div>
-                )
-            }
 
-            {/* -------------------------------- */}
-            {/* Chart */}
-            {/* -------------------------------- */}
+                    <div
+                        className="
+                            text-amber-300
+                            italic
+                            mb-2
+                        "
+                    >
+                        {hoveredEvent.trading_implication}
+                    </div>
 
-            <div
-                ref={chartContainerRef}
-                className="
-                    w-full
-                "
-            />
+                    <div
+                        className="
+                            flex
+                            justify-between
+                            text-zinc-400
+                            mt-2
+                        "
+                    >
+                        <span>Strength</span>
+                        <span>{hoveredEvent.strength_score}</span>
+                    </div>
 
+                    <div
+                        className="
+                            flex
+                            justify-between
+                            text-zinc-400
+                            mt-1
+                        "
+                    >
+                        <span>NIFTY</span>
+                        <span>{hoveredEvent.nifty_context_data?.direction}</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
