@@ -1,3 +1,4 @@
+//IntradayTradeStockAnalyser/frontend/components/upload/UploadPanel.tsx
 "use client";
 
 import {
@@ -218,28 +219,75 @@ export default function UploadPanel({
             {/* -------------------------------- */}
             {/* File Input */}
             {/* -------------------------------- */}
-
-            <input
-
-                type="file"
-
-                accept=".csv,.xlsx,.xls"
-
-                disabled={
-                    disabled ||
-                    uploading
-                }
-
-                onChange={
-                    handleFileChange
-                }
-
+            <div
                 className="
-                    text-sm
-                    text-gray-300
-                "
-            />
+        flex
+        flex-col
+        gap-2
+    "
+            >
 
+                <label
+                    className="
+            inline-flex
+            w-fit
+            items-center
+            justify-center
+            rounded-md
+            bg-blue-600
+            hover:bg-blue-700
+            px-4
+            py-2
+            text-sm
+            font-medium
+            text-white
+            cursor-pointer
+            transition-colors
+        "
+                >
+
+                    Select CSV File
+
+                    <input
+
+                        type="file"
+
+                        accept=".csv,.xlsx,.xls"
+
+                        disabled={
+                            disabled ||
+                            uploading
+                        }
+
+                        onChange={
+                            handleFileChange
+                        }
+
+                        className="hidden"
+                    />
+
+                </label>
+
+                {
+
+                    selectedFile && (
+
+                        <div
+                            className="
+                    text-sm
+                    text-gray-400
+                "
+                        >
+
+                            Selected:
+                            {" "}
+                            {selectedFile.name}
+
+                        </div>
+                    )
+                }
+
+            </div>
             {/* -------------------------------- */}
             {/* Upload Button */}
             {/* -------------------------------- */}

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 
 import CandlestickChart from
     "./CandlestickChart";
@@ -13,7 +13,7 @@ import { Candle }
 import {
     MarketEvent
 }
-from "../../types/replay";
+    from "../../types/replay";
 
 
 type Props = {
@@ -42,17 +42,10 @@ export default function SynchronizedCharts({
     // -----------------------------------
     // Shared Crosshair Timestamp
     // -----------------------------------
-
-    const [
-
-        synchronizedTimestamp,
-
-        setSynchronizedTimestamp
-
-    ] = useState<number | null>(
-        null
-    );
-
+    const synchronizedTimestampRef =
+        useRef<number | null>(
+            null
+        );
     console.log(
         "[SynchronizedCharts] Market Events:",
         marketEvents
@@ -71,9 +64,7 @@ export default function SynchronizedCharts({
         timestamp: number | null
     ) => {
 
-        setSynchronizedTimestamp(
-            timestamp
-        );
+        synchronizedTimestampRef.current = timestamp;
     };
 
     return (
@@ -104,7 +95,7 @@ export default function SynchronizedCharts({
                 }
 
                 synchronizedTimestamp={
-                    synchronizedTimestamp
+                     synchronizedTimestampRef.current
                 }
 
             />
@@ -132,7 +123,7 @@ export default function SynchronizedCharts({
                 }
 
                 synchronizedTimestamp={
-                    synchronizedTimestamp
+                    synchronizedTimestampRef.current
                 }
 
             />
