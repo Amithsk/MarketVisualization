@@ -1,0 +1,348 @@
+//IntradayTradeStockAnalyser/frontend/components/replay/NIFTYRelationshipPanel.tsx
+
+type Props = {
+
+    niftyRelationshipAnalysis?: {
+
+        market_alignment?: string;
+
+        relative_strength?: string;
+
+        nifty_trend?: string;
+
+        stock_trend?: string;
+
+        relationship_summary?: string;
+
+        influence?: string;
+
+    } | null;
+};
+
+export default function NIFTYRelationshipPanel({
+
+    niftyRelationshipAnalysis
+
+}: Props) {
+
+    const marketAlignment =
+        niftyRelationshipAnalysis
+            ?.market_alignment;
+
+    const relativeStrength =
+        niftyRelationshipAnalysis
+            ?.relative_strength;
+
+    const niftyTrend =
+        niftyRelationshipAnalysis
+            ?.nifty_trend;
+
+    const stockTrend =
+        niftyRelationshipAnalysis
+            ?.stock_trend;
+
+    const relationshipSummary =
+        niftyRelationshipAnalysis
+            ?.relationship_summary;
+
+    const influence =
+        niftyRelationshipAnalysis
+            ?.influence;
+
+    return (
+
+        <div
+            className="
+                mb-6
+                rounded-lg
+                border
+                border-purple-900
+                bg-purple-950/20
+                p-5
+            "
+        >
+
+            {/* ===================================== */}
+            {/* HEADER */}
+            {/* ===================================== */}
+
+            <div
+                className="
+                    mb-4
+                    text-sm
+                    font-bold
+                    uppercase
+                    tracking-wide
+                    text-purple-300
+                "
+            >
+
+                NIFTY Relationship Analysis
+
+            </div>
+
+            {/* ===================================== */}
+            {/* RELATIONSHIP SUMMARY */}
+            {/* ===================================== */}
+
+            <div
+                className="
+                    mb-4
+                    text-sm
+                    leading-relaxed
+                    text-gray-200
+                "
+            >
+
+                {
+
+                    relationshipSummary ||
+
+                    "No NIFTY relationship analysis available."
+                }
+
+            </div>
+
+            {/* ===================================== */}
+            {/* MARKET RELATIONSHIP GRID */}
+            {/* ===================================== */}
+
+            <div
+                className="
+                    mb-4
+                    grid
+                    grid-cols-2
+                    gap-3
+                "
+            >
+
+                <div
+                    className="
+                        rounded-md
+                        border
+                        border-gray-800
+                        bg-gray-950
+                        p-3
+                    "
+                >
+
+                    <div
+                        className="
+                            mb-2
+                            text-xs
+                            font-semibold
+                            uppercase
+                            tracking-wide
+                            text-gray-500
+                        "
+                    >
+
+                        NIFTY Trend
+
+                    </div>
+
+                    <div
+                        className="
+                            text-sm
+                            font-medium
+                            text-gray-300
+                        "
+                    >
+
+                        {
+
+                            niftyTrend ||
+
+                            "Unavailable"
+                        }
+
+                    </div>
+
+                </div>
+
+                <div
+                    className="
+                        rounded-md
+                        border
+                        border-gray-800
+                        bg-gray-950
+                        p-3
+                    "
+                >
+
+                    <div
+                        className="
+                            mb-2
+                            text-xs
+                            font-semibold
+                            uppercase
+                            tracking-wide
+                            text-gray-500
+                        "
+                    >
+
+                        Stock Trend
+
+                    </div>
+
+                    <div
+                        className="
+                            text-sm
+                            font-medium
+                            text-gray-300
+                        "
+                    >
+
+                        {
+
+                            stockTrend ||
+
+                            "Unavailable"
+                        }
+
+                    </div>
+
+                </div>
+
+                <div
+                    className="
+                        rounded-md
+                        border
+                        border-gray-800
+                        bg-gray-950
+                        p-3
+                    "
+                >
+
+                    <div
+                        className="
+                            mb-2
+                            text-xs
+                            font-semibold
+                            uppercase
+                            tracking-wide
+                            text-gray-500
+                        "
+                    >
+
+                        Market Alignment
+
+                    </div>
+
+                    <div
+                        className="
+                            text-sm
+                            font-medium
+                            text-gray-300
+                        "
+                    >
+
+                        {
+
+                            marketAlignment ||
+
+                            "Unavailable"
+                        }
+
+                    </div>
+
+                </div>
+
+                <div
+                    className="
+                        rounded-md
+                        border
+                        border-gray-800
+                        bg-gray-950
+                        p-3
+                    "
+                >
+
+                    <div
+                        className="
+                            mb-2
+                            text-xs
+                            font-semibold
+                            uppercase
+                            tracking-wide
+                            text-gray-500
+                        "
+                    >
+
+                        Relative Strength
+
+                    </div>
+
+                    <div
+                        className="
+                            text-sm
+                            font-medium
+                            text-gray-300
+                        "
+                    >
+
+                        {
+
+                            relativeStrength ||
+
+                            "Unavailable"
+                        }
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {/* ===================================== */}
+            {/* MARKET INFLUENCE */}
+            {/* ===================================== */}
+
+            <div
+                className="
+                    rounded-md
+                    border
+                    border-gray-800
+                    bg-gray-950
+                    p-3
+                "
+            >
+
+                <div
+                    className="
+                        mb-2
+                        text-xs
+                        font-semibold
+                        uppercase
+                        tracking-wide
+                        text-gray-500
+                    "
+                >
+
+                    NIFTY Influence
+
+                </div>
+
+                <div
+                    className="
+                        text-xs
+                        leading-relaxed
+                        text-gray-400
+                    "
+                >
+
+                    {
+
+                        influence ||
+
+                        "No market influence explanation available."
+                    }
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
+

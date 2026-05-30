@@ -242,6 +242,33 @@ export type ReplayData = {
 
     execution_control: ExecutionControl;
 
+    explanation_context?: {
+
+        candle_explanations?: Record<string, unknown>;
+
+        strategy_explanations?: {
+
+            strategy_name?: string;
+
+            explanation?: string;
+
+            confidence_score?: number;
+
+            tradable?: boolean;
+
+            direction?: string;
+
+        };
+
+        timeline_narration?: unknown[];
+
+        trade_coaching?: Record<string, unknown>;
+
+        nifty_relationship_analysis?: Record<string, unknown>;
+    };
+
+
+
     stock_selection_context: StockSelectionContext;
 
     trade_construction: TradeConstruction;

@@ -40,6 +40,21 @@ import StrategyContextPanel from
 import LearningInsightPanel from
     "../../components/replay/LearningInsightPanel";
 
+import NIFTYRelationshipPanel from
+    "../../components/replay/NIFTYRelationshipPanel";
+
+import TimelineNarrationPanel from
+    "../../components/replay/TimelineNarrationPanel";
+
+
+import CandleExplanationPanel from
+    "../../components/replay/CandleExplanationPanel";
+
+
+
+
+
+
 export default function ReplayPage() {
 
     // -----------------------------------
@@ -446,6 +461,159 @@ export default function ReplayPage() {
             }
 
             {/* -------------------------------- */}
+            {/* STRATEGY CONTEXT */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <StrategyContextPanel
+
+                        strategyUsed={
+                            replayData
+                                .trade_construction
+                                .strategy_used
+                        }
+
+                        structureValid={
+                            replayData
+                                .trade_construction
+                                .structure_valid
+                        }
+
+                        reason={
+                            replayData
+                                .stock_selection_context
+                                .reason
+                        }
+
+                        strategySummary={
+                            replayData
+                                .narrative_context
+                                .strategy_summary
+                        }
+
+                        strategyExplanation={
+                            replayData
+                                .explanation_context
+                                .strategy_explanations
+                        }
+
+                    />
+                )
+            }
+            {/* -------------------------------- */}
+            {/* LEARNING INSIGHT PANEL */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <LearningInsightPanel
+
+                        learningInsight={
+                            replayData
+                                ?.narrative_context
+                                ?.learning_insight
+                        }
+
+                        executionSummary={
+                            replayData
+                                ?.narrative_context
+                                ?.execution_summary
+                        }
+
+                        tradeConstructionSummary={
+                            replayData
+                                ?.narrative_context
+                                ?.trade_construction_summary
+                        }
+
+                        tradeCoaching={
+                            replayData
+                                ?.explanation_context
+                                ?.trade_coaching
+                        }
+
+                    />
+                )
+            }
+
+         
+            {/* -------------------------------- */}
+            {/* NIFTY RELATIONSHIP PANEL */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <NIFTYRelationshipPanel
+
+                        niftyRelationshipAnalysis={
+                            replayData
+                                ?.explanation_context
+                                ?.nifty_relationship_analysis
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* TIMELINE NARRATION PANEL */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <TimelineNarrationPanel
+
+                        timelineNarration={
+                            replayData
+                                ?.explanation_context
+                                ?.timeline_narration
+                        }
+
+                    />
+                )
+            }
+
+            {/* -------------------------------- */}
+            {/* CANDLE EXPLANATION PANEL */}
+            {/* -------------------------------- */}
+
+            {
+
+                replayData && (
+
+                    <CandleExplanationPanel
+
+                        selectedExplanation={
+
+                            Object.values(
+
+                                replayData
+                                    ?.explanation_context
+                                    ?.candle_explanations || {}
+
+                            )[0]
+
+                        }
+
+                    />
+                )
+            }
+
+
+
+
+
+
+            {/* -------------------------------- */}
             {/* TOP CONTEXT GRID */}
             {/* -------------------------------- */}
 
@@ -542,7 +710,7 @@ export default function ReplayPage() {
             }
 
         </div>
-        
+
     );
 
 }
