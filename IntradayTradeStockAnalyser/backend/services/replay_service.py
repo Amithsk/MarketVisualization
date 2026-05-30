@@ -30,6 +30,10 @@ from backend.services.market_event_service import (
     MarketEventService
 )
 
+from backend.services.ai_explanation.explanation_engine import (
+    ExplanationEngine
+)
+
 
 class ReplayService:
 
@@ -318,6 +322,24 @@ class ReplayService:
                 narrative_context
             )
 
+            serialized_nifty_candles = [
+
+                {
+
+                    **vars(candle),
+
+                    "time": (
+                        candle.time.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        if candle.time
+                        else None
+                    )
+                }
+
+                for candle in nifty_candles
+            ]
+
             replay_payload = {
 
                 "trade_data": trade_data,
@@ -361,9 +383,31 @@ class ReplayService:
 
                 "trade_construction": trade_construction,
 
-                "narrative_context": narrative_context
+                "narrative_context": narrative_context,
+
+                # =====================================
+                # PHASE 4 → AI EXPLANATION CONTEXT
+                # =====================================
+
+                "explanation_context": {}
 
             }
+
+            # =====================================
+            # PHASE 4 → AI EXPLANATION ENGINE
+            # =====================================
+
+            explanation_engine = ExplanationEngine()
+
+            explanation_context = (
+                explanation_engine.generate_explanations(
+                    replay_payload
+                )
+            )
+
+            replay_payload[
+                "explanation_context"
+            ] = explanation_context
 
             log_step(
                 "REPLAY PAYLOAD GENERATED"
@@ -389,6 +433,13 @@ class ReplayService:
                 replay_payload["market_events"]
             )
 
+            log_object(
+                "Explanation Context",
+                replay_payload[
+                    "explanation_context"
+                ]
+            )
+
             return replay_payload
 
         except Exception as error:
@@ -400,3 +451,4 @@ class ReplayService:
             log_error(error)
 
             raise
+
