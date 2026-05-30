@@ -139,6 +139,15 @@ export default function CandlestickChart({
             priceScaleId: "",
             color: "#3B82F6",
         });
+        volumeSeries.priceScale().applyOptions({
+
+            scaleMargins: {
+
+                top: 0.78,
+
+                bottom: 0,
+            },
+        });
 
         // -----------------------------------
         // Format candle data
@@ -426,18 +435,18 @@ export default function CandlestickChart({
             {hoverData && (
 
                 <div
-    className="
+                    className="
         w-full
         overflow-x-auto
     "
->
+                >
 
-    {
+                    {
 
-        hoverData && (
+                        hoverData && (
 
-            <div
-                className="
+                            <div
+                                className="
                     flex
                     min-w-max
                     items-center
@@ -452,97 +461,97 @@ export default function CandlestickChart({
                     text-gray-300
                     mb-3
                 "
-            >
+                            >
 
-                <div
-                    className="
+                                <div
+                                    className="
                         font-semibold
                         text-white
                     "
-                >
+                                >
 
-                    {title}
+                                    {title}
 
-                </div>
+                                </div>
 
-                <div>
-                    Time:
-                    <span
-                        className="
+                                <div>
+                                    Time:
+                                    <span
+                                        className="
                             ml-1
                             text-white
                         "
-                    >
-                        {hoverData.time}
-                    </span>
-                </div>
+                                    >
+                                        {hoverData.time}
+                                    </span>
+                                </div>
 
-                <div>
-                    O:
-                    <span
-                        className="
+                                <div>
+                                    O:
+                                    <span
+                                        className="
                             ml-1
                             text-green-400
                         "
-                    >
-                        {hoverData.open}
-                    </span>
-                </div>
+                                    >
+                                        {hoverData.open}
+                                    </span>
+                                </div>
 
-                <div>
-                    H:
-                    <span
-                        className="
+                                <div>
+                                    H:
+                                    <span
+                                        className="
                             ml-1
                             text-green-400
                         "
-                    >
-                        {hoverData.high}
-                    </span>
-                </div>
+                                    >
+                                        {hoverData.high}
+                                    </span>
+                                </div>
 
-                <div>
-                    L:
-                    <span
-                        className="
+                                <div>
+                                    L:
+                                    <span
+                                        className="
                             ml-1
                             text-red-400
                         "
-                    >
-                        {hoverData.low}
-                    </span>
-                </div>
+                                    >
+                                        {hoverData.low}
+                                    </span>
+                                </div>
 
-                <div>
-                    C:
-                    <span
-                        className="
+                                <div>
+                                    C:
+                                    <span
+                                        className="
                             ml-1
                             text-white
                         "
-                    >
-                        {hoverData.close}
-                    </span>
-                </div>
+                                    >
+                                        {hoverData.close}
+                                    </span>
+                                </div>
 
-                <div>
-                    Vol:
-                    <span
-                        className="
+                                <div>
+                                    Vol:
+                                    <span
+                                        className="
                             ml-1
                             text-cyan-400
                         "
-                    >
-                        {hoverData.volume}
-                    </span>
+                                    >
+                                        {hoverData.volume}
+                                    </span>
+                                </div>
+
+                            </div>
+                        )
+                    }
+
                 </div>
 
-            </div>
-        )
-    }
-
-</div>
-                
             )}
 
             <div ref={chartContainerRef} className="w-full" />
@@ -562,7 +571,7 @@ export default function CandlestickChart({
                         py-3
                         text-white
                         text-xs
-                        min-w-[260px]
+                        min-w-65
                     "
                     style={{
                         left: tooltipPosition.x + 15,
