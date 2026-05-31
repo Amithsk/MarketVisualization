@@ -20,6 +20,8 @@ type Props = {
     title: string;
     onCrosshairMove?: (timestamp: number | null) => void;
     synchronizedTimestamp?: number | null;
+    currentCandleIndex?: number;
+    onCandleSelect?: (index: number) => void;
 };
 
 // -----------------------------------
@@ -42,6 +44,8 @@ export default function CandlestickChart({
     title,
     onCrosshairMove,
     synchronizedTimestamp,
+    currentCandleIndex,
+    onCandleSelect,
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -184,6 +188,11 @@ export default function CandlestickChart({
         candleSeries.setData(formattedCandles);
         volumeSeries.setData(formattedVolume);
         // -----------------------------------
+        // Replay Auto Follow
+        // -----------------------------------
+
+        chart.timeScale().scrollToRealTime();
+        // -----------------------------------
         // Create Event Markers
         // -----------------------------------
 
@@ -246,6 +255,43 @@ export default function CandlestickChart({
                         }
 
                         // -----------------------------------
+                        // Replay Active Event Check
+                        // -----------------------------------
+
+                        const isActiveReplayEvent =
+
+                            currentCandleIndex !== undefined &&
+
+                            event.candle_index ===
+                            currentCandleIndex;
+
+                        // -----------------------------------
+                        // Default Marker Color
+                        // -----------------------------------
+
+                        const markerColor =
+
+                            event.event_type.includes(
+                                "BREAKOUT"
+                            )
+
+                                ? "#22c55e"
+
+                                : event.event_type.includes(
+                                    "REJECTION"
+                                )
+
+                                    ? "#ef4444"
+
+                                    : event.event_type.includes(
+                                        "VWAP"
+                                    )
+
+                                        ? "#3b82f6"
+
+                                        : "#f59e0b";
+
+                        // -----------------------------------
                         // Create Marker
                         // -----------------------------------
 
@@ -259,32 +305,22 @@ export default function CandlestickChart({
 
                             color:
 
-                                event.event_type.includes(
-                                    "BREAKOUT"
-                                )
+                                isActiveReplayEvent
 
-                                    ? "#22c55e"
+                                    ? "#00E5FF"
 
-                                    : event.event_type.includes(
-                                        "REJECTION"
-                                    )
-
-                                        ? "#ef4444"
-
-                                        : event.event_type.includes(
-                                            "VWAP"
-                                        )
-
-                                            ? "#3b82f6"
-
-                                            : "#f59e0b",
+                                    : markerColor,
 
                             shape:
-
                                 "circle" as const,
 
                             text:
-                                event.event_type
+
+                                isActiveReplayEvent
+
+                                    ? `▶ ${event.event_type}`
+
+                                    : event.event_type
                         };
                     }
                 )
@@ -341,14 +377,48 @@ export default function CandlestickChart({
                 setHoveredEvent(null);
                 return;
             }
+            // -----------------------------------
+            // Selected Candle Index
+            // -----------------------------------
+
+            const candleIndex = candles.findIndex((c) => {
+
+                return (
+                    createISTTimestamp(c.time) ===
+                    Number(param.time)
+                );
+            });
+
+            // -----------------------------------
+            // Notify Parent
+            // -----------------------------------
+
+            if (
+
+                candleIndex !== -1 &&
+
+                onCandleSelect
+            ) {
+
+                onCandleSelect(
+                    candleIndex
+                );
+            }
+            const matchedCandle = candles.find((c) => {
+
+                return (
+                    createISTTimestamp(c.time) ===
+                    Number(param.time)
+                );
+            });
 
             setHoverData({
-                time: candles.find((c) => { return (createISTTimestamp(c.time) === Number(param.time)); })?.time,
+                ttime: matchedCandle?.time,
                 open: candleData.open,
                 high: candleData.high,
                 low: candleData.low,
                 close: candleData.close,
-                volume: candles.find((c) => { return (createISTTimestamp(c.time) === Number(param.time)); })?.volume
+                volume: matchedCandle?.volume
             });
 
             if (onCrosshairMove) {

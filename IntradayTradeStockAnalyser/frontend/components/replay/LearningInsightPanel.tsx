@@ -8,6 +8,8 @@ type Props = {
 
     tradeConstructionSummary: string | null;
 
+    compact?: boolean;
+
     tradeCoaching?: {
 
         improvement_suggestions?: string[];
@@ -26,6 +28,8 @@ export default function LearningInsightPanel({
     executionSummary,
 
     tradeConstructionSummary,
+
+    compact = false,
 
     tradeCoaching
 

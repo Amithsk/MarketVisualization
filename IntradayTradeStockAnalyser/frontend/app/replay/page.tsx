@@ -50,6 +50,13 @@ import TimelineNarrationPanel from
 import CandleExplanationPanel from
     "../../components/replay/CandleExplanationPanel";
 
+import useReplayPlayback
+    from "../../hooks/useReplayPlayback";
+
+
+import ReplayControls
+    from "../../components/replay/ReplayControls";
+
 
 
 
@@ -96,6 +103,40 @@ export default function ReplayPage() {
         fetchReplayData
 
     } = useReplayData();
+    // -----------------------------------
+    // Replay Playback Engine
+    // -----------------------------------
+
+    const {
+
+        currentCandleIndex,
+
+        isPlaying,
+
+        playbackSpeed,
+
+        replayProgress,
+
+        play,
+
+        pause,
+
+        reset,
+
+        nextCandle,
+
+        previousCandle,
+
+        jumpToCandle,
+
+        setPlaybackSpeed,
+
+    } = useReplayPlayback({
+
+        totalCandles:
+            replayData?.stock_candles?.length || 0
+
+    });
 
     // -----------------------------------
     // Upload Status
@@ -103,6 +144,14 @@ export default function ReplayPage() {
 
     const [uploadSuccess, setUploadSuccess] =
         useState(false);
+
+    const [
+
+        selectedCandleIndex,
+
+        setSelectedCandleIndex
+
+    ] = useState<number>(0);
 
     // -----------------------------------
     // Reset Upload State
@@ -388,121 +437,160 @@ export default function ReplayPage() {
                     </div>
                 )
             }
-
             {/* -------------------------------- */}
-            {/* MARKET CONTEXT */}
-            {/* -------------------------------- */}
-
-            {
-
-                replayData && (
-
-                    <MarketBiasCard
-
-                        marketContext={
-                            replayData
-                                .market_context
-                        }
-
-                    />
-                )
-            }
-
-            {/* -------------------------------- */}
-            {/* TRADE PERMISSION */}
+            {/* REPLAY CONTROLS */}
             {/* -------------------------------- */}
 
             {
 
                 replayData && (
 
-                    <TradePermissionBanner
+                    <div
+                        className="
+                            mb-6
+                        "
+                    >
 
-                        tradePermission={
-                            replayData
-                                .execution_control
-                                .trade_permission
-                        }
+                        <ReplayControls
 
-                        executionAllowed={
-                            replayData
-                                .execution_control
-                                .execution_allowed
-                        }
+                            isPlaying={
+                                isPlaying
+                            }
 
-                    />
+                            playbackSpeed={
+                                playbackSpeed
+                            }
+
+                            replayProgress={
+                                replayProgress
+                            }
+
+                            currentCandleIndex={
+                                currentCandleIndex
+                            }
+
+                            totalCandles={
+                                replayData
+                                    .stock_candles
+                                    .length
+                            }
+
+                            onPlay={
+                                play
+                            }
+
+                            onPause={
+                                pause
+                            }
+
+                            onReset={
+                                reset
+                            }
+
+                            onNext={
+                                nextCandle
+                            }
+
+                            onPrevious={
+                                previousCandle
+                            }
+
+                            onSpeedChange={
+                                setPlaybackSpeed
+                            }
+
+                        />
+
+                    </div>
                 )
             }
 
             {/* -------------------------------- */}
-            {/* RELATIVE STRENGTH */}
+            {/* CHARTS */}
             {/* -------------------------------- */}
 
             {
 
                 replayData && (
 
-                    <RelativeStrengthBadge
+                    <div
+                        className="
+                            mb-6
+                        "
+                    >
 
-                        rsValue={
-                            replayData
-                                .stock_selection_context
-                                .rs_value
-                        }
+                        <SynchronizedCharts
 
-                        tradable={
-                            replayData
-                                .stock_selection_context
-                                .tradable
-                        }
+                            niftyCandles={
+                                replayData
+                                    .nifty_candles
+                            }
 
-                    />
+                            stockCandles={
+                                replayData
+                                    .stock_candles
+                            }
+
+                            marketEvents={
+                                replayData
+                                    .market_events
+                            }
+
+                            stockName={
+                                selectedStock
+                            }
+
+                            currentCandleIndex={
+                                currentCandleIndex
+                            }
+                            onCandleSelect={
+                                setSelectedCandleIndex
+                            }
+
+                        />
+
+                    </div>
                 )
             }
 
             {/* -------------------------------- */}
-            {/* STRATEGY CONTEXT */}
+            {/* CURRENT MARKET MOMENT */}
             {/* -------------------------------- */}
 
             {
 
                 replayData && (
 
-                    <StrategyContextPanel
+                    <CandleExplanationPanel
 
-                        strategyUsed={
-                            replayData
-                                .trade_construction
-                                .strategy_used
+                        compact={
+                            isPlaying
                         }
 
-                        structureValid={
-                            replayData
-                                .trade_construction
-                                .structure_valid
-                        }
+                        selectedExplanation={
 
-                        reason={
-                            replayData
-                                .stock_selection_context
-                                .reason
-                        }
+                            Object.values(
 
-                        strategySummary={
-                            replayData
-                                .narrative_context
-                                .strategy_summary
-                        }
+                                replayData
+                                    ?.explanation_context
+                                    ?.candle_explanations || {}
 
-                        strategyExplanation={
-                            replayData
-                                .explanation_context
-                                .strategy_explanations
+                            )[selectedCandleIndex] ||
+
+                            Object.values(
+
+                                replayData
+                                    ?.explanation_context
+                                    ?.candle_explanations || {}
+
+                            )[0]
+
                         }
 
                     />
                 )
             }
+
             {/* -------------------------------- */}
             {/* LEARNING INSIGHT PANEL */}
             {/* -------------------------------- */}
@@ -531,6 +619,10 @@ export default function ReplayPage() {
                                 ?.trade_construction_summary
                         }
 
+                        compact={
+                            isPlaying
+                        }
+
                         tradeCoaching={
                             replayData
                                 ?.explanation_context
@@ -541,95 +633,20 @@ export default function ReplayPage() {
                 )
             }
 
-         
             {/* -------------------------------- */}
-            {/* NIFTY RELATIONSHIP PANEL */}
-            {/* -------------------------------- */}
-
-            {
-
-                replayData && (
-
-                    <NIFTYRelationshipPanel
-
-                        niftyRelationshipAnalysis={
-                            replayData
-                                ?.explanation_context
-                                ?.nifty_relationship_analysis
-                        }
-
-                    />
-                )
-            }
-
-            {/* -------------------------------- */}
-            {/* TIMELINE NARRATION PANEL */}
+            {/* PAUSED MODE ANALYSIS */}
             {/* -------------------------------- */}
 
             {
 
-                replayData && (
+                replayData &&
 
-                    <TimelineNarrationPanel
+                !isPlaying && (
 
-                        timelineNarration={
-                            replayData
-                                ?.explanation_context
-                                ?.timeline_narration
-                        }
-
-                    />
-                )
-            }
-
-            {/* -------------------------------- */}
-            {/* CANDLE EXPLANATION PANEL */}
-            {/* -------------------------------- */}
-
-            {
-
-                replayData && (
-
-                    <CandleExplanationPanel
-
-                        selectedExplanation={
-
-                            Object.values(
-
-                                replayData
-                                    ?.explanation_context
-                                    ?.candle_explanations || {}
-
-                            )[0]
-
-                        }
-
-                    />
-                )
-            }
-
-
-
-
-
-
-            {/* -------------------------------- */}
-            {/* TOP CONTEXT GRID */}
-            {/* -------------------------------- */}
-
-            {
-
-                replayData && (
-
-                    <div
-                        className="
-                grid
-                grid-cols-1
-                lg:grid-cols-3
-                gap-4
-                mb-6
-            "
-                    >
+                    <>
+                        {/* -------------------------------- */}
+                        {/* MARKET CONTEXT */}
+                        {/* -------------------------------- */}
 
                         <MarketBiasCard
 
@@ -639,6 +656,10 @@ export default function ReplayPage() {
                             }
 
                         />
+
+                        {/* -------------------------------- */}
+                        {/* TRADE PERMISSION */}
+                        {/* -------------------------------- */}
 
                         <TradePermissionBanner
 
@@ -656,6 +677,10 @@ export default function ReplayPage() {
 
                         />
 
+                        {/* -------------------------------- */}
+                        {/* RELATIVE STRENGTH */}
+                        {/* -------------------------------- */}
+
                         <RelativeStrengthBadge
 
                             rsValue={
@@ -672,42 +697,88 @@ export default function ReplayPage() {
 
                         />
 
-                    </div>
+                        {/* -------------------------------- */}
+                        {/* STRATEGY CONTEXT */}
+                        {/* -------------------------------- */}
+
+                        <StrategyContextPanel
+
+                            strategyUsed={
+                                replayData
+                                    .trade_construction
+                                    .strategy_used
+                            }
+
+                            structureValid={
+                                replayData
+                                    .trade_construction
+                                    .structure_valid
+                            }
+
+                            reason={
+                                replayData
+                                    .stock_selection_context
+                                    .reason
+                            }
+
+                            strategySummary={
+                                replayData
+                                    .narrative_context
+                                    .strategy_summary
+                            }
+
+                            strategyExplanation={
+                                replayData
+                                    .explanation_context
+                                    .strategy_explanations
+                            }
+
+                        />
+
+                        {/* -------------------------------- */}
+                        {/* NIFTY RELATIONSHIP PANEL */}
+                        {/* -------------------------------- */}
+
+                        <NIFTYRelationshipPanel
+
+                            niftyRelationshipAnalysis={
+                                replayData
+                                    ?.explanation_context
+                                    ?.nifty_relationship_analysis
+                            }
+
+                        />
+
+                        {/* -------------------------------- */}
+                        {/* TIMELINE NARRATION PANEL */}
+                        {/* -------------------------------- */}
+
+                        <TimelineNarrationPanel
+
+                            timelineNarration={
+                                replayData
+                                    ?.explanation_context
+                                    ?.timeline_narration
+                            }
+
+                            currentCandleIndex={
+                                currentCandleIndex
+                            }
+
+                            compact={
+                                false
+                            }
+
+                            onJumpToCandle={
+                                jumpToCandle
+                            }
+
+                        />
+
+                    </>
                 )
             }
 
-            {/* -------------------------------- */}
-            {/* CHARTS */}
-            {/* -------------------------------- */}
-
-            {
-
-                replayData && (
-
-                    <SynchronizedCharts
-
-                        niftyCandles={
-                            replayData
-                                .nifty_candles
-                        }
-
-                        stockCandles={
-                            replayData
-                                .stock_candles
-                        }
-
-                        marketEvents={
-                            replayData
-                                .market_events
-                        }
-
-                        stockName={
-                            selectedStock
-                        }
-
-                    />
-                )
-            }
 
         </div>
 

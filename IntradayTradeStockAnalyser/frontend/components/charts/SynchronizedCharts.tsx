@@ -25,6 +25,12 @@ type Props = {
     marketEvents: MarketEvent[];
 
     stockName: string;
+
+    currentCandleIndex?: number;
+
+    onCandleSelect?: (
+        index: number
+    ) => void;
 };
 
 export default function SynchronizedCharts({
@@ -35,17 +41,23 @@ export default function SynchronizedCharts({
 
     marketEvents,
 
-    stockName
+    stockName,
+
+    currentCandleIndex,
+
+    onCandleSelect,
 
 }: Props) {
 
     // -----------------------------------
     // Shared Crosshair Timestamp
     // -----------------------------------
+
     const synchronizedTimestampRef =
         useRef<number | null>(
             null
         );
+
     console.log(
         "[SynchronizedCharts] Market Events:",
         marketEvents
@@ -55,6 +67,49 @@ export default function SynchronizedCharts({
         "[SynchronizedCharts] Market Events Count:",
         marketEvents?.length || 0
     );
+
+    // -----------------------------------
+    // Replay Candle Slicing
+    // -----------------------------------
+
+    const visibleNiftyCandles =
+        currentCandleIndex !== undefined
+            ? niftyCandles.slice(
+                0,
+                currentCandleIndex + 1
+            )
+            : niftyCandles;
+
+    const visibleStockCandles =
+        currentCandleIndex !== undefined
+            ? stockCandles.slice(
+                0,
+                currentCandleIndex + 1
+            )
+            : stockCandles;
+
+    // -----------------------------------
+    // Replay Event Filtering
+    // -----------------------------------
+
+    const visibleMarketEvents =
+        currentCandleIndex !== undefined
+            ? marketEvents.filter((event) => {
+
+                if (
+                    event.candle_index === undefined ||
+                    event.candle_index === null
+                ) {
+
+                    return false;
+                }
+
+                return (
+                    event.candle_index <=
+                    currentCandleIndex
+                );
+            })
+            : marketEvents;
 
     // -----------------------------------
     // Crosshair Handler
@@ -85,17 +140,20 @@ export default function SynchronizedCharts({
             <CandlestickChart
 
                 candles={
-                    niftyCandles
+                    visibleNiftyCandles
                 }
 
                 title="NIFTY 50"
+                currentCandleIndex={
+                    currentCandleIndex
+                }
 
                 onCrosshairMove={
                     handleCrosshairMove
                 }
 
                 synchronizedTimestamp={
-                     synchronizedTimestampRef.current
+                    synchronizedTimestampRef.current
                 }
 
             />
@@ -107,15 +165,23 @@ export default function SynchronizedCharts({
             <CandlestickChart
 
                 candles={
-                    stockCandles
+                    visibleStockCandles
                 }
 
                 marketEvents={
-                    marketEvents
+                    visibleMarketEvents
                 }
 
                 title={
                     stockName
+                }
+
+                currentCandleIndex={
+                    currentCandleIndex
+                }
+                
+                onCandleSelect={
+                    onCandleSelect
                 }
 
                 onCrosshairMove={

@@ -22,13 +22,136 @@ type CandleExplanation = {
 type Props = {
 
     selectedExplanation?: CandleExplanation | null;
+
+    compact?: boolean;
 };
 
 export default function CandleExplanationPanel({
 
-    selectedExplanation
+    selectedExplanation,
+    compact = false
 
 }: Props) {
+    
+    // =====================================
+    // COMPACT REPLAY MODE
+    // =====================================
+
+    if (
+
+        compact &&
+
+        selectedExplanation
+    ) {
+
+        return (
+
+            <div
+                className="
+                mb-6
+                rounded-lg
+                border
+                border-cyan-700
+                bg-cyan-950/30
+                p-5
+            "
+            >
+
+                {/* ========================= */}
+                {/* TITLE */}
+                {/* ========================= */}
+
+                <div
+                    className="
+                    mb-2
+                    text-lg
+                    font-bold
+                    text-cyan-300
+                "
+                >
+
+                    {
+
+                        selectedExplanation.title ||
+
+                        "Current Market Moment"
+                    }
+
+                </div>
+
+                {/* ========================= */}
+                {/* SUMMARY */}
+                {/* ========================= */}
+
+                <div
+                    className="
+                    mb-4
+                    text-sm
+                    leading-relaxed
+                    text-gray-200
+                "
+                >
+
+                    {
+
+                        selectedExplanation.summary ||
+
+                        "No summary available."
+                    }
+
+                </div>
+
+                {/* ========================= */}
+                {/* TRADE IMPLICATION */}
+                {/* ========================= */}
+
+                <div
+                    className="
+                    rounded-md
+                    border
+                    border-yellow-900
+                    bg-yellow-950/20
+                    p-3
+                "
+                >
+
+                    <div
+                        className="
+                        mb-1
+                        text-xs
+                        font-semibold
+                        uppercase
+                        tracking-wide
+                        text-yellow-400
+                    "
+                    >
+
+                        Trade Implication
+
+                    </div>
+
+                    <div
+                        className="
+                        text-sm
+                        text-gray-300
+                    "
+                    >
+
+                        {
+
+                            selectedExplanation
+                                .trading_implication ||
+
+                            "No trading implication available."
+                        }
+
+                    </div>
+
+                </div>
+
+            </div>
+        );
+    }
 
     return (
 

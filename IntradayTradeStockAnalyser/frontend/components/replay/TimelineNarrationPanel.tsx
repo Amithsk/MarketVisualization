@@ -20,14 +20,214 @@ type Props = {
 
     timelineNarration?: TimelineNarration[];
 
+
+    currentCandleIndex?: number;
+
+    compact?: boolean;
+
+    onJumpToCandle?: (
+        candleIndex: number
+    ) => void;
+
 };
 
 export default function TimelineNarrationPanel({
 
-    timelineNarration
+    timelineNarration,
+
+    currentCandleIndex,
+
+    compact = false,
+
+    onJumpToCandle,
 
 }: Props) {
 
+    // =====================================
+    // COMPACT REPLAY MODE
+    // =====================================
+
+    if (
+
+        compact &&
+
+        timelineNarration
+    ) {
+
+        const visibleNarration =
+
+            timelineNarration.filter(
+
+                (
+                    _,
+                    index
+                ) => {
+
+                    if (
+                        currentCandleIndex === undefined
+                    ) {
+
+                        return false;
+                    }
+
+                    return (
+
+                        index >=
+                        currentCandleIndex - 1 &&
+
+                        index <=
+                        currentCandleIndex + 1
+                    );
+                }
+            );
+
+        return (
+
+            <div
+                className="
+                mb-6
+                rounded-lg
+                border
+                border-orange-900
+                bg-orange-950/20
+                p-5
+            "
+            >
+
+                {/* ========================= */}
+                {/* HEADER */}
+                {/* ========================= */}
+
+                <div
+                    className="
+                    mb-4
+                    text-sm
+                    font-bold
+                    uppercase
+                    tracking-wide
+                    text-orange-300
+                "
+                >
+
+                    Current Market Story
+
+                </div>
+
+                {/* ========================= */}
+                {/* COMPACT TIMELINE */}
+                {/* ========================= */}
+
+                <div
+                    className="
+                    space-y-3
+                "
+                >
+
+                    {
+
+                        visibleNarration.map(
+
+                            (
+                                item,
+                                index
+                            ) => {
+
+                                const actualIndex =
+
+                                    timelineNarration.indexOf(
+                                        item
+                                    );
+
+                                const isActive =
+
+                                    actualIndex ===
+                                    currentCandleIndex;
+
+                                return (
+
+                                    <div
+
+                                        key={actualIndex}
+
+                                        onClick={() => {
+
+                                            if (
+                                                onJumpToCandle
+                                            ) {
+
+                                                onJumpToCandle(
+                                                    actualIndex
+                                                );
+                                            }
+                                        }}
+
+                                        className={`
+                                        rounded-md
+                                        border
+                                        p-3
+                                        cursor-pointer
+                                        transition-all
+
+                                        ${isActive
+
+                                                ? `
+                                                border-cyan-500
+                                                bg-cyan-950/40
+                                            `
+
+                                                : `
+                                                border-gray-800
+                                                bg-gray-950
+                                            `
+                                            }
+                                    `}
+                                    >
+
+                                        <div
+                                            className="
+                                            mb-1
+                                            text-sm
+                                            font-semibold
+                                            text-orange-300
+                                        "
+                                        >
+
+                                            {
+
+                                                item.title ||
+
+                                                "Market Event"
+                                            }
+
+                                        </div>
+
+                                        <div
+                                            className="
+                                            text-xs
+                                            text-gray-400
+                                        "
+                                        >
+
+                                            {
+
+                                                item.narration ||
+
+                                                "Narration unavailable."
+                                            }
+
+                                        </div>
+
+                                    </div>
+                                );
+                            }
+                        )
+                    }
+
+                </div>
+
+            </div>
+        );
+    }
     return (
 
         <div
@@ -103,16 +303,44 @@ export default function TimelineNarrationPanel({
                             item,
                             index
                         ) => (
-
                             <div
+
                                 key={index}
-                                className="
-                                    rounded-md
-                                    border
-                                    border-gray-800
-                                    bg-gray-950
-                                    p-4
-                                "
+
+                                onClick={() => {
+
+                                    if (
+                                        onJumpToCandle
+                                    ) {
+
+                                        onJumpToCandle(index);
+                                    }
+                                }}
+
+                                className={`
+        rounded-md
+        border
+        p-4
+        transition-all
+        duration-300
+        cursor-pointer
+
+        ${currentCandleIndex === index
+
+                                        ? `
+                    border-cyan-500
+                    bg-cyan-950/30
+                    shadow-lg
+                    shadow-cyan-500/20
+                  `
+
+                                        : `
+                    border-gray-800
+                    bg-gray-950
+                    hover:border-gray-700
+                  `
+                                    }
+    `}
                             >
 
                                 {/* ========================= */}
