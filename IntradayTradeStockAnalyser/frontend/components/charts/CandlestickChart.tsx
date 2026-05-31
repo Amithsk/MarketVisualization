@@ -200,131 +200,111 @@ export default function CandlestickChart({
             marketEvents &&
             marketEvents.length > 0
         ) {
+            // -----------------------------------
+            // Group Events By Candle
+            // -----------------------------------
 
-            const markers = marketEvents
-                .map(
-                    (
-                        event: MarketEvent
-                    ) => {
+            const eventsByCandle =
+                new Map<
+                    number,
+                    MarketEvent[]
+                >();
 
-                        const eventTime =
+            marketEvents.forEach(
+                (event) => {
 
-                            event.candle_time ||
-
-                            (event as any).time ||
-
-                            (event as any).timestamp;
-
-                        // -----------------------------------
-                        // Invalid Event Check
-                        // -----------------------------------
-
-                        if (!eventTime) {
-
-                            console.log(
-                                "[INVALID EVENT TIME]",
-                                event
-                            );
-
-                            return null;
-                        }
-
-                        // -----------------------------------
-                        // Match Marker To Exact Candle
-                        // -----------------------------------
-
-                        const matchingCandle =
-                            formattedCandles.find(
-                                (
-                                    candle
-                                ) =>
-                                    candle.time ===
-                                    createISTTimestamp(
-                                        eventTime
-                                    )
-                            );
-
-                        if (!matchingCandle) {
-
-                            console.log(
-                                "[NO MATCHING CANDLE]",
-                                eventTime
-                            );
-
-                            return null;
-                        }
-
-                        // -----------------------------------
-                        // Replay Active Event Check
-                        // -----------------------------------
-
-                        const isActiveReplayEvent =
-
-                            currentCandleIndex !== undefined &&
-
-                            event.candle_index ===
-                            currentCandleIndex;
-
-                        // -----------------------------------
-                        // Default Marker Color
-                        // -----------------------------------
-
-                        const markerColor =
-
-                            event.event_type.includes(
-                                "BREAKOUT"
-                            )
-
-                                ? "#22c55e"
-
-                                : event.event_type.includes(
-                                    "REJECTION"
-                                )
-
-                                    ? "#ef4444"
-
-                                    : event.event_type.includes(
-                                        "VWAP"
-                                    )
-
-                                        ? "#3b82f6"
-
-                                        : "#f59e0b";
-
-                        // -----------------------------------
-                        // Create Marker
-                        // -----------------------------------
-
-                        return {
-
-                            time:
-                                matchingCandle.time,
-
-                            position:
-                                "aboveBar" as const,
-
-                            color:
-
-                                isActiveReplayEvent
-
-                                    ? "#00E5FF"
-
-                                    : markerColor,
-
-                            shape:
-                                "circle" as const,
-
-                            text:
-
-                                isActiveReplayEvent
-
-                                    ? `▶ ${event.event_type}`
-
-                                    : event.event_type
-                        };
+                    if (
+                        event.candle_index === undefined ||
+                        event.candle_index === null
+                    ) {
+                        return;
                     }
+
+                    const existingEvents =
+                        eventsByCandle.get(
+                            event.candle_index
+                        ) || [];
+
+                    existingEvents.push(
+                        event
+                    );
+
+                    eventsByCandle.set(
+                        event.candle_index,
+                        existingEvents
+                    );
+                }
+            );
+
+            const markers =
+
+                Array.from(
+                    eventsByCandle.entries()
                 )
-                .filter(Boolean);
+
+                    .map(
+
+                        ([
+
+                            candleIndex,
+
+                            candleEvents
+
+                        ]) => {
+
+                            const matchingCandle =
+                                formattedCandles[
+                                candleIndex
+                                ];
+
+                            if (
+                                !matchingCandle
+                            ) {
+
+                                return null;
+                            }
+
+                            const eventCount =
+                                candleEvents.length;
+
+                            const isActiveReplayEvent =
+
+                                currentCandleIndex !== undefined &&
+
+                                candleIndex ===
+                                currentCandleIndex;
+
+                            return {
+
+                                time:
+                                    matchingCandle.time,
+
+                                position:
+                                    "aboveBar" as const,
+
+                                color:
+
+                                    isActiveReplayEvent
+
+                                        ? "#00E5FF"
+
+                                        : "#f59e0b",
+
+                                shape:
+                                    "square" as const,
+
+                                text:
+
+                                    eventCount > 1
+
+                                        ? `★${eventCount}`
+
+                                        : "★",
+                            };
+                        }
+                    )
+
+                    .filter(Boolean);
 
             console.log(
                 "[FIRST CANDLE TIME]",
