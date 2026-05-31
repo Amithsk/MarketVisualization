@@ -369,21 +369,7 @@ export default function CandlestickChart({
                 );
             });
 
-            // -----------------------------------
-            // Notify Parent
-            // -----------------------------------
 
-            if (
-
-                candleIndex !== -1 &&
-
-                onCandleSelect
-            ) {
-
-                onCandleSelect(
-                    candleIndex
-                );
-            }
             const matchedCandle = candles.find((c) => {
 
                 return (
@@ -448,6 +434,50 @@ export default function CandlestickChart({
         };
 
         chart.subscribeCrosshairMove(handleCrosshairMove);
+        // -----------------------------------
+        // Candle Click Selection
+        // -----------------------------------
+
+        const handleChartClick = (
+            param: any
+        ) => {
+
+            if (
+                !param.time ||
+                !onCandleSelect
+            ) {
+                return;
+            }
+
+            const candleIndex =
+                candles.findIndex(
+
+                    (candle) =>
+
+                        createISTTimestamp(
+                            candle.time
+                        ) ===
+                        Number(param.time)
+                );
+
+            if (
+                candleIndex !== -1
+            ) {
+
+                console.log(
+                    "[CLICKED CANDLE]",
+                    candleIndex
+                );
+
+                onCandleSelect(
+                    candleIndex
+                );
+            }
+        };
+
+        chart.subscribeClick(
+            handleChartClick
+        );
 
         // -----------------------------------
         // Fit content
@@ -473,8 +503,20 @@ export default function CandlestickChart({
         // -----------------------------------
 
         return () => {
-            window.removeEventListener("resize", handleResize);
-            chart.unsubscribeCrosshairMove(handleCrosshairMove);
+
+            window.removeEventListener(
+                "resize",
+                handleResize
+            );
+
+            chart.unsubscribeCrosshairMove(
+                handleCrosshairMove
+            );
+
+            chart.unsubscribeClick(
+                handleChartClick
+            );
+
             chart.remove();
         };
     }, [candles, marketEvents, onCrosshairMove, synchronizedTimestamp]);

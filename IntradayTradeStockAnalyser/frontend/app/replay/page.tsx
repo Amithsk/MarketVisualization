@@ -200,6 +200,22 @@ export default function ReplayPage() {
                 selectedStock
         });
     };
+    const selectedCandleEvents =
+
+        replayData?.market_events?.filter(
+
+            (event) =>
+
+                event.candle_index ===
+                selectedCandleIndex
+
+        ) || [];
+    
+    console.log(
+        "[SELECTED EVENTS]",
+        selectedCandleIndex,
+        selectedCandleEvents.length
+    );
 
     return (
 
@@ -553,19 +569,27 @@ export default function ReplayPage() {
                 )
             }
 
+
             {/* -------------------------------- */}
             {/* CURRENT MARKET MOMENT */}
             {/* -------------------------------- */}
 
             {
 
+
                 replayData && (
+
 
                     <CandleExplanationPanel
 
                         compact={
                             isPlaying
                         }
+
+                        selectedEvents={
+                            selectedCandleEvents
+                        }
+
 
                         selectedExplanation={
 

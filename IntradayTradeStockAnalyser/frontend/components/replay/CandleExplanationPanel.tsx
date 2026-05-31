@@ -1,5 +1,10 @@
 //IntradayTradeStockAnalyser/frontend/components/replay/CandleExplanationPanel.tsx
 
+import {
+    MarketEvent
+}
+    from "../../types/replay";
+
 type CandleExplanation = {
 
     title?: string;
@@ -8,7 +13,7 @@ type CandleExplanation = {
 
     explanation?: string;
 
-    trading_implication?: string;
+    trade_implication?: string;
 
     event_type?: string;
 
@@ -23,16 +28,21 @@ type Props = {
 
     selectedExplanation?: CandleExplanation | null;
 
+    selectedEvents?: MarketEvent[];
+
     compact?: boolean;
 };
 
 export default function CandleExplanationPanel({
 
     selectedExplanation,
+
+    selectedEvents = [],
+
     compact = false
 
 }: Props) {
-    
+
     // =====================================
     // COMPACT REPLAY MODE
     // =====================================
@@ -102,6 +112,63 @@ export default function CandleExplanationPanel({
                 </div>
 
                 {/* ========================= */}
+                {/* EVENTS DETECTED */}
+                {/* ========================= */}
+
+                {
+                    selectedEvents.length > 0 && (
+
+                        <div
+                            className="
+                mb-4
+            "
+                        >
+
+                            <h3
+                                className="
+                    font-semibold
+                    mb-2
+                "
+                            >
+                                Events Detected
+                            </h3>
+
+                            <ul
+                                className="
+                    list-disc
+                    ml-5
+                    text-sm
+                "
+                            >
+
+                                {
+                                    selectedEvents.map(
+
+                                        (
+                                            event,
+                                            index
+                                        ) => (
+
+                                            <li
+                                                key={
+                                                    index
+                                                }
+                                            >
+                                                {
+                                                    event.event_type
+                                                }
+                                            </li>
+                                        )
+                                    )
+                                }
+
+                            </ul>
+
+                        </div>
+                    )
+                }
+
+                {/* ========================= */}
                 {/* TRADE IMPLICATION */}
                 {/* ========================= */}
 
@@ -140,7 +207,7 @@ export default function CandleExplanationPanel({
                         {
 
                             selectedExplanation
-                                .trading_implication ||
+                                .trade_implication ||
 
                             "No trading implication available."
                         }
@@ -340,6 +407,62 @@ export default function CandleExplanationPanel({
                         </div>
 
                         {/* ========================= */}
+                        {/* EVENTS DETECTED */}
+                        {/* ========================= */}
+
+                        {
+                            selectedEvents.length > 0 && (
+
+                                <div
+                                    className="
+                mb-4
+            "
+                                >
+
+                                    <div
+                                        className="
+                    mb-2
+                    text-sm
+                    font-semibold
+                    text-yellow-300
+                "
+                                    >
+                                        Events Detected
+                                    </div>
+
+                                    <ul
+                                        className="
+                    list-disc
+                    ml-5
+                    text-sm
+                    text-gray-300
+                "
+                                    >
+
+                                        {
+                                            selectedEvents.map(
+
+                                                (
+                                                    event,
+                                                    index
+                                                ) => (
+
+                                                    <li
+                                                        key={index}
+                                                    >
+                                                        {event.event_type}
+                                                    </li>
+                                                )
+                                            )
+                                        }
+
+                                    </ul>
+
+                                </div>
+                            )
+                        }
+
+                        {/* ========================= */}
                         {/* SUMMARY */}
                         {/* ========================= */}
 
@@ -453,7 +576,7 @@ export default function CandleExplanationPanel({
                                 {
 
                                     selectedExplanation
-                                        .trading_implication ||
+                                        .trade_implication ||
 
                                     "No trading implication available."
                                 }
