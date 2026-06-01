@@ -1,22 +1,11 @@
 //IntradayTradeStockAnalyser/frontend/components/replay/NIFTYRelationshipPanel.tsx
 
+import { NiftyRelationshipAnalysis }
+from "../../types/replay";
+
 type Props = {
-
-    niftyRelationshipAnalysis?: {
-
-        market_alignment?: string;
-
-        relative_strength_analysis?: string;
-
-        market_direction?: string;
-
-        stock_behavior?: string;
-
-        trading_implication?: string;
-
-        influence?: string;
-
-    } | null;
+    niftyRelationshipAnalysis?:
+        NiftyRelationshipAnalysis | null;
 };
 
 export default function NIFTYRelationshipPanel({
@@ -45,9 +34,9 @@ export default function NIFTYRelationshipPanel({
         niftyRelationshipAnalysis
             ?.trading_implication;
 
-    const influence =
+    const relationshipStrength =
         niftyRelationshipAnalysis
-            ?.influence;
+            ?.relationship_strength;
 
     return (
 
@@ -333,7 +322,7 @@ export default function NIFTYRelationshipPanel({
 
                     {
 
-                        influence ||
+                        relationshipStrength  ||
 
                         "No market influence explanation available."
                     }
