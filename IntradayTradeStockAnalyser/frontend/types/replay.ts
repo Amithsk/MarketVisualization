@@ -176,6 +176,77 @@ export type NiftyContext = {
     relative_strength_score: number;
 };
 
+export type CandleExplanation = {
+
+    title?: string;
+
+    summary?: string;
+
+    reasons?: string[];
+
+    market_interpretation?: string;
+
+    trade_implication?: string;
+
+    nifty_relationship?: string;
+
+    confidence_score?: number;
+};
+
+export type TimelineNarration = {
+
+    candle_index: number;
+
+    timestamp: string;
+
+    title: string;
+
+    nifty_behavior: string;
+
+    stock_behavior: string;
+
+    relationship: string;
+
+    interpretation: string;
+
+    trading_implication: string;
+};
+export type TradeCoaching = {
+
+    execution_quality: string;
+
+    entry_review: string;
+
+    stop_review: string;
+
+    exit_review: string;
+
+    strategy_review: string;
+
+    mistakes_detected: string[];
+
+    improvement_suggestions: string[];
+
+    confidence_score: number;
+};
+
+export type NiftyRelationshipAnalysis = {
+
+    market_direction: string;
+
+    stock_behavior: string;
+
+    relationship_strength: string;
+
+    market_alignment: string;
+
+    relative_strength_analysis: string;
+
+    trading_implication: string;
+
+    confidence_score: number;
+};
+
 export type MarketEvent = {
 
     event_id: number;
@@ -244,7 +315,10 @@ export type ReplayData = {
 
     explanation_context?: {
 
-        candle_explanations?: Record<string, unknown>;
+        candle_explanations?: Record<
+        string,
+        CandleExplanation
+            >;
 
         strategy_explanations?: {
 
@@ -260,11 +334,11 @@ export type ReplayData = {
 
         };
 
-        timeline_narration?: unknown[];
+        timeline_narration?: TimelineNarration[];
 
-        trade_coaching?: Record<string, unknown>;
+        trade_coaching?: TradeCoaching;
 
-        nifty_relationship_analysis?: Record<string, unknown>;
+        nifty_relationship_analysis?: NiftyRelationshipAnalysis;
     };
 
 
