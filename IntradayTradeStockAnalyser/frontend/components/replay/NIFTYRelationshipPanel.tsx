@@ -12,7 +12,7 @@ type Props = {
 
         stock_behavior?: string;
 
-        relationship_summary?: string;
+        trading_implication?: string;
 
         influence?: string;
 
@@ -41,9 +41,9 @@ export default function NIFTYRelationshipPanel({
         niftyRelationshipAnalysis
             ?.stock_behavior;
 
-    const relationshipSummary =
+    const tradingImplication  =
         niftyRelationshipAnalysis
-            ?.relationship_summary;
+            ?.trading_implication;
 
     const influence =
         niftyRelationshipAnalysis
@@ -96,7 +96,7 @@ export default function NIFTYRelationshipPanel({
 
                 {
 
-                    relationshipSummary ||
+                    tradingImplication  ||
 
                     "No NIFTY relationship analysis available."
                 }
