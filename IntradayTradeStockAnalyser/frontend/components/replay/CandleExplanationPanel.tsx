@@ -11,7 +11,7 @@ type CandleExplanation = {
 
     summary?: string;
 
-    explanation?: string;
+    market_interpretation ?: string;
 
     trade_implication?: string;
 
@@ -526,7 +526,7 @@ export default function CandleExplanationPanel({
                                 {
 
                                     selectedExplanation
-                                        .explanation ||
+                                        .market_interpretation ||
 
                                     "No detailed explanation available."
                                 }
