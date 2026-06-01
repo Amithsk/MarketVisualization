@@ -6,11 +6,11 @@ type Props = {
 
         market_alignment?: string;
 
-        relative_strength?: string;
+        relative_strength_analysis?: string;
 
-        nifty_trend?: string;
+        market_direction?: string;
 
-        stock_trend?: string;
+        stock_behavior?: string;
 
         relationship_summary?: string;
 
@@ -29,17 +29,17 @@ export default function NIFTYRelationshipPanel({
         niftyRelationshipAnalysis
             ?.market_alignment;
 
-    const relativeStrength =
+    const relativeStrengthAnalysis  =
         niftyRelationshipAnalysis
-            ?.relative_strength;
+            ?.relative_strength_analysis;
 
-    const niftyTrend =
+    const marketDirection  =
         niftyRelationshipAnalysis
-            ?.nifty_trend;
+            ?.market_direction;
 
-    const stockTrend =
+    const stockBehavior  =
         niftyRelationshipAnalysis
-            ?.stock_trend;
+            ?.stock_behavior;
 
     const relationshipSummary =
         niftyRelationshipAnalysis
@@ -151,7 +151,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            niftyTrend ||
+                            marketDirection   ||
 
                             "Unavailable"
                         }
@@ -195,7 +195,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            stockTrend ||
+                            stockBehavior  ||
 
                             "Unavailable"
                         }
@@ -283,7 +283,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            relativeStrength ||
+                            relativeStrengthAnalysis  ||
 
                             "Unavailable"
                         }
