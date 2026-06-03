@@ -29,17 +29,17 @@ export default function LearningInsightPanel({
     tradeCoaching
 
 }: Props) {
-    
-     console.log(
-            "[LearningInsightPanel]",
-            tradeCoaching
-        );
+
+    console.log(
+        "[LearningInsightPanel]",
+        tradeCoaching
+    );
 
     return (
-       
 
-    <div
-        className="
+
+        <div
+            className="
                 mb-6
                 rounded-lg
                 border
@@ -47,14 +47,14 @@ export default function LearningInsightPanel({
                 bg-blue-950/30
                 p-5
             "
-    >
+        >
 
-        {/* ===================================== */}
-        {/* HEADER */}
-        {/* ===================================== */}
+            {/* ===================================== */}
+            {/* HEADER */}
+            {/* ===================================== */}
 
-        <div
-            className="
+            <div
+                className="
                     mb-4
                     text-sm
                     font-bold
@@ -62,44 +62,44 @@ export default function LearningInsightPanel({
                     tracking-wide
                     text-blue-300
                 "
-        >
+            >
 
-            Learning Insight
+                Learning Insight
 
-        </div>
+            </div>
 
-        {/* ===================================== */}
-        {/* PRIMARY LEARNING INSIGHT */}
-        {/* ===================================== */}
+            {/* ===================================== */}
+            {/* PRIMARY LEARNING INSIGHT */}
+            {/* ===================================== */}
 
-        <div
-            className="
+            <div
+                className="
                     mb-4
                     text-sm
                     leading-relaxed
                     text-gray-200
                 "
-        >
+            >
+
+                {
+
+                    learningInsight ||
+
+                    "No learning insight available."
+                }
+
+            </div>
+
+            {/* ===================================== */}
+            {/* AI TRADE COACHING */}
+            {/* ===================================== */}
 
             {
 
-                learningInsight ||
+                tradeCoaching && (
 
-                "No learning insight available."
-            }
-
-        </div>
-
-        {/* ===================================== */}
-        {/* AI TRADE COACHING */}
-        {/* ===================================== */}
-
-        {
-
-            tradeCoaching && (
-
-                <div
-                    className="
+                    <div
+                        className="
                             mb-4
                             rounded-md
                             border
@@ -107,10 +107,10 @@ export default function LearningInsightPanel({
                             bg-yellow-950/20
                             p-4
                         "
-                >
+                    >
 
-                    <div
-                        className="
+                        <div
+                            className="
                                 mb-3
                                 text-xs
                                 font-semibold
@@ -118,26 +118,26 @@ export default function LearningInsightPanel({
                                 tracking-wide
                                 text-yellow-400
                             "
-                    >
+                        >
 
-                        AI Trade Coaching
+                            AI Trade Coaching
 
-                    </div>
+                        </div>
 
 
-                    {
+                        {
 
-                        tradeCoaching
-                            .execution_quality && (
-
-                            <div
-                                className="
-                                        mb-3
-                                    "
-                            >
+                            tradeCoaching
+                                .execution_quality && (
 
                                 <div
                                     className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
                                             mb-1
                                             text-xs
                                             font-semibold
@@ -145,46 +145,219 @@ export default function LearningInsightPanel({
                                             tracking-wide
                                             text-yellow-300
                                         "
-                                >
+                                    >
 
-                                    Execution Quality
+                                        Execution Quality
 
-                                </div>
+                                    </div>
 
-                                <div
-                                    className="
+                                    <div
+                                        className="
                                             text-xs
                                             text-gray-300
                                         "
-                                >
+                                    >
 
-                                    {
-                                        tradeCoaching
-                                            .execution_quality
-                                    }
+                                        {
+                                            tradeCoaching
+                                                .execution_quality
+                                        }
+
+                                    </div>
 
                                 </div>
+                            )
+                        }
+                        {
 
-                            </div>
-                        )
-                    }
-
-                    {
-
-                        tradeCoaching
-                            .mistakes_detected &&
-                        tradeCoaching
-                            .mistakes_detected
-                            .length > 0 && (
-
-                            <div
-                                className="
-                                        mb-3
-                                    "
-                            >
+                            tradeCoaching
+                                .entry_review && (
 
                                 <div
                                     className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-yellow-300
+                                        "
+                                    >
+
+                                        Entry Review
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-xs
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+                                            tradeCoaching
+                                                .entry_review
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                        {
+
+                            tradeCoaching
+                                .strategy_review && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-yellow-300
+                                        "
+                                    >
+
+                                        Strategy Review
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-xs
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+                                            tradeCoaching
+                                                .strategy_review
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                        {
+
+                            tradeCoaching
+                                .stop_review && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-yellow-300
+                                        "
+                                    >
+
+                                        Stop Review
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-xs
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+                                            tradeCoaching
+                                                .stop_review
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                                                {
+
+                            tradeCoaching
+                                .exit_review && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-yellow-300
+                                        "
+                                    >
+
+                                        Exit Review
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-xs
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+                                            tradeCoaching
+                                                .exit_review
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+
+
+                        {
+
+                            tradeCoaching
+                                .mistakes_detected &&
+                            tradeCoaching
+                                .mistakes_detected
+                                .length > 0 && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
                                             mb-2
                                             text-xs
                                             font-semibold
@@ -192,14 +365,14 @@ export default function LearningInsightPanel({
                                             tracking-wide
                                             text-red-400
                                         "
-                                >
+                                    >
 
-                                    Mistakes Detected
+                                        Mistakes Detected
 
-                                </div>
+                                    </div>
 
-                                <ul
-                                    className="
+                                    <ul
+                                        className="
                                             list-disc
                                             space-y-1
                                             pl-4
@@ -207,49 +380,49 @@ export default function LearningInsightPanel({
                                             leading-relaxed
                                             text-gray-400
                                         "
-                                >
+                                    >
 
-                                    {
+                                        {
 
-                                        tradeCoaching
-                                            .mistakes_detected
-                                            .map(
-                                                (
-                                                    mistake,
-                                                    index
-                                                ) => (
+                                            tradeCoaching
+                                                .mistakes_detected
+                                                .map(
+                                                    (
+                                                        mistake,
+                                                        index
+                                                    ) => (
 
-                                                    <li
-                                                        key={index}
-                                                    >
+                                                        <li
+                                                            key={index}
+                                                        >
 
-                                                        {
-                                                            mistake
-                                                        }
+                                                            {
+                                                                mistake
+                                                            }
 
-                                                    </li>
+                                                        </li>
+                                                    )
                                                 )
-                                            )
-                                    }
+                                        }
 
-                                </ul>
+                                    </ul>
 
-                            </div>
-                        )
-                    }
+                                </div>
+                            )
+                        }
 
-                    {
+                        {
 
-                        tradeCoaching
-                            .improvement_suggestions &&
-                        tradeCoaching
-                            .improvement_suggestions
-                            .length > 0 && (
+                            tradeCoaching
+                                .improvement_suggestions &&
+                            tradeCoaching
+                                .improvement_suggestions
+                                .length > 0 && (
 
-                            <div>
+                                <div>
 
-                                <div
-                                    className="
+                                    <div
+                                        className="
                                             mb-2
                                             text-xs
                                             font-semibold
@@ -257,14 +430,14 @@ export default function LearningInsightPanel({
                                             tracking-wide
                                             text-green-400
                                         "
-                                >
+                                    >
 
-                                    Improvement Suggestions
+                                        Improvement Suggestions
 
-                                </div>
+                                    </div>
 
-                                <ul
-                                    className="
+                                    <ul
+                                        className="
                                             list-disc
                                             space-y-1
                                             pl-4
@@ -272,47 +445,47 @@ export default function LearningInsightPanel({
                                             leading-relaxed
                                             text-gray-400
                                         "
-                                >
+                                    >
 
-                                    {
+                                        {
 
-                                        tradeCoaching
-                                            .improvement_suggestions
-                                            .map(
-                                                (
-                                                    suggestion,
-                                                    index
-                                                ) => (
+                                            tradeCoaching
+                                                .improvement_suggestions
+                                                .map(
+                                                    (
+                                                        suggestion,
+                                                        index
+                                                    ) => (
 
-                                                    <li
-                                                        key={index}
-                                                    >
+                                                        <li
+                                                            key={index}
+                                                        >
 
-                                                        {
-                                                            suggestion
-                                                        }
+                                                            {
+                                                                suggestion
+                                                            }
 
-                                                    </li>
+                                                        </li>
+                                                    )
                                                 )
-                                            )
-                                    }
+                                        }
 
-                                </ul>
+                                    </ul>
 
-                            </div>
-                        )
-                    }
+                                </div>
+                            )
+                        }
 
-                </div>
-            )
-        }
+                    </div>
+                )
+            }
 
-        {/* ===================================== */}
-        {/* EXECUTION CONTEXT */}
-        {/* ===================================== */}
+            {/* ===================================== */}
+            {/* EXECUTION CONTEXT */}
+            {/* ===================================== */}
 
-        <div
-            className="
+            <div
+                className="
                     mb-3
                     rounded-md
                     border
@@ -320,10 +493,10 @@ export default function LearningInsightPanel({
                     bg-gray-950
                     p-3
                 "
-        >
+            >
 
-            <div
-                className="
+                <div
+                    className="
                         mb-2
                         text-xs
                         font-semibold
@@ -331,47 +504,47 @@ export default function LearningInsightPanel({
                         tracking-wide
                         text-gray-500
                     "
-            >
+                >
 
-                Execution Context
+                    Execution Context
 
-            </div>
+                </div>
 
-            <div
-                className="
+                <div
+                    className="
                         text-xs
                         leading-relaxed
                         text-gray-400
                     "
-            >
+                >
 
-                {
+                    {
 
-                    executionSummary ||
+                        executionSummary ||
 
-                    "Execution summary unavailable."
-                }
+                        "Execution summary unavailable."
+                    }
+
+                </div>
 
             </div>
 
-        </div>
+            {/* ===================================== */}
+            {/* TRADE CONSTRUCTION */}
+            {/* ===================================== */}
 
-        {/* ===================================== */}
-        {/* TRADE CONSTRUCTION */}
-        {/* ===================================== */}
-
-        <div
-            className="
+            <div
+                className="
                     rounded-md
                     border
                     border-gray-800
                     bg-gray-950
                     p-3
                 "
-        >
+            >
 
-            <div
-                className="
+                <div
+                    className="
                         mb-2
                         text-xs
                         font-semibold
@@ -379,32 +552,32 @@ export default function LearningInsightPanel({
                         tracking-wide
                         text-gray-500
                     "
-            >
+                >
 
-                Trade Construction
+                    Trade Construction
 
-            </div>
+                </div>
 
-            <div
-                className="
+                <div
+                    className="
                         text-xs
                         leading-relaxed
                         text-gray-400
                     "
-            >
+                >
 
-                {
+                    {
 
-                    tradeConstructionSummary ||
+                        tradeConstructionSummary ||
 
-                    "Trade construction summary unavailable."
-                }
+                        "Trade construction summary unavailable."
+                    }
+
+                </div>
 
             </div>
 
         </div>
-
-    </div>
     );
 }
 
