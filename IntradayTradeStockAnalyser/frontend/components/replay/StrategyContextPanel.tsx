@@ -13,14 +13,12 @@ type Props = {
     strategyExplanation?: {
 
         strategy_name?: string;
-
-        explanation?: string;
-
+        strategy_bias?: string;
+        selection_reasons?: string[];
+        market_alignment?: string;
+        execution_expectation?: string;
+        risk_notes?: string[];
         confidence_score?: number;
-
-        tradable?: boolean;
-
-        direction?: string;
 
     } | null;
 };
@@ -65,6 +63,11 @@ export default function StrategyContextPanel({
         badgeColor =
             "bg-red-700";
     }
+
+    console.log(
+        "[StrategyContextPanel] strategyExplanation:",
+        strategyExplanation
+    );
 
     return (
 
@@ -125,10 +128,9 @@ export default function StrategyContextPanel({
                         text-xs
                         font-semibold
                         text-white
-                        ${
-                            structureValid
-                                ? "bg-green-800"
-                                : "bg-red-800"
+                        ${structureValid
+                            ? "bg-green-800"
+                            : "bg-red-800"
                         }
                     `}
                 >
@@ -199,62 +201,332 @@ export default function StrategyContextPanel({
                             AI STRATEGY ANALYSIS
 
                         </div>
+                        {
 
-                        <div
-                            className="
-                                mb-2
-                                text-sm
-                                leading-relaxed
-                                text-gray-300
-                            "
-                        >
+                            strategyExplanation
+                                .strategy_name && (
 
-                            {
-
-                                strategyExplanation
-                                    .explanation ||
-
-                                "No AI explanation available."
-                            }
-
-                        </div>
-
-                        <div
-                            className="
-                                flex
-                                flex-wrap
-                                gap-2
-                                text-xs
-                            "
-                        >
-
-                            {
-
-                                strategyExplanation
-                                    .direction && (
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
 
                                     <div
                                         className="
-                                            rounded
-                                            bg-gray-800
-                                            px-2
-                                            py-1
-                                            text-gray-300
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-blue-300
                                         "
                                     >
 
-                                        Direction:
-                                        {" "}
+                                        Strategy Name
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-sm
+                                            font-medium
+                                            text-white
+                                        "
+                                    >
 
                                         {
 
                                             strategyExplanation
-                                                .direction
+                                                .strategy_name
                                         }
 
                                     </div>
-                                )
-                            }
+
+                                </div>
+                            )
+                        }
+
+                        {
+
+                            strategyExplanation
+                                .strategy_bias && (
+
+                                <div
+                                    className="
+                                            mb-3
+                                        "
+                                >
+
+                                    <div
+                                        className="
+                                                mb-1
+                                                text-xs
+                                                font-semibold
+                                                uppercase
+                                                tracking-wide
+                                                text-blue-300
+                                            "
+                                    >
+
+                                        Strategy Bias
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                                text-sm
+                                                text-gray-300
+                                            "
+                                    >
+
+                                        {
+
+                                            strategyExplanation
+                                                .strategy_bias
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                                                {
+
+                            strategyExplanation
+                                .market_alignment && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-blue-300
+                                        "
+                                    >
+
+                                        Market Alignment
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-sm
+                                            leading-relaxed
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+
+                                            strategyExplanation
+                                                .market_alignment
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                                                {
+
+                            strategyExplanation
+                                .execution_expectation && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-1
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-blue-300
+                                        "
+                                    >
+
+                                        Execution Expectation
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-sm
+                                            leading-relaxed
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+
+                                            strategyExplanation
+                                                .execution_expectation
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+                                                 {
+
+                            strategyExplanation
+                                .risk_notes &&
+                            strategyExplanation
+                                .risk_notes
+                                .length > 0 && (
+
+                                <div
+                                    className="
+                                        mb-3
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-2
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-yellow-300
+                                        "
+                                    >
+
+                                        Risk Notes
+
+                                    </div>
+
+                                    <ul
+                                        className="
+                                            list-disc
+                                            space-y-1
+                                            pl-4
+                                            text-sm
+                                            leading-relaxed
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+
+                                            strategyExplanation
+                                                .risk_notes
+                                                .map(
+                                                    (
+                                                        risk,
+                                                        index
+                                                    ) => (
+
+                                                        <li
+                                                            key={index}
+                                                        >
+
+                                                            {
+                                                                risk
+                                                            }
+
+                                                        </li>
+                                                    )
+                                                )
+                                        }
+
+                                    </ul>
+
+                                </div>
+                            )
+                        }
+
+                        {
+
+                            strategyExplanation
+                                .selection_reasons &&
+                            strategyExplanation
+                                .selection_reasons
+                                .length > 0 && (
+
+                                <div
+                                    className="
+                                            mb-3
+                                        "
+                                >
+
+                                    <div
+                                        className="
+                                                mb-2
+                                                text-xs
+                                                font-semibold
+                                                uppercase
+                                                tracking-wide
+                                                text-blue-300
+                                            "
+                                    >
+
+                                        Selection Reasons
+
+                                    </div>
+
+                                    <ul
+                                        className="
+                                                list-disc
+                                                space-y-1
+                                                pl-4
+                                                text-sm
+                                                leading-relaxed
+                                                text-gray-300
+                                            "
+                                    >
+
+                                        {
+
+                                            strategyExplanation
+                                                .selection_reasons
+                                                .map(
+                                                    (
+                                                        reason,
+                                                        index
+                                                    ) => (
+
+                                                        <li
+                                                            key={index}
+                                                        >
+
+                                                            {
+                                                                reason
+                                                            }
+
+                                                        </li>
+                                                    )
+                                                )
+                                        }
+
+                                    </ul>
+
+                                </div>
+                            )
+                        }
+
+                        <div
+                            className="
+                                    flex
+                                    flex-wrap
+                                    gap-2
+                                    text-xs
+                                "
+                        >
 
                             {
 
@@ -285,37 +557,6 @@ export default function StrategyContextPanel({
                                 )
                             }
 
-                            {
-
-                                strategyExplanation
-                                    .tradable !==
-                                undefined && (
-
-                                    <div
-                                        className={`
-                                            rounded
-                                            px-2
-                                            py-1
-                                            ${
-                                                strategyExplanation
-                                                    .tradable
-                                                    ? "bg-green-900 text-green-300"
-                                                    : "bg-red-900 text-red-300"
-                                            }
-                                        `}
-                                    >
-
-                                        {
-
-                                            strategyExplanation
-                                                .tradable
-                                                ? "TRADABLE"
-                                                : "NON TRADABLE"
-                                        }
-
-                                    </div>
-                                )
-                            }
 
                         </div>
 
