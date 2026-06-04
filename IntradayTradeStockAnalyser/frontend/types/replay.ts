@@ -316,21 +316,25 @@ export type ReplayData = {
     explanation_context?: {
 
         candle_explanations?: Record<
-        string,
-        CandleExplanation
-            >;
+            string,
+            CandleExplanation
+        >;
 
         strategy_explanations?: {
 
             strategy_name?: string;
 
-            explanation?: string;
+            strategy_bias?: string;
+
+            selection_reasons?: string[];
+
+            market_alignment?: string;
+
+            execution_expectation?: string;
+
+            risk_notes?: string[];
 
             confidence_score?: number;
-
-            tradable?: boolean;
-
-            direction?: string;
 
         };
 
