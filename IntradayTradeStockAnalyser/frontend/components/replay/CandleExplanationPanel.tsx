@@ -110,6 +110,7 @@ export default function CandleExplanationPanel({
                     }
 
                 </div>
+                
 
                 {/* ========================= */}
                 {/* EVENTS DETECTED */}
