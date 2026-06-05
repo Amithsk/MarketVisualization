@@ -166,63 +166,7 @@ export default function CandleExplanationPanel({
                     )
                 }
 
-                {/* ========================= */}
-                {/* EVENTS DETECTED */}
-                {/* ========================= */}
-
-                {
-                    selectedEvents.length > 0 && (
-
-                        <div
-                            className="
-                mb-4
-            "
-                        >
-
-                            <h3
-                                className="
-                    font-semibold
-                    mb-2
-                "
-                            >
-                                Events Detected
-                            </h3>
-
-                            <ul
-                                className="
-                    list-disc
-                    ml-5
-                    text-sm
-                "
-                            >
-
-                                {
-                                    selectedEvents.map(
-
-                                        (
-                                            event,
-                                            index
-                                        ) => (
-
-                                            <li
-                                                key={
-                                                    index
-                                                }
-                                            >
-                                                {
-                                                    event.event_type
-                                                }
-                                            </li>
-                                        )
-                                    )
-                                }
-
-                            </ul>
-
-                        </div>
-                    )
-                }
-
+ 
                 {/* ========================= */}
                 {/* TRADE IMPLICATION */}
                 {/* ========================= */}
