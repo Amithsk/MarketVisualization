@@ -1,28 +1,11 @@
 //IntradayTradeStockAnalyser/frontend/components/replay/CandleExplanationPanel.tsx
 
 import {
-    MarketEvent
+    MarketEvent,
+    CandleExplanation
 }
     from "../../types/replay";
 
-type CandleExplanation = {
-
-    title?: string;
-
-    summary?: string;
-
-    market_interpretation ?: string;
-
-    trade_implication?: string;
-
-    event_type?: string;
-
-    confidence_score?: number;
-
-    market_context?: string;
-
-    candle_time?: string;
-};
 
 type Props = {
 
@@ -42,6 +25,11 @@ export default function CandleExplanationPanel({
     compact = false
 
 }: Props) {
+
+    console.log(
+        "[CandleExplanationPanel] selectedExplanation:",
+        selectedExplanation
+    );
 
     // =====================================
     // COMPACT REPLAY MODE
@@ -110,7 +98,73 @@ export default function CandleExplanationPanel({
                     }
 
                 </div>
-                
+                {
+
+                    selectedExplanation
+                        .reasons &&
+
+                    selectedExplanation
+                        .reasons
+                        .length > 0 && (
+
+                        <div
+                            className="
+                mb-4
+            "
+                        >
+
+                            <div
+                                className="
+                    mb-2
+                    text-xs
+                    font-semibold
+                    uppercase
+                    tracking-wide
+                    text-cyan-300
+                "
+                            >
+
+                                Key Reasons
+
+                            </div>
+
+                            <ul
+                                className="
+                    list-disc
+                    space-y-1
+                    pl-5
+                    text-sm
+                    text-gray-300
+                "
+                            >
+
+                                {
+
+                                    selectedExplanation
+                                        .reasons
+                                        .map(
+
+                                            (
+                                                reason,
+                                                index
+                                            ) => (
+
+                                                <li
+                                                    key={index}
+                                                >
+
+                                                    {reason}
+
+                                                </li>
+                                            )
+                                        )
+                                }
+
+                            </ul>
+
+                        </div>
+                    )
+                }
 
                 {/* ========================= */}
                 {/* EVENTS DETECTED */}
@@ -324,13 +378,6 @@ export default function CandleExplanationPanel({
                                 "
                             >
 
-                                {
-
-                                    selectedExplanation
-                                        .candle_time ||
-
-                                    "Time unavailable"
-                                }
 
                             </div>
 
@@ -349,31 +396,6 @@ export default function CandleExplanationPanel({
                             "
                         >
 
-                            {
-
-                                selectedExplanation
-                                    .event_type && (
-
-                                    <div
-                                        className="
-                                            rounded
-                                            bg-blue-900
-                                            px-2
-                                            py-1
-                                            text-xs
-                                            text-blue-200
-                                        "
-                                    >
-
-                                        {
-
-                                            selectedExplanation
-                                                .event_type
-                                        }
-
-                                    </div>
-                                )
-                            }
 
                             {
 
@@ -486,6 +508,78 @@ export default function CandleExplanationPanel({
 
                         </div>
 
+
+                        {/* ========================= */}
+                        {/* REASON EXPLANATION */}
+                        {/* ========================= */}
+                        {
+
+                            selectedExplanation
+                                .reasons &&
+
+                            selectedExplanation
+                                .reasons
+                                .length > 0 && (
+
+                                <div
+                                    className="
+                mb-4
+            "
+                                >
+
+                                    <div
+                                        className="
+                    mb-2
+                    text-xs
+                    font-semibold
+                    uppercase
+                    tracking-wide
+                    text-cyan-300
+                "
+                                    >
+
+                                        Key Reasons
+
+                                    </div>
+
+                                    <ul
+                                        className="
+                    list-disc
+                    space-y-1
+                    pl-5
+                    text-sm
+                    text-gray-300
+                "
+                                    >
+
+                                        {
+
+                                            selectedExplanation
+                                                .reasons
+                                                .map(
+
+                                                    (
+                                                        reason,
+                                                        index
+                                                    ) => (
+
+                                                        <li
+                                                            key={index}
+                                                        >
+
+                                                            {reason}
+
+                                                        </li>
+                                                    )
+                                                )
+                                        }
+
+                                    </ul>
+
+                                </div>
+                            )
+                        }
+
                         {/* ========================= */}
                         {/* DETAILED EXPLANATION */}
                         {/* ========================= */}
@@ -537,6 +631,62 @@ export default function CandleExplanationPanel({
                         </div>
 
                         {/* ========================= */}
+                        {/* NIFTY RELATIONSHIP */}
+                        {/* ========================= */}
+
+                        {
+
+                            selectedExplanation
+                                .nifty_relationship && (
+
+                                <div
+                                    className="
+                                        mb-4
+                                        rounded-md
+                                        border
+                                        border-blue-900
+                                        bg-blue-950/20
+                                        p-4
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            mb-2
+                                            text-xs
+                                            font-semibold
+                                            uppercase
+                                            tracking-wide
+                                            text-blue-400
+                                        "
+                                    >
+
+                                        Nifty Relationship
+
+                                    </div>
+
+                                    <div
+                                        className="
+                                            text-sm
+                                            leading-relaxed
+                                            text-gray-300
+                                        "
+                                    >
+
+                                        {
+
+                                            selectedExplanation
+                                                .nifty_relationship
+                                        }
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
+
+
+                        {/* ========================= */}
                         {/* TRADING IMPLICATION */}
                         {/* ========================= */}
 
@@ -585,60 +735,8 @@ export default function CandleExplanationPanel({
                             </div>
 
                         </div>
+                  
 
-                        {/* ========================= */}
-                        {/* MARKET CONTEXT */}
-                        {/* ========================= */}
-
-                        {
-
-                            selectedExplanation
-                                .market_context && (
-
-                                <div
-                                    className="
-                                        rounded-md
-                                        border
-                                        border-purple-900
-                                        bg-purple-950/20
-                                        p-4
-                                    "
-                                >
-
-                                    <div
-                                        className="
-                                            mb-2
-                                            text-xs
-                                            font-semibold
-                                            uppercase
-                                            tracking-wide
-                                            text-purple-400
-                                        "
-                                    >
-
-                                        Market Context
-
-                                    </div>
-
-                                    <div
-                                        className="
-                                            text-sm
-                                            leading-relaxed
-                                            text-gray-300
-                                        "
-                                    >
-
-                                        {
-
-                                            selectedExplanation
-                                                .market_context
-                                        }
-
-                                    </div>
-
-                                </div>
-                            )
-                        }
 
                     </>
                 )
