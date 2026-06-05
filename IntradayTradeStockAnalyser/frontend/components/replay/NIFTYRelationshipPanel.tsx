@@ -1,11 +1,11 @@
 //IntradayTradeStockAnalyser/frontend/components/replay/NIFTYRelationshipPanel.tsx
 
 import { NiftyRelationshipAnalysis }
-from "../../types/replay";
+    from "../../types/replay";
 
 type Props = {
     niftyRelationshipAnalysis?:
-        NiftyRelationshipAnalysis | null;
+    NiftyRelationshipAnalysis | null;
 };
 
 export default function NIFTYRelationshipPanel({
@@ -18,19 +18,19 @@ export default function NIFTYRelationshipPanel({
         niftyRelationshipAnalysis
             ?.market_alignment;
 
-    const relativeStrengthAnalysis  =
+    const relativeStrengthAnalysis =
         niftyRelationshipAnalysis
             ?.relative_strength_analysis;
 
-    const marketDirection  =
+    const marketDirection =
         niftyRelationshipAnalysis
             ?.market_direction;
 
-    const stockBehavior  =
+    const stockBehavior =
         niftyRelationshipAnalysis
             ?.stock_behavior;
 
-    const tradingImplication  =
+    const tradingImplication =
         niftyRelationshipAnalysis
             ?.trading_implication;
 
@@ -74,6 +74,51 @@ export default function NIFTYRelationshipPanel({
             {/* RELATIONSHIP SUMMARY */}
             {/* ===================================== */}
 
+            {
+
+                niftyRelationshipAnalysis
+                    ?.confidence_score !==
+                undefined && (
+
+                    <div
+
+
+
+                        className="
+                mb-4
+            "
+                    >
+
+                        <span
+                            className="
+                    rounded
+                    bg-green-900
+                    px-2
+                    py-1
+                    text-xs
+                    text-green-200
+                "
+                        >
+
+                            Confidence:
+                            {" "}
+
+                            {
+
+                                niftyRelationshipAnalysis
+                                    .confidence_score
+                            }
+
+                        </span>
+
+                    </div>
+                )
+            }
+
+            {/* ===================================== */}
+            {/* RELATIONSHIP SUMMARY */}
+            {/* ===================================== */}
+
             <div
                 className="
                     mb-4
@@ -85,7 +130,7 @@ export default function NIFTYRelationshipPanel({
 
                 {
 
-                    tradingImplication  ||
+                    tradingImplication ||
 
                     "No NIFTY relationship analysis available."
                 }
@@ -140,7 +185,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            marketDirection   ||
+                            marketDirection ||
 
                             "Unavailable"
                         }
@@ -184,7 +229,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            stockBehavior  ||
+                            stockBehavior ||
 
                             "Unavailable"
                         }
@@ -272,7 +317,7 @@ export default function NIFTYRelationshipPanel({
 
                         {
 
-                            relativeStrengthAnalysis  ||
+                            relativeStrengthAnalysis ||
 
                             "Unavailable"
                         }
@@ -322,7 +367,7 @@ export default function NIFTYRelationshipPanel({
 
                     {
 
-                        relationshipStrength  ||
+                        relationshipStrength ||
 
                         "No market influence explanation available."
                     }
