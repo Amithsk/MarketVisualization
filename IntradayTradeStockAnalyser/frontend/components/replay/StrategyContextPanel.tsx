@@ -109,6 +109,8 @@ export default function StrategyContextPanel({
 
                     {
 
+                        strategyExplanation
+                            ?.strategy_name ||
                         strategyUsed
                             ?.replaceAll(
                                 "_",
@@ -291,7 +293,7 @@ export default function StrategyContextPanel({
                                 </div>
                             )
                         }
-                                                {
+                        {
 
                             strategyExplanation
                                 .market_alignment && (
@@ -336,7 +338,7 @@ export default function StrategyContextPanel({
                                 </div>
                             )
                         }
-                                                {
+                        {
 
                             strategyExplanation
                                 .execution_expectation && (
@@ -381,7 +383,7 @@ export default function StrategyContextPanel({
                                 </div>
                             )
                         }
-                                                 {
+                        {
 
                             strategyExplanation
                                 .risk_notes &&
