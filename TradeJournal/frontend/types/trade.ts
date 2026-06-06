@@ -1,3 +1,4 @@
+//TradeJournal/frontend/types/trade.ts
 // ==============================
 // ENUM TYPES (MATCH BACKEND)
 // ==============================
@@ -16,6 +17,13 @@ export type TradeStatus =
   | "partially_filled"
   | "cancelled"
   | "rejected"
+
+
+export type TradeState = {
+  is_executed: boolean
+  is_exited: boolean
+  is_reviewed: boolean
+}
 
 // ==============================
 // CORE DOMAIN MODELS
@@ -51,6 +59,8 @@ export type TradePlan = {
 
   // set ONLY after execution
   trade_id?: number | null
+  // backend-controlled workflow state
+  trade_state?: TradeState
 }
 
 /**

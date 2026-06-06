@@ -1,3 +1,4 @@
+//TradeJournal/frontend/components/trade/TradePlanList.tsx
 "use client"
 
 import TradePlanCard from "./TradePlanCard"
@@ -39,7 +40,7 @@ export default function TradePlanList({
           <TradePlanCard plan={plan} />
 
           {/* EXECUTE */}
-          {plan.plan_status === "PLANNED" && (
+          {!plan.trade_state?.is_executed && plan.plan_status === "PLANNED" && (
             <button
               className="mt-3 w-full rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               disabled={loading}
@@ -50,7 +51,7 @@ export default function TradePlanList({
           )}
 
           {/* EXIT */}
-          {plan.plan_status === "EXECUTED" && plan.trade_id && (
+          {plan.trade_state?.is_executed && !plan.trade_state?.is_exited && plan.trade_id && (
             <div className="mt-3">
               <TradeExitForm
                 onSubmit={(payload) =>
@@ -61,7 +62,7 @@ export default function TradePlanList({
           )}
 
           {/* REVIEW */}
-          {plan.plan_status === "EXECUTED" && plan.trade_id && (
+          {plan.trade_state?.is_exited && !plan.trade_state?.is_reviewed  && plan.trade_id && (
             <div className="mt-3">
               <TradeReviewForm
                 onSubmit={(payload) =>
