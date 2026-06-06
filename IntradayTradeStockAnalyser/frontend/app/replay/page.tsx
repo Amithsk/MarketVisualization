@@ -57,6 +57,9 @@ import useReplayPlayback
 import ReplayControls
     from "../../components/replay/ReplayControls";
 
+import IntradayPanel from
+    "../../components/replay/IntradayPanel";
+
 
 
 
@@ -210,7 +213,7 @@ export default function ReplayPage() {
                 selectedCandleIndex
 
         ) || [];
-    
+
     console.log(
         "[SELECTED EVENTS]",
         selectedCandleIndex,
@@ -516,6 +519,18 @@ export default function ReplayPage() {
                             }
 
                         />
+                        {
+                            replayData && (
+
+                                <IntradayPanel
+
+                                    tradeData={
+                                        replayData.trade_data
+                                    }
+
+                                />
+                            )
+                        }
 
                     </div>
                 )
