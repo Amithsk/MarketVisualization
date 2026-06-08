@@ -41,7 +41,7 @@ echo ======================================
 echo [6/6] Verifying ports...
 echo ======================================
 
-for %%P in (8001 8002 3001 3002 8501 80) do (
+for %%P in (8001 8002 8003 3001 3002 3003 8501 80) do (
     echo Checking port %%P...
     netstat -ano | findstr :%%P
 )
