@@ -104,7 +104,7 @@ export default function UploadPanel({
             const response =
                 await fetch(
 
-                    "http://127.0.0.1:8000/api/v1/upload/stock-candles",
+                    "http://127.0.0.1:8003/api/v1/upload/stock-candles",
 
                     {
                         method: "POST",

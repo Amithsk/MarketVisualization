@@ -1,3 +1,4 @@
+#IntradayTradeStockAnalyser/backend/app.py
 from fastapi import FastAPI
 
 from backend.api.upload import (router as upload_router)
@@ -21,7 +22,9 @@ app.add_middleware(
 
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:3003"
     ],
+
 
     allow_credentials=True,
 
