@@ -226,6 +226,8 @@ export default function ReplayPage() {
                 selectedStock
         });
     };
+    
+
     const selectedCandleEvents =
 
         replayData?.market_events?.filter(
@@ -237,11 +239,23 @@ export default function ReplayPage() {
 
         ) || [];
 
-    console.log(
-        "[SELECTED EVENTS]",
-        selectedCandleIndex,
-        selectedCandleEvents.length
-    );
+
+
+    const candleExplanations =
+
+        replayData
+            ?.explanation_context
+            ?.candle_explanations || {};
+
+    const selectedExplanation =
+
+        candleExplanations[
+        String(selectedCandleIndex)
+        ] || null;
+
+
+
+
 
     return (
 
@@ -632,25 +646,8 @@ export default function ReplayPage() {
                         }
 
 
-                        selectedExplanation={
-
-                            Object.values(
-
-                                replayData
-                                    ?.explanation_context
-                                    ?.candle_explanations || {}
-
-                            )[selectedCandleIndex] ||
-
-                            Object.values(
-
-                                replayData
-                                    ?.explanation_context
-                                    ?.candle_explanations || {}
-
-                            )[0]
-
-                        }
+                        selectedExplanation={selectedExplanation
+                            }
 
                     />
                 )
