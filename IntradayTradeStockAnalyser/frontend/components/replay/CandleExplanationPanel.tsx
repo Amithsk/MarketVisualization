@@ -594,9 +594,238 @@ export default function CandleExplanationPanel({
                             )
                         }
 
-                        <div className="mb-4 text-yellow-400">
-                            ACTION (Coming Next)
-                        </div>
+                        {/* --------------------- */}
+                        {/* ACTION  */}
+                        {/* --------------------- */}
+
+                        {
+                            selectedExplanation?.action && (
+
+                                <div
+                                    className="
+                mb-6
+                rounded-lg
+                border
+                border-slate-700
+                bg-slate-900
+                p-4
+            "
+                                >
+
+                                    <h3
+                                        className="
+                    mb-4
+                    text-lg
+                    font-semibold
+                    text-green-400
+                "
+                                    >
+                                        TRADE ACTION
+                                    </h3>
+
+                                    {/* --------------------- */}
+                                    {/* WOULD TRADE */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Would Trade
+                                        </div>
+
+                                        <div
+                                            className={`
+                        text-lg
+                        font-bold
+                        ${selectedExplanation
+                                                    ?.action
+                                                    ?.would_trade
+                                                    ? "text-green-400"
+                                                    : "text-red-400"
+                                                }
+                    `}
+                                        >
+
+                                            {
+                                                selectedExplanation
+                                                    ?.action
+                                                    ?.would_trade
+                                                    ? "YES"
+                                                    : "NO"
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* TRADE BIAS */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Trade Bias
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.action
+                                                    ?.trade_bias
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* CONFIDENCE */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Confidence
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.action
+                                                    ?.confidence
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* REASONS */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Why Trade?
+                                        </div>
+
+                                        <ul
+                                            className="
+                        mt-2
+                        list-disc
+                        list-inside
+                        text-gray-300
+                    "
+                                        >
+
+                                            {
+                                                selectedExplanation
+                                                    ?.action
+                                                    ?.reason
+                                                    ?.map(
+
+                                                        (
+                                                            item: string,
+                                                            index: number
+                                                        ) => (
+
+                                                            <li key={index}>
+                                                                {item}
+                                                            </li>
+                                                        )
+                                                    )
+                                            }
+
+                                        </ul>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* WHY NOT */}
+                                    {/* --------------------- */}
+
+                                    {
+
+                                        selectedExplanation
+                                            ?.action
+                                            ?.why_not
+                                            ?.length > 0 && (
+
+                                            <div>
+
+                                                <div
+                                                    className="
+                                text-sm
+                                font-semibold
+                                text-red-300
+                            "
+                                                >
+                                                    Why Not?
+                                                </div>
+
+                                                <ul
+                                                    className="
+                                mt-2
+                                list-disc
+                                list-inside
+                                text-gray-300
+                            "
+                                                >
+
+                                                    {
+                                                        selectedExplanation
+                                                            ?.action
+                                                            ?.why_not
+                                                            ?.map(
+
+                                                                (
+                                                                    item: string,
+                                                                    index: number
+                                                                ) => (
+
+                                                                    <li key={index}>
+                                                                        {item}
+                                                                    </li>
+                                                                )
+                                                            )
+                                                    }
+
+                                                </ul>
+
+                                            </div>
+                                        )
+                                    }
+
+                                </div>
+                            )
+                        }
 
                         <div className="mb-4 text-yellow-400">
                             LEARNING (Coming Next)
