@@ -40,12 +40,31 @@ def build_candle_explanations(
         }
     """
 
-    stock_candles = replay_payload.get("stock_candles", [])
-    market_events = replay_payload.get("market_events", [])
-    market_context = replay_payload.get("market_context", {})
+    stock_candles = replay_payload.get(
+        "stock_candles", []
+        )
+    
+    
+    nifty_candles = replay_payload.get(
+        "nifty_candles",
+            []
+         )
+    
+    market_events = replay_payload.get(
+        "market_events", 
+        []
+        )
+    
+    market_context = replay_payload.get(
+        "market_context", 
+        {}
+        )
+    
     stock_selection_context = replay_payload.get(
-        "stock_selection_context", {}
-    )
+        "stock_selection_context", 
+        {}
+        )
+    
 
     events_by_candle = _group_events_by_candle(market_events)
 
@@ -57,6 +76,15 @@ def build_candle_explanations(
 
         if not candle_events:
             continue
+    
+        stock_candle = stock_candles[
+        candle_index
+            ]
+
+        nifty_candle = nifty_candles[
+        candle_index
+            ]
+   
 
         primary_event = _select_primary_event(candle_events)
 
@@ -85,6 +113,10 @@ def build_candle_explanations(
                 _calculate_confidence_score(
                     primary_event,
                     reasons
+                ),
+            "stock_analysis":
+                _build_stock_analysis(
+            stock_candle
                 ),
         }
 
@@ -353,4 +385,115 @@ def _calculate_confidence_score(
     score += min(len(reasons) * 2, 10)
 
     return min(score, 100)
+
+
+#Calcualte stock-level analysis metrics like move %, vwap position, etc. to enrich explanations
+def _build_stock_analysis(
+    stock_candle: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    open_price = stock_candle.get(
+        "open",
+        0
+    )
+
+    close_price = stock_candle.get(
+        "close",
+        0
+    )
+
+    vwap = stock_candle.get(
+        "vwap",
+        0
+    )
+
+    # ------------------------------
+    # Move %
+    # ------------------------------
+
+    move_pct = 0
+
+    if open_price:
+
+        move_pct = round(
+
+            (
+                (close_price - open_price)
+                / open_price
+            ) * 100,
+
+            2
+        )
+
+    # ------------------------------
+    # VWAP Difference
+    # ------------------------------
+
+    vwap_difference = round(
+        close_price - vwap,
+        2
+    )
+
+    return {
+
+        "move": {
+
+            "formula":
+                "((Close-Open)/Open)*100",
+
+            "open":
+                open_price,
+
+            "close":
+                close_price,
+
+            "result":
+                move_pct,
+
+            "direction":
+                (
+                    "BULLISH"
+                    if move_pct > 0
+                    else "BEARISH"
+                ),
+
+            "interpretation":
+                (
+                    "Price closed above open."
+                    if move_pct > 0
+                    else
+                    "Price closed below open."
+                )
+        },
+
+        "vwap_position": {
+
+            "formula":
+                "Close - VWAP",
+
+            "close":
+                close_price,
+
+            "vwap":
+                vwap,
+
+            "result":
+                vwap_difference,
+
+            "position":
+                (
+                    "ABOVE"
+                    if vwap_difference > 0
+                    else "BELOW"
+                ),
+
+            "interpretation":
+                (
+                    "Price closed above VWAP."
+                    if vwap_difference > 0
+                    else
+                    "Price closed below VWAP."
+                )
+        }
+    }
 
