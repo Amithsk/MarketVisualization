@@ -827,9 +827,187 @@ export default function CandleExplanationPanel({
                             )
                         }
 
-                        <div className="mb-4 text-yellow-400">
-                            LEARNING (Coming Next)
-                        </div>
+
+                        {/* --------------------- */}
+                        {/* LEARNING */}
+                        {/* --------------------- */}
+                        {
+                            selectedExplanation?.learning && (
+
+                                <div
+                                    className="
+                mb-6
+                rounded-lg
+                border
+                border-yellow-700
+                bg-slate-900
+                p-4
+            "
+                                >
+
+                                    <h3
+                                        className="
+                    mb-4
+                    text-lg
+                    font-semibold
+                    text-yellow-400
+                "
+                                    >
+                                        LEARNING
+                                    </h3>
+
+                                    {/* --------------------- */}
+                                    {/* CONCEPT */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Concept
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.concept
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* EVIDENCE */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Evidence
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            Stock Move:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.evidence
+                                                    ?.stock_move_pct
+                                            }%
+
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            NIFTY Move:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.evidence
+                                                    ?.nifty_move_pct
+                                            }%
+
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            Relative Strength:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.evidence
+                                                    ?.relative_strength
+                                            }x
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* LESSON */}
+                                    {/* --------------------- */}
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Lesson
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.lesson
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* --------------------- */}
+                                    {/* REMEMBER */}
+                                    {/* --------------------- */}
+
+                                    <div
+                                        className="
+                    rounded
+                    border-l-4
+                    border-yellow-500
+                    bg-slate-800
+                    p-3
+                "
+                                    >
+
+                                        <div
+                                            className="
+                        mb-2
+                        font-semibold
+                        text-yellow-400
+                    "
+                                        >
+                                            Remember
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.learning
+                                                    ?.remember
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
 
                     </div>
                 )
