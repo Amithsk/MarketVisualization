@@ -118,6 +118,11 @@ def build_candle_explanations(
                 _build_stock_analysis(
             stock_candle
                 ),
+            
+            "nifty_analysis":
+                _build_nifty_analysis(
+            nifty_candle
+                ),
         }
 
         explanations[candle_index] = explanation
@@ -493,6 +498,68 @@ def _build_stock_analysis(
                     if vwap_difference > 0
                     else
                     "Price closed below VWAP."
+                )
+        }
+    }
+
+#Function to build nifty-level analysis metrics like move % to enrich explanations
+def _build_nifty_analysis(
+    nifty_candle: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    open_price = nifty_candle.get(
+        "open",
+        0
+    )
+
+    close_price = nifty_candle.get(
+        "close",
+        0
+    )
+
+    move_pct = 0
+
+    if open_price:
+
+        move_pct = round(
+
+            (
+                (close_price - open_price)
+                / open_price
+            ) * 100,
+
+            2
+        )
+
+    return {
+
+        "move": {
+
+            "formula":
+                "((Close-Open)/Open)*100",
+
+            "open":
+                open_price,
+
+            "close":
+                close_price,
+
+            "result":
+                move_pct,
+
+            "direction":
+                (
+                    "BULLISH"
+                    if move_pct > 0
+                    else "BEARISH"
+                ),
+
+            "interpretation":
+                (
+                    "NIFTY closed above open."
+                    if move_pct > 0
+                    else
+                    "NIFTY closed below open."
                 )
         }
     }
