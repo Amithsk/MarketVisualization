@@ -289,9 +289,139 @@ export default function CandleExplanationPanel({
                             </div>
 
                         </div>
-                        <div className="mb-4 text-yellow-400">
-                            NIFTY ANALYSIS (Coming Next)
-                        </div>
+                        {/* ===================================== */}
+                        {/* NIFTY ANALYSIS */}
+                        {/* ===================================== */}
+
+                        {
+                            selectedExplanation?.nifty_analysis && (
+
+                                <div
+                                    className="
+                mb-6
+                rounded-lg
+                border
+                border-slate-700
+                bg-slate-900
+                p-4
+            "
+                                >
+
+                                    <h3
+                                        className="
+                    mb-4
+                    text-lg
+                    font-semibold
+                    text-cyan-400
+                "
+                                    >
+                                        NIFTY ANALYSIS
+                                    </h3>
+
+                                    {/* --------------------- */}
+                                    {/* NIFTY MOVE */}
+                                    {/* --------------------- */}
+
+                                    <div>
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Market Move %
+                                        </div>
+
+                                        <div className="text-sm text-gray-300">
+
+                                            Formula:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.formula
+                                            }
+
+                                        </div>
+
+                                        <div className="text-sm text-gray-300">
+
+                                            Open:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.open
+                                            }
+
+                                        </div>
+
+                                        <div className="text-sm text-gray-300">
+
+                                            Close:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.close
+                                            }
+
+                                        </div>
+
+                                        <div
+                                            className="
+                        mt-2
+                        text-base
+                        font-semibold
+                        text-green-400
+                    "
+                                        >
+
+                                            Result:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.result
+                                            }%
+
+                                        </div>
+
+                                        <div className="text-sm text-gray-400">
+
+                                            Direction:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.direction
+                                            }
+
+                                        </div>
+
+                                        <div className="text-sm text-gray-400">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.nifty_analysis
+                                                    ?.move
+                                                    ?.interpretation
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
 
                         <div className="mb-4 text-yellow-400">
                             RELATIONSHIP ANALYSIS (Coming Next)
