@@ -60,11 +60,17 @@ export async function createTradePlan(
  * Execute a trade plan (creates TradeLog in backend)
  */
 export async function executeTradePlan(
-  planId: number
+  planId: number,
+  payload?: {
+    entry_timestamp?: string
+  }
 ): Promise<{ trade_id: number; status: "EXECUTED" }> {
   return api<{ trade_id: number; status: "EXECUTED" }>(
     `/trade-plans/${planId}/execute`,
-    { method: "POST" }
+    {
+      method: "POST",
+      body: JSON.stringify(payload ?? {}),
+    }
   )
 }
 
