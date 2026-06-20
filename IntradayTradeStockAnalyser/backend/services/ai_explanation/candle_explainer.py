@@ -136,6 +136,12 @@ def build_candle_explanations(
             stock_candle,
             nifty_candle
               ),
+        "learning":
+        _build_learning_analysis(
+            primary_event,
+            stock_candle,
+            nifty_candle
+        )
 
         }
 
@@ -805,4 +811,179 @@ def _build_action_analysis(
 
         "why_not":
             why_not
+    }
+
+#Function to build learning analysis metrics like concept, lesson, remember based on event type and stock/nifty behavior to enrich explanations
+
+def _build_learning_analysis(
+    event: Dict[str, Any],
+    stock_candle: Dict[str, Any],
+    nifty_candle: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    event_type = event.get(
+        "event_type",
+        "UNKNOWN"
+    )
+
+    # ----------------------------------
+    # Calculations
+    # ----------------------------------
+
+    stock_move = round(
+        (
+            (
+                stock_candle["close"]
+                - stock_candle["open"]
+            )
+            / stock_candle["open"]
+        ) * 100,
+        2
+    )
+
+    nifty_move = round(
+        (
+            (
+                nifty_candle["close"]
+                - nifty_candle["open"]
+            )
+            / nifty_candle["open"]
+        ) * 100,
+        2
+    )
+
+    relative_strength = round(
+        abs(stock_move)
+        /
+        max(abs(nifty_move), 0.01),
+        2
+    )
+
+    vwap_distance = round(
+        stock_candle["close"]
+        -
+        stock_candle["vwap"],
+        2
+    )
+
+    # ----------------------------------
+    # Defaults
+    # ----------------------------------
+
+    concept = "Market Structure"
+
+    lesson = (
+        "Important market event detected."
+    )
+
+    remember = (
+        "Wait for confirmation before trading."
+    )
+
+    # ----------------------------------
+    # Event Specific Learning
+    # ----------------------------------
+
+    if event_type == "BREAKOUT":
+
+        concept = "Bullish Breakout"
+
+        lesson = (
+            f"Stock gained {stock_move}% "
+            f"while NIFTY gained "
+            f"{nifty_move}%. "
+            f"Relative strength was "
+            f"{relative_strength}x."
+        )
+
+        remember = (
+            "Breakouts supported by "
+            "VWAP and market strength "
+            "have higher probability "
+            "of continuation."
+        )
+
+    elif event_type == "BREAKDOWN":
+
+        concept = "Bearish Breakdown"
+
+        lesson = (
+            f"Stock moved {stock_move}% "
+            f"while NIFTY moved "
+            f"{nifty_move}%."
+        )
+
+        remember = (
+            "Avoid buying when support "
+            "has clearly failed."
+        )
+
+    elif event_type == "REJECTION":
+
+        concept = "Resistance Rejection"
+
+        lesson = (
+            f"Price rejected higher levels "
+            f"while trading "
+            f"{vwap_distance} away from VWAP."
+        )
+
+        remember = (
+            "Repeated rejection often "
+            "signals weakness."
+        )
+
+    elif event_type == "VWAP_HOLD":
+
+        concept = "VWAP Support"
+
+        lesson = (
+            f"Price closed "
+            f"{vwap_distance} above VWAP."
+        )
+
+        remember = (
+            "Strong stocks usually hold "
+            "VWAP during intraday trends."
+        )
+
+    elif event_type == "VWAP_REJECTION":
+
+        concept = "VWAP Rejection"
+
+        lesson = (
+            f"Price closed "
+            f"{abs(vwap_distance)} below VWAP."
+        )
+
+        remember = (
+            "Repeated VWAP rejection often "
+            "indicates intraday weakness."
+        )
+
+    return {
+
+        "concept":
+            concept,
+
+        "evidence": {
+
+            "stock_move_pct":
+                stock_move,
+
+            "nifty_move_pct":
+                nifty_move,
+
+            "relative_strength":
+                relative_strength,
+
+            "vwap_distance":
+                vwap_distance
+        },
+
+        "lesson":
+            lesson,
+
+        "remember":
+            remember
     }
