@@ -88,6 +88,7 @@ const FEATURES = {
 
 
 
+
 export default function ReplayPage() {
 
     // -----------------------------------
@@ -179,6 +180,14 @@ export default function ReplayPage() {
 
     ] = useState<number>(0);
 
+    const [
+
+        showUploadSection,
+
+        setShowUploadSection
+
+    ] = useState(true);
+
     // -----------------------------------
     // Reset Upload State
     // On Stock Change
@@ -226,7 +235,7 @@ export default function ReplayPage() {
                 selectedStock
         });
     };
-    
+
 
     const selectedCandleEvents =
 
@@ -295,85 +304,118 @@ export default function ReplayPage() {
             {/* CONTROLS */}
             {/* -------------------------------- */}
 
-            <div
+            <button
+
+                onClick={() =>
+
+                    setShowUploadSection(
+                        !showUploadSection
+                    )
+
+                }
+
                 className="
+        mb-4
+        px-4
+        py-2
+        bg-slate-800
+        rounded
+    "
+            >
+
+                {
+
+                    showUploadSection
+                        ?  "▼ Upload & Data Selection"
+                        : "▶ Upload & Data Selection"
+
+                }
+
+            </button>
+            {
+                showUploadSection && (
+                    <>
+
+
+                        <div
+                            className="
                     flex
                     gap-4
                     mb-6
                     items-end
                     flex-wrap
                 "
-            >
+                        >
 
-                {/* -------------------------------- */}
-                {/* Trade Date Selector */}
-                {/* -------------------------------- */}
+                            {/* -------------------------------- */}
+                            {/* Trade Date Selector */}
+                            {/* -------------------------------- */}
 
-                <TradeDateSelector
+                            <TradeDateSelector
 
-                    tradeDates={
-                        tradeDates
-                    }
+                                tradeDates={
+                                    tradeDates
+                                }
 
-                    selectedDate={
-                        selectedDate
-                    }
+                                selectedDate={
+                                    selectedDate
+                                }
 
-                    onSelectDate={
-                        selectTradeDate
-                    }
+                                onSelectDate={
+                                    selectTradeDate
+                                }
 
-                    loading={
-                        tradeLoading
-                    }
+                                loading={
+                                    tradeLoading
+                                }
 
-                />
+                            />
 
-                {/* -------------------------------- */}
-                {/* Stock Selector */}
-                {/* -------------------------------- */}
+                            {/* -------------------------------- */}
+                            {/* Stock Selector */}
+                            {/* -------------------------------- */}
 
-                <StockSelector
+                            <StockSelector
 
-                    stocks={
-                        stocks
-                    }
+                                stocks={
+                                    stocks
+                                }
 
-                    selectedStock={
-                        selectedStock
-                    }
+                                selectedStock={
+                                    selectedStock
+                                }
 
-                    onSelectStock={
-                        setSelectedStock
-                    }
+                                onSelectStock={
+                                    setSelectedStock
+                                }
 
-                    disabled={
-                        !selectedDate
-                    }
+                                disabled={
+                                    !selectedDate
+                                }
 
-                    loading={
-                        tradeLoading
-                    }
+                                loading={
+                                    tradeLoading
+                                }
 
-                />
+                            />
 
-                {/* -------------------------------- */}
-                {/* Load Replay */}
-                {/* -------------------------------- */}
+                            {/* -------------------------------- */}
+                            {/* Load Replay */}
+                            {/* -------------------------------- */}
 
-                <button
+                            <button
 
-                    onClick={
-                        handleLoadReplay
-                    }
+                                onClick={
+                                    handleLoadReplay
+                                }
 
-                    disabled={
-                        !selectedDate ||
-                        !selectedStock ||
-                        !uploadSuccess
-                    }
+                                disabled={
+                                    !selectedDate ||
+                                    !selectedStock ||
+                                    !uploadSuccess
+                                }
 
-                    className="
+                                className="
                         bg-blue-600
                         hover:bg-blue-700
                         disabled:bg-gray-700
@@ -384,113 +426,117 @@ export default function ReplayPage() {
                         text-sm
                         font-medium
                     "
-                >
+                            >
 
-                    Load Replay
+                                Load Replay
 
-                </button>
+                            </button>
 
-            </div>
+                        </div>
 
-            {/* -------------------------------- */}
-            {/* Upload Panel */}
-            {/* -------------------------------- */}
+                        {/* -------------------------------- */}
+                        {/* Upload Panel */}
+                        {/* -------------------------------- */}
 
-            <div
-                className="
+                        <div
+                            className="
                     mb-6
                 "
-            >
+                        >
 
-                <UploadPanel
+                            <UploadPanel
 
-                    selectedStock={
-                        selectedStock
-                    }
+                                selectedStock={
+                                    selectedStock
+                                }
 
-                    disabled={
-                        !selectedDate ||
-                        !selectedStock
-                    }
+                                disabled={
+                                    !selectedDate ||
+                                    !selectedStock
+                                }
 
-                    onUploadSuccess={
-                        handleUploadSuccess
-                    }
+                                onUploadSuccess={
+                                    handleUploadSuccess
+                                }
 
-                />
+                            />
 
-            </div>
+                        </div>
 
-            {/* -------------------------------- */}
-            {/* Upload Helper */}
-            {/* -------------------------------- */}
+                        {/* -------------------------------- */}
+                        {/* Upload Helper */}
+                        {/* -------------------------------- */}
 
-            {
+                        {
 
-                !uploadSuccess &&
+                            !uploadSuccess &&
 
-                selectedDate &&
+                            selectedDate &&
 
-                selectedStock && (
+                            selectedStock && (
 
-                    <div
-                        className="
+                                <div
+                                    className="
                             mb-4
                             text-yellow-400
                             text-sm
                         "
-                    >
+                                >
 
-                        Upload stock candle CSV
-                        before loading replay.
+                                    Upload stock candle CSV
+                                    before loading replay.
 
-                    </div>
-                )
-            }
+                                </div>
+                            )
+                        }
 
-            {/* -------------------------------- */}
-            {/* LOADING */}
-            {/* -------------------------------- */}
-
-            {
-
-                (tradeLoading || replayLoading) && (
-
-                    <div
-                        className="
-                            mb-4
-                            text-blue-400
-                        "
-                    >
-
-                        Loading...
-
-                    </div>
-                )
-            }
-
-            {/* -------------------------------- */}
-            {/* ERROR */}
-            {/* -------------------------------- */}
-
-            {
-
-                (tradeError || replayError) && (
-
-                    <div
-                        className="
-                            mb-4
-                            text-red-400
-                        "
-                    >
+                        {/* -------------------------------- */}
+                        {/* LOADING */}
+                        {/* -------------------------------- */}
 
                         {
 
-                            tradeError ||
-                            replayError
+                            (tradeLoading || replayLoading) && (
+
+                                <div
+                                    className="
+                            mb-4
+                            text-blue-400
+                        "
+                                >
+
+                                    Loading...
+
+                                </div>
+                            )
                         }
 
-                    </div>
+                        {/* -------------------------------- */}
+                        {/* ERROR */}
+                        {/* -------------------------------- */}
+
+                        {
+
+                            (tradeError || replayError) && (
+
+                                <div
+                                    className="
+                            mb-4
+                            text-red-400
+                        "
+                                >
+
+                                    {
+
+                                        tradeError ||
+                                        replayError
+                                    }
+
+                                </div>
+                            )
+                        }
+
+                    </>
                 )
             }
             {/* -------------------------------- */}
@@ -647,7 +693,7 @@ export default function ReplayPage() {
 
 
                         selectedExplanation={selectedExplanation
-                            }
+                        }
 
                     />
                 )
@@ -855,7 +901,7 @@ export default function ReplayPage() {
             }
 
 
-        </div>
+        </div >
 
     );
 
