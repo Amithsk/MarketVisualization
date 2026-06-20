@@ -28,11 +28,7 @@ class NotTakenPayload(BaseModel):
 # -------- Execution --------
 
 class ExecuteTradePayload(BaseModel):
-    symbol: str
-    side: str
-    quantity: int
-    entry_price: float
-    entry_timestamp: datetime
+    entry_timestamp: Optional[datetime] = None
 
 
 class ExitTradePayload(BaseModel):

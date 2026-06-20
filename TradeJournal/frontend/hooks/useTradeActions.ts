@@ -62,14 +62,20 @@ export function useTradeActions(tradingDate: string) {
 
   /* ---------------- EXECUTE PLAN ---------------- */
 
-  const executePlan = async (planId: number) => {
-    console.group("🟢 useTradeActions.executePlan")
-    console.log("planId:", planId)
-    console.groupEnd()
+ const executePlan = async (
+planId: number,
+payload?: {
+entry_timestamp?: string
+}
+) => {
+console.group("🟢 useTradeActions.executePlan")
+console.log("planId:", planId)
+console.log("payload:", payload)
+console.groupEnd()
 
-    await executeTradePlan(planId)
-    await loadPlans()
-  }
+await executeTradePlan(planId, payload)
+await loadPlans()
+}
 
   /* ---------------- EXIT TRADE ---------------- */
 

@@ -7,6 +7,8 @@ import TradePlanForm from "./TradePlanForm"
 import TradePlanCard from "./TradePlanCard"
 import TradeExitForm from "./TradeExitForm"
 import TradeReviewForm from "./TradeReviewForm"
+import TradeExecuteForm from "./TradeExecuteForm"
+
 
 import { useTradeActions } from "@/hooks/useTradeActions"
 import { TradePlan } from "@/types/trade"
@@ -67,15 +69,17 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
           {isExpanded && (
             <div className="border-t px-3 pb-3">
               {/* EXECUTE */}
+
               {!plan.trade_state?.is_executed &&
                 plan.plan_status === "PLANNED" && (
-                  <button
-                    className="mt-3 w-full rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-                    disabled={loading || !canExecuteMoreTrades}
-                    onClick={() => executePlan(plan.id)}
-                  >
-                    Execute Trade
-                  </button>
+
+                  <TradeExecuteForm
+                    tradeDate={tradeDate}
+                    onSubmit={(payload) =>
+                      executePlan(plan.id, payload)
+                    }
+                  />
+
                 )}
 
               {/* EXIT */}

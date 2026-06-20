@@ -14,7 +14,10 @@ router = APIRouter(prefix="/api", tags=["Trades"])
 # EXECUTE TRADE
 # --------------------------------------------------
 @router.post("/trade-plans/{plan_id}/execute")
-def execute_trade(plan_id: int, db: Session = Depends(get_db)):
+def execute_trade(plan_id: int,
+                  payload: schemas.ExecuteTradePayload,
+                  db: Session = Depends(get_db)
+                  ):
     plan = db.get(models.TradePlan, plan_id)
 
     if not plan:
@@ -25,10 +28,15 @@ def execute_trade(plan_id: int, db: Session = Depends(get_db)):
             status_code=409,
             detail=f"Trade plan not executable (status={plan.plan_status})"
         )
+    trade_timestamp = (
+    payload.entry_timestamp
+    if payload.entry_timestamp
+    else datetime.now()
+           )
 
     trade = models.TradeLog(
         # REQUIRED FIELDS
-        timestamp=datetime.utcnow(),
+        timestamp=trade_timestamp,
 
         # ✅ FIX 1: symbol comes from plan
         symbol=plan.symbol,
