@@ -1,3 +1,4 @@
+//TradeJournal/frontend/components/trade/TradeLogTable.tsx
 "use client"
 
 import { useState } from "react"
