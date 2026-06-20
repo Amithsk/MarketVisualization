@@ -423,9 +423,176 @@ export default function CandleExplanationPanel({
                             )
                         }
 
-                        <div className="mb-4 text-yellow-400">
-                            RELATIONSHIP ANALYSIS (Coming Next)
-                        </div>
+                        {
+                            selectedExplanation?.relationship_analysis && (
+
+                                <div
+                                    className="
+                mb-6
+                rounded-lg
+                border
+                border-slate-700
+                bg-slate-900
+                p-4
+            "
+                                >
+
+                                    <h3
+                                        className="
+                    mb-4
+                    text-lg
+                    font-semibold
+                    text-yellow-400
+                "
+                                    >
+                                        MARKET RELATIONSHIP ANALYSIS
+                                    </h3>
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Market Condition
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.market_condition
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Stock Move %
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.stock_move_pct
+                                            }%
+
+                                        </div>
+
+                                    </div>
+
+                                    <div className="mb-4">
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            NIFTY Move %
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.nifty_move_pct
+                                            }%
+
+                                        </div>
+
+                                    </div>
+
+                                    <div>
+
+                                        <div
+                                            className="
+                        text-sm
+                        font-semibold
+                        text-cyan-300
+                    "
+                                        >
+                                            Relative Strength
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            Formula:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.relative_strength
+                                                    ?.formula
+                                            }
+
+                                        </div>
+
+                                        <div className="text-gray-300">
+
+                                            Calculation:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.relative_strength
+                                                    ?.calculation
+                                            }
+
+                                        </div>
+
+                                        <div
+                                            className="
+                        mt-2
+                        text-green-400
+                        font-semibold
+                    "
+                                        >
+
+                                            Result:
+                                            {" "}
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.relative_strength
+                                                    ?.result
+                                            }
+
+                                        </div>
+
+                                        <div className="text-gray-400">
+
+                                            {
+                                                selectedExplanation
+                                                    ?.relationship_analysis
+                                                    ?.relative_strength
+                                                    ?.interpretation
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            )
+                        }
 
                         <div className="mb-4 text-yellow-400">
                             ACTION (Coming Next)
