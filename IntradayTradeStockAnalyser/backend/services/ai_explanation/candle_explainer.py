@@ -123,6 +123,12 @@ def build_candle_explanations(
                 _build_nifty_analysis(
             nifty_candle
                 ),
+            
+            "relationship_analysis":
+                _build_relationship_analysis(
+                stock_candle,
+                nifty_candle
+                ),
         }
 
         explanations[candle_index] = explanation
@@ -561,6 +567,85 @@ def _build_nifty_analysis(
                     else
                     "NIFTY closed below open."
                 )
+        }
+    }
+#Function to analyze stock vs nifty relationship metrics to enrich explanations
+def _build_relationship_analysis(
+    stock_candle: Dict[str, Any],
+    nifty_candle: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    stock_open = stock_candle["open"]
+    stock_close = stock_candle["close"]
+
+    nifty_open = nifty_candle["open"]
+    nifty_close = nifty_candle["close"]
+
+    stock_move = round(
+        ((stock_close - stock_open)
+         / stock_open) * 100,
+        2
+    )
+
+    nifty_move = round(
+        ((nifty_close - nifty_open)
+         / nifty_open) * 100,
+        2
+    )
+
+    stock_direction = (
+        "BULLISH"
+        if stock_move > 0
+        else "BEARISH"
+    )
+
+    nifty_direction = (
+        "BULLISH"
+        if nifty_move > 0
+        else "BEARISH"
+    )
+
+    relative_strength = (
+        round(
+            abs(stock_move) /
+            max(abs(nifty_move), 0.01),
+            2
+        )
+    )
+
+    return {
+    "market_condition":
+        f"NIFTY {nifty_direction} + "
+        f"STOCK {stock_direction}",
+
+    "stock_move_pct":
+        stock_move,
+
+    "nifty_move_pct":
+        nifty_move,
+
+    "relative_strength": {
+        "formula":
+            "ABS(Stock Move %) / ABS(NIFTY Move %)",
+             "minimum_nifty_move_used": 0.01,
+
+        "stock_move_pct":
+            stock_move,
+
+        "nifty_move_pct":
+            nifty_move,
+
+        "calculation":
+            f"{abs(stock_move)} / "
+            f"{max(abs(nifty_move), 0.01)}",
+
+        "result":
+            relative_strength,
+
+        "interpretation":
+            f"Stock moved "
+            f"{relative_strength}x faster than "
+            f"NIFTY during this candle."
         }
     }
 
