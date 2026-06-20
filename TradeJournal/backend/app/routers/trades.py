@@ -1,4 +1,4 @@
-# app/routers/trades.py
+# TradeJournal/backend/app/routers/trades.py
 
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException

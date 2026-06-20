@@ -1,4 +1,4 @@
-# backend/app/schemas.py
+# TradeJournal/backend/app/schemas.py
 from pydantic import BaseModel
 from datetime import datetime, date
 from typing import Optional

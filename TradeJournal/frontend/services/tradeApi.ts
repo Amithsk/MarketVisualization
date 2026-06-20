@@ -1,4 +1,4 @@
-// frontend/services/trade.ts
+// TradeJournal/frontend/services/tradeApi.ts
 import { TradePlan, TradeReview } from "@/types/trade"
 
 const API_BASE = "/journal/api"
