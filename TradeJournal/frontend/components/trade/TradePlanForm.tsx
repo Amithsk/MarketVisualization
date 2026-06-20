@@ -1,3 +1,4 @@
+//TradeJournal/frontend/components/trade/TradePlanForm.tsx
 "use client"
 
 import { useState } from "react"
