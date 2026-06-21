@@ -59,12 +59,23 @@ export default function CandleExplanationPanel({
 
     return (
         <div>
+
+          <div
+            className="
+                grid
+               grid-cols-1
+               lg:grid-cols-2
+                gap-6
+                mb-6
+                 ">
             {/* ===================================== */}
             {/* STOCK ANALYSIS */}
             {/* ===================================== */}
 
+            
             {
-                selectedExplanation?.stock_analysis && (
+                
+                 selectedExplanation?.stock_analysis && (
 
                     <div
                         className="
@@ -403,11 +414,15 @@ export default function CandleExplanationPanel({
                             </div>
 
                         </details>
-                        {/* ===================================== */}
-                        {/* NIFTY ANALYSIS */}
-                        {/* ===================================== */}
-
-                        {
+                      </div>  
+                 )
+            }
+               </div>
+             {/* ===================================== */}
+             {/* NIFTY ANALYSIS */}
+             {/* ===================================== */}
+              <div>
+             {
                             selectedExplanation?.nifty_analysis && (
 
                                 <div
@@ -536,6 +551,13 @@ export default function CandleExplanationPanel({
                                 </div>
                             )
                         }
+               
+           </div> 
+             
+           <div>
+                        {/* ===================================== */}
+                        {/* MARKET RELATIONSHIP ANALYSIS */}
+                        {/* ===================================== */}
 
                         {
                             selectedExplanation?.relationship_analysis && (
@@ -707,8 +729,9 @@ export default function CandleExplanationPanel({
                                 </div>
                             )
                         }
-
-                        {/* --------------------- */}
+           </div> 
+           <div>
+              {/* --------------------- */}
                         {/* ACTION  */}
                         {/* --------------------- */}
 
@@ -941,8 +964,9 @@ export default function CandleExplanationPanel({
                             )
                         }
 
-
-                        {/* --------------------- */}
+           </div>    
+           <div>
+                                   {/* --------------------- */}
                         {/* LEARNING */}
                         {/* --------------------- */}
                         {
@@ -1123,15 +1147,11 @@ export default function CandleExplanationPanel({
                             )
                         }
 
-                    </div>
-                )
-            }
-
-
+           </div>       
 
 
         </div>
 
-    );
+    )
+ 
 }
-
