@@ -9,6 +9,7 @@ import SystemVsMarketReality from "@/components/analytics/SystemVsMarketReality"
 import Step3Performance from "@/components/analytics/Step3Performance";
 
 import MissedOpportunities from "@/components/analytics/MissedOpportunities";
+import RuleEffectiveness from "@/components/analytics/RuleEffectiveness";
 
 export default function AnalyticsPage() {
 
@@ -64,6 +65,9 @@ export default function AnalyticsPage() {
             />
             <MissedOpportunities
            data={performance}
+            />
+            <RuleEffectiveness
+              data={learning}
             />
 
         </div>
