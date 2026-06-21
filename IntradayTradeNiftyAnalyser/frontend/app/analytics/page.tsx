@@ -10,6 +10,7 @@ import Step3Performance from "@/components/analytics/Step3Performance";
 
 import MissedOpportunities from "@/components/analytics/MissedOpportunities";
 import RuleEffectiveness from "@/components/analytics/RuleEffectiveness";
+import ImprovementTracker from "@/components/analytics/ImprovementTracker";
 
 export default function AnalyticsPage() {
 
@@ -68,6 +69,10 @@ export default function AnalyticsPage() {
             />
             <RuleEffectiveness
               data={learning}
+            />
+
+            <ImprovementTracker
+            data={learning}
             />
 
         </div>
