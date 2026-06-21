@@ -72,7 +72,7 @@ export default function CandleExplanationPanel({
             {/* STOCK ANALYSIS */}
             {/* ===================================== */}
 
-            
+            <div>
             {
                 
                  selectedExplanation?.stock_analysis && (
@@ -551,9 +551,11 @@ export default function CandleExplanationPanel({
                                 </div>
                             )
                         }
+                        
                
            </div> 
              
+         </div>    
            <div>
                         {/* ===================================== */}
                         {/* MARKET RELATIONSHIP ANALYSIS */}
