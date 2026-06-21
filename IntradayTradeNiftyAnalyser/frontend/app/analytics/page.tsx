@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 import LearningSection from "@/components/analytics/LearningSection";
@@ -11,8 +13,16 @@ import Step3Performance from "@/components/analytics/Step3Performance";
 import MissedOpportunities from "@/components/analytics/MissedOpportunities";
 import RuleEffectiveness from "@/components/analytics/RuleEffectiveness";
 import ImprovementTracker from "@/components/analytics/ImprovementTracker";
+import TradeDateSelector from "@/components/analytics/TradeDateSelector";
 
 export default function AnalyticsPage() {
+    
+    const [tradeDate, setTradeDate] =
+    useState(
+        new Date()
+            .toISOString()
+            .split("T")[0]
+    );
 
     const {
         loading,
@@ -22,7 +32,7 @@ export default function AnalyticsPage() {
         step2,
         performance
     } = useAnalytics(
-        "2026-06-11"
+        tradeDate
     );
 
     if (loading) {
@@ -41,8 +51,15 @@ export default function AnalyticsPage() {
         );
     }
 
+
+
     return (
         <div style={{ padding: "20px" }}>
+
+            <TradeDateSelector
+            value={tradeDate}
+            onChange={setTradeDate}
+            />
 
             <LearningSection
                 data={learning}
