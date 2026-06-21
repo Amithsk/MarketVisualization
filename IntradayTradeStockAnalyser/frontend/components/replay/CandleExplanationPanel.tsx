@@ -88,106 +88,164 @@ export default function CandleExplanationPanel({
                             STOCK ANALYSIS
                         </h3>
 
+
                         {/* --------------------- */}
-                        {/* MOVE */}
+                        {/* STOCK MOVE */}
                         {/* --------------------- */}
 
-                        <div className="mb-4">
+                        <details
+                            open
+                            className="
+        mb-4
+        border-b
+        border-slate-700
+    "
+                        >
 
-                            <div
+                            <summary
                                 className="
-                        text-sm
-                        font-semibold
-                        text-cyan-300
-                    "
-                            >
-                                Move %
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                Formula:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.formula
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                Open:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.open
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                Close:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.close
-                                }
-
-                            </div>
-
-                            <div
-                                className="
-                        mt-2
-                        text-base
-                        font-semibold
-                        text-green-400
-                    "
+            cursor-pointer
+            flex
+            justify-between
+            items-center
+            py-3
+            font-semibold
+        "
                             >
 
-                                Result:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.result
-                                }%
+                                <span>
+                                    Stock Move
+                                </span>
+
+                                <span
+                                    className={
+                                        (
+                                            selectedExplanation
+                                                ?.stock_analysis
+                                                ?.move
+                                                ?.result ?? 0
+                                        ) >= 0
+                                            ? "text-green-400"
+                                            : "text-red-400"
+                                    }
+                                >
+
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.result
+                                    }%
+
+                                </span>
+
+                            </summary>
+
+                            <div className="pb-4">
+
+                                <div
+                                    className="
+                text-cyan-300
+                text-sm
+                mb-2
+            "
+                                >
+                                    Calculation
+                                </div>
+
+                                <div
+                                    className="
+                bg-slate-950
+                border
+                border-slate-700
+                rounded
+                p-3
+                mb-3
+                font-mono
+                text-sm
+            "
+                                >
+
+                                    Formula:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.formula
+                                    }
+
+                                    <br />
+
+                                    Open:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.open
+                                    }
+
+                                    <br />
+
+                                    Close:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.close
+                                    }
+
+                                    <br />
+
+                                    Result:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.result
+                                    }%
+
+                                </div>
+
+                                <div
+                                    className="
+                text-cyan-300
+                text-sm
+                mb-2
+            "
+                                >
+                                    Meaning
+                                </div>
+
+                                <div className="text-gray-300">
+
+                                    Direction:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.direction
+                                    }
+
+                                    <br />
+                                    <br />
+
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.move
+                                            ?.interpretation
+                                    }
+
+                                </div>
 
                             </div>
 
-                            <div className="text-sm text-gray-400">
-
-                                Direction:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.direction
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-400">
-
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.move
-                                        ?.interpretation
-                                }
-
-                            </div>
-
-                        </div>
+                        </details>
 
                         {/* --------------------- */}
                         {/* VWAP */}
