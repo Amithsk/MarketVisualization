@@ -3,6 +3,7 @@
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 import LearningSection from "@/components/analytics/LearningSection";
+import Step1Validation from "@/components/analytics/Step1Validation";
 
 export default function AnalyticsPage() {
 
@@ -10,6 +11,7 @@ export default function AnalyticsPage() {
         loading,
         error,
         learning,
+        step1,
     } = useAnalytics(
         "2026-06-11"
     );
@@ -35,6 +37,10 @@ export default function AnalyticsPage() {
 
             <LearningSection
                 data={learning}
+            />
+
+            <Step1Validation
+            data={step1}
             />
 
         </div>
