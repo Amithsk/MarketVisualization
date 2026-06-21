@@ -248,105 +248,161 @@ export default function CandleExplanationPanel({
                         </details>
 
                         {/* --------------------- */}
-                        {/* VWAP */}
+                        {/* VWAP POSITION */}
                         {/* --------------------- */}
 
-                        <div>
+                        <details
+                            className="
+        mb-4
+        border-b
+        border-slate-700
+    "
+                        >
 
-                            <div
+                            <summary
                                 className="
-                        text-sm
-                        font-semibold
-                        text-cyan-300
-                    "
-                            >
-                                VWAP Position
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                Formula:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.formula
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                Close:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.close
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-300">
-
-                                VWAP:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.vwap
-                                }
-
-                            </div>
-
-                            <div
-                                className="
-                        mt-2
-                        text-base
-                        font-semibold
-                        text-green-400
-                    "
+            cursor-pointer
+            flex
+            justify-between
+            items-center
+            py-3
+            font-semibold
+        "
                             >
 
-                                Result:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.result
-                                }
+                                <span>
+                                    VWAP Position
+                                </span>
+
+                                <span
+                                    className={
+                                        (
+                                            selectedExplanation
+                                                ?.stock_analysis
+                                                ?.vwap_position
+                                                ?.result ?? 0
+                                        ) >= 0
+                                            ? "text-green-400"
+                                            : "text-red-400"
+                                    }
+                                >
+
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.result
+                                    }
+
+                                </span>
+
+                            </summary>
+
+                            <div className="pb-4">
+
+                                <div
+                                    className="
+                text-cyan-300
+                text-sm
+                mb-2
+            "
+                                >
+                                    Calculation
+                                </div>
+
+                                <div
+                                    className="
+                bg-slate-950
+                border
+                border-slate-700
+                rounded
+                p-3
+                mb-3
+                font-mono
+                text-sm
+            "
+                                >
+
+                                    Formula:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.formula
+                                    }
+
+                                    <br />
+
+                                    Close:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.close
+                                    }
+
+                                    <br />
+
+                                    VWAP:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.vwap
+                                    }
+
+                                    <br />
+
+                                    Result:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.result
+                                    }
+
+                                </div>
+
+                                <div
+                                    className="
+                text-cyan-300
+                text-sm
+                mb-2
+            "
+                                >
+                                    Meaning
+                                </div>
+
+                                <div className="text-gray-300">
+
+                                    Position:
+                                    {" "}
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.position
+                                    }
+
+                                    <br />
+                                    <br />
+
+                                    {
+                                        selectedExplanation
+                                            ?.stock_analysis
+                                            ?.vwap_position
+                                            ?.interpretation
+                                    }
+
+                                </div>
 
                             </div>
 
-                            <div className="text-sm text-gray-400">
-
-                                Position:
-                                {" "}
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.position
-                                }
-
-                            </div>
-
-                            <div className="text-sm text-gray-400">
-
-                                {
-                                    selectedExplanation
-                                        ?.stock_analysis
-                                        ?.vwap_position
-                                        ?.interpretation
-                                }
-
-                            </div>
-
-                        </div>
+                        </details>
                         {/* ===================================== */}
                         {/* NIFTY ANALYSIS */}
                         {/* ===================================== */}
