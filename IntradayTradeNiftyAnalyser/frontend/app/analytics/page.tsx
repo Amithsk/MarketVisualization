@@ -8,6 +8,8 @@ import Step2Validation from "@/components/analytics/Step2Validation";
 import SystemVsMarketReality from "@/components/analytics/SystemVsMarketReality";
 import Step3Performance from "@/components/analytics/Step3Performance";
 
+import MissedOpportunities from "@/components/analytics/MissedOpportunities";
+
 export default function AnalyticsPage() {
 
     const {
@@ -59,6 +61,9 @@ export default function AnalyticsPage() {
 
             <Step3Performance
             data={performance}
+            />
+            <MissedOpportunities
+           data={performance}
             />
 
         </div>
