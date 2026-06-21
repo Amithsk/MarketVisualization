@@ -191,6 +191,16 @@ export type CandleExplanation = {
     nifty_relationship?: string;
 
     confidence_score?: number;
+
+    stock_analysis?: any;
+
+    nifty_analysis?: any;
+
+    relationship_analysis?: any;
+
+    action?: any;
+
+    learning?: any;
 };
 
 export type TimelineNarration = {
