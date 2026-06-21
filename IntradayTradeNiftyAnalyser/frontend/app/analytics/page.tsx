@@ -5,6 +5,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import LearningSection from "@/components/analytics/LearningSection";
 import Step1Validation from "@/components/analytics/Step1Validation";
 import Step2Validation from "@/components/analytics/Step2Validation";
+import SystemVsMarketReality from "@/components/analytics/SystemVsMarketReality";
 
 export default function AnalyticsPage() {
 
@@ -47,6 +48,11 @@ export default function AnalyticsPage() {
 
             <Step2Validation
             data={step2}
+            />
+
+            <SystemVsMarketReality
+             step1={step1}
+             step2={step2}
             />
 
         </div>
