@@ -6,6 +6,7 @@ import LearningSection from "@/components/analytics/LearningSection";
 import Step1Validation from "@/components/analytics/Step1Validation";
 import Step2Validation from "@/components/analytics/Step2Validation";
 import SystemVsMarketReality from "@/components/analytics/SystemVsMarketReality";
+import Step3Performance from "@/components/analytics/Step3Performance";
 
 export default function AnalyticsPage() {
 
@@ -15,6 +16,7 @@ export default function AnalyticsPage() {
         learning,
         step1,
         step2,
+        performance
     } = useAnalytics(
         "2026-06-11"
     );
@@ -53,6 +55,10 @@ export default function AnalyticsPage() {
             <SystemVsMarketReality
              step1={step1}
              step2={step2}
+            />
+
+            <Step3Performance
+            data={performance}
             />
 
         </div>
