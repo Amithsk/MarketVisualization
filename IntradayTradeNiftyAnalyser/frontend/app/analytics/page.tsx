@@ -2,15 +2,14 @@
 
 import { useAnalytics } from "@/hooks/useAnalytics";
 
+import LearningSection from "@/components/analytics/LearningSection";
+
 export default function AnalyticsPage() {
 
     const {
         loading,
         error,
         learning,
-        step1,
-        step2,
-        performance,
     } = useAnalytics(
         "2026-06-11"
     );
@@ -34,45 +33,9 @@ export default function AnalyticsPage() {
     return (
         <div style={{ padding: "20px" }}>
 
-            <h1>
-                Analytics Test Page
-            </h1>
-
-            <h2>Learning</h2>
-            <pre>
-                {JSON.stringify(
-                    learning,
-                    null,
-                    2
-                )}
-            </pre>
-
-            <h2>STEP1</h2>
-            <pre>
-                {JSON.stringify(
-                    step1,
-                    null,
-                    2
-                )}
-            </pre>
-
-            <h2>STEP2</h2>
-            <pre>
-                {JSON.stringify(
-                    step2,
-                    null,
-                    2
-                )}
-            </pre>
-
-            <h2>Performance</h2>
-            <pre>
-                {JSON.stringify(
-                    performance,
-                    null,
-                    2
-                )}
-            </pre>
+            <LearningSection
+                data={learning}
+            />
 
         </div>
     );
