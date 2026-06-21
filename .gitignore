@@ -18,5 +18,20 @@ IntradayTradeStockAnalyser/backend/models/__pycache__
 IntradayTradeStockAnalyser/backend/constants/__pycache__
 IntradayTradeStockAnalyser/frontend/.next
 
+IntradayTradeNiftyAnalyser/backend/app/__pycache__
+IntradayTradeNiftyAnalyser/backend/app/db/__pycache__
+
+IntradayTradeNiftyAnalyser/backend/app/repositories/analytics/__pycache__
+
+IntradayTradeNiftyAnalyser/backend/app/services/analytics/__pycache__
+
+IntradayTradeNiftyAnalyser/backend/app/schemas/analytics/__pycache__
+
+IntradayTradeNiftyAnalyser/backend/app/api/analytics/__pycache__
+
+
+
+
+
 
     
