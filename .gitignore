@@ -1,6 +1,7 @@
 node_modules/
 TradeJournal/frontend/node_modules/
 TradeJournal/frontend/.next
+
 TradeJournal/backend/app/__pycache__
 TradeJournal/backend/app/routers/__pycache__
 Code/__pycache__
@@ -28,6 +29,10 @@ IntradayTradeNiftyAnalyser/backend/app/services/analytics/__pycache__
 IntradayTradeNiftyAnalyser/backend/app/schemas/analytics/__pycache__
 
 IntradayTradeNiftyAnalyser/backend/app/api/analytics/__pycache__
+
+
+IntradayTradeIndexAnalyser/frontend/node_modules/
+IntradayTradeIndexAnalyser/frontend/.next
 
 
 
