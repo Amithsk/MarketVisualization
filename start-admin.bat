@@ -26,7 +26,7 @@ REM 3. INTRADAY BACKEND (8003)
 REM -------------------------------
 start "Intraday Backend (8003)" cmd /k ^
 cd /d D:\MarketVisualization\IntradayTradeStockAnalyser ^&^
-call IntradayTradeStockAnalyserenv\Scripts\activate ^&^
+call backend\IntradayTradeStockAnalyserenv\Scripts\activate ^&^
 echo Running Intraday Backend on 8003 ^&^
 uvicorn backend.app:app --reload --host 127.0.0.1 --port 8003
 
