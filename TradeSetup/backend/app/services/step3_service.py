@@ -312,12 +312,21 @@ def generate_step3_execution(db: Session, trade_date: date) -> Step3ExecutionRes
 
         passed.append({
             "symbol": symbol,
+            "price": candle["close"], 
             "avg_traded_value_20d": avg_val,
             "atr_pct": round(atr_pct, 2),
             "abnormal_candle": abnormal,
         })
     logger.info("[STEP3][STATE][LAYER1_PASS] trade_date=%s passed=%s", trade_date, len(passed))
-    passed.sort(key=lambda x: x["avg_traded_value_20d"], reverse=True)
+    # Sort by:
+    # 1. Lowest stock price first
+    # 2. Higher liquidity when prices are equal
+    passed.sort(
+        key=lambda x: (
+            x["price"],
+            -x["avg_traded_value_20d"]
+        )
+    )
     top6 = passed[:6]
     logger.info("[STEP3][STATE][TOP6_SELECTED] trade_date=%s count=%s", trade_date, len(top6))
     candidates = [
