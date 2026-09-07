@@ -97,6 +97,7 @@ export default function LivePage() {
                 stockCandles={stockCandles}
                 marketEvents={[]}
                 stockName={selectedStock}
+                 mode="live"
             />
 
         </div>

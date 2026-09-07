@@ -15,13 +15,19 @@ import { Candle } from "../../types/candle";
 import { MarketEvent } from "../../types/replay";
 
 type Props = {
-    candles: Candle[];
+       candles: Candle[];
     marketEvents?: MarketEvent[];
     title: string;
     onCrosshairMove?: (timestamp: number | null) => void;
     synchronizedTimestamp?: number | null;
     currentCandleIndex?: number;
     onCandleSelect?: (index: number) => void;
+
+    // -----------------------------------
+    // Chart Mode
+    // -----------------------------------
+
+    mode?: "live" | "replay";
 };
 
 // -----------------------------------
@@ -29,23 +35,50 @@ type Props = {
 // -----------------------------------
 
 function createISTTimestamp(dateTime: string): number {
-    const [datePart, timePart] = dateTime.split(" ");
-    const [year, month, day] = datePart.split("-").map(Number);
-    const [hours, minutes, seconds] = timePart.split(":").map(Number);
+
+    const match = dateTime
+        .trim()
+        .match(
+            /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/
+        );
+
+    if (!match) {
+        throw new Error(
+            `Invalid candle timestamp format: ${dateTime}`
+        );
+    }
+
+    const [
+        ,
+        year,
+        month,
+        day,
+        hours,
+        minutes,
+        seconds = "0",
+    ] = match;
 
     return Math.floor(
-        Date.UTC(year, month - 1, day, hours, minutes, seconds) / 1000
+        Date.UTC(
+            Number(year),
+            Number(month) - 1,
+            Number(day),
+            Number(hours),
+            Number(minutes),
+            Number(seconds)
+        ) / 1000
     );
 }
 
 export default function CandlestickChart({
-    candles,
+     candles,
     marketEvents = [],
     title,
     onCrosshairMove,
     synchronizedTimestamp,
     currentCandleIndex,
     onCandleSelect,
+    mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
 

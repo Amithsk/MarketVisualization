@@ -18,7 +18,7 @@ import {
 
 type Props = {
 
-    niftyCandles: Candle[];
+   niftyCandles: Candle[];
 
     stockCandles: Candle[];
 
@@ -31,9 +31,12 @@ type Props = {
     onCandleSelect?: (
         index: number
     ) => void;
+
+    mode?: "live" | "replay";
 };
 
 export default function SynchronizedCharts({
+
 
     niftyCandles,
 
@@ -46,6 +49,8 @@ export default function SynchronizedCharts({
     currentCandleIndex,
 
     onCandleSelect,
+
+    mode = "replay",
 
 }: Props) {
 
@@ -144,6 +149,9 @@ export default function SynchronizedCharts({
                 }
 
                 title="NIFTY 50"
+
+                mode={mode}
+
                 currentCandleIndex={
                     currentCandleIndex
                 }
@@ -171,7 +179,8 @@ export default function SynchronizedCharts({
                 marketEvents={
                     visibleMarketEvents
                 }
-
+                mode={mode}
+                
                 title={
                     stockName
                 }
