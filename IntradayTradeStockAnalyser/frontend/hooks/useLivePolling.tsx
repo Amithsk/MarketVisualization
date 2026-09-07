@@ -9,6 +9,10 @@ import {
     fetchNiftyCandles,
     fetchSymbolCandles,
 } from "../services/liveApi";
+import {
+    isIndianMarketOpen,
+    millisecondsUntilIndianMarketOpen,
+} from "../lib/marketHours";
 
 import { Candle } from "../types/candle";
 
@@ -68,6 +72,11 @@ export default function useLivePolling(
 
 
         async function loadOnce() {
+
+            // Guard every live API request, including an already-scheduled poll.
+            if (!isIndianMarketOpen()) {
+                return;
+            }
 
             // -----------------------------------
             // NIFTY
@@ -163,6 +172,25 @@ export default function useLivePolling(
         // -----------------------------------
 
         function scheduleNext() {
+
+            // While closed, schedule one next-open wake-up rather than polling.
+            if (!isIndianMarketOpen()) {
+                timerRef.current = window.setTimeout(
+                    async () => {
+                        if (
+                            !cancelled &&
+                            requestId === requestIdRef.current
+                        ) {
+                            // loadOnce re-checks market hours before calling APIs.
+                            await loadOnce();
+                            scheduleNext();
+                        }
+                    },
+                    millisecondsUntilIndianMarketOpen()
+                );
+
+                return;
+            }
 
             const delay =
                 nextFiveMinuteBoundaryDelay();
