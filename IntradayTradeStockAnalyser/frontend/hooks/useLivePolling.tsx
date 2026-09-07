@@ -48,14 +48,23 @@ export default function useLivePolling(
 
     const [stock, setStock] =
         useState<Candle[]>([]);
-
     const timerRef =
         useRef<number | null>(null);
+
+    const requestIdRef =
+        useRef(0);
 
 
     useEffect(() => {
 
         let cancelled = false;
+
+        const requestId =
+        ++requestIdRef.current;
+
+        
+        setStock([]);
+
 
 
         async function loadOnce() {
@@ -112,7 +121,7 @@ export default function useLivePolling(
                         );
 
                     if (
-                        !cancelled &&
+                        !cancelled && requestId === requestIdRef.current &&
                         sRes?.candles
                     ) {
 
@@ -164,7 +173,10 @@ export default function useLivePolling(
 
                         await loadOnce();
 
-                        if (!cancelled) {
+                        if (
+                            !cancelled &&
+                            requestId === requestIdRef.current
+                        ) {
                             scheduleNext();
                         }
 
