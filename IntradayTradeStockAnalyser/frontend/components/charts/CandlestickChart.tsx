@@ -116,8 +116,10 @@ type LiveMetadataItem = {
 
 function LiveCandleMetadata({
     metadata,
+    showStockCandleDetails,
 }: {
     metadata: LiveMetadataItem[];
+    showStockCandleDetails: boolean;
 }) {
     if (!metadata.length) {
         return null;
@@ -149,47 +151,36 @@ function LiveCandleMetadata({
                         transform: "translateX(-50%)",
                     }}
                 >
-                    <div>H {Number(item.high).toFixed(1)}</div>
-
-                    <div
-                        className="absolute"
-                        style={{
-                            top: `${item.bodyCenterY - item.highY + 8}px`,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                        }}
-                    >
+                    {showStockCandleDetails && (
                         <div
-                            className="
-                                min-w-10
-                                text-center
-                                font-medium
-                            "
+                            className="absolute"
+                            style={{
+                                top: `${item.bodyCenterY - item.highY + 8}px`,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                            }}
                         >
-                            {item.range.toFixed(1)}
+                            <div
+                                className="
+                                    min-w-10
+                                    text-center
+                                    font-medium
+                                "
+                            >
+                                {item.range.toFixed(1)}
+                            </div>
+
+                            <div
+                                className="
+                                    mx-auto
+                                    mt-1
+                                    h-0.5
+                                    w-5
+                                    bg-white
+                                "
+                            />
                         </div>
-
-                        <div
-                            className="
-                                mx-auto
-                                mt-1
-                                h-0.5
-                                w-5
-                                bg-white
-                            "
-                        />
-                    </div>
-
-                    <div
-                        className="absolute"
-                        style={{
-                            top: `${item.lowY - item.highY + 4}px`,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                        }}
-                    >
-                        L {Number(item.low).toFixed(1)}
-                    </div>
+                    )}
 
                     <div
                         className="
@@ -207,49 +198,44 @@ function LiveCandleMetadata({
 
                     {item.volumeChange !== null && (
                         <div
-                            className="
+                            className={`
                                 absolute
                                 font-medium
-                            "
+                                ${item.volumeChange > 0
+                                    ? "text-green-400"
+                                    : item.volumeChange < 0
+                                        ? "text-red-400"
+                                        : "text-gray-300"}
+                            `}
                             style={{
                                 top: `${item.lowY - item.highY + 42}px`,
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
                         >
-                            {item.volumeChange >= 0
+                            {item.volumeChange > 0
                                 ? `▲ ${Math.abs(item.volumeChange).toFixed(0)}%`
-                                : `▼ ${Math.abs(item.volumeChange).toFixed(0)}%`}
+                                : item.volumeChange < 0
+                                    ? `▼ ${Math.abs(item.volumeChange).toFixed(0)}%`
+                                    : "— 0%"}
                         </div>
                     )}
 
-                    <div
-                        className="
-                            absolute
-                            text-gray-300
-                        "
-                        style={{
-                            top: `${item.lowY - item.highY + 62}px`,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                        }}
-                    >
-                        C {Number(item.close).toFixed(1)}
-                    </div>
-
-                    <div
-                        className="
-                            absolute
-                            text-gray-300
-                        "
-                        style={{
-                            top: `${item.lowY - item.highY + 84}px`,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                        }}
-                    >
-                        {item.timeLabel}
-                    </div>
+                    {showStockCandleDetails && (
+                        <div
+                            className="
+                                absolute
+                                text-gray-300
+                            "
+                            style={{
+                                top: `${item.lowY - item.highY + 62}px`,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                            }}
+                        >
+                            C {Number(item.close).toFixed(1)}
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
@@ -297,7 +283,7 @@ function createISTTimestamp(dateTime: string): number {
 
 export default function CandlestickChart({
     candles,
-    marketEvents = EMPTY_MARKET_EVENTS,
+    marketEvents: providedMarketEvents,
     title,
     onCrosshairMove,
     synchronizedTimestamp,
@@ -306,6 +292,8 @@ export default function CandlestickChart({
     mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
+    const marketEvents = providedMarketEvents ?? EMPTY_MARKET_EVENTS;
+    const isStockChart = providedMarketEvents !== undefined;
 
     // -----------------------------------
     // Live Metadata Position State
@@ -450,7 +438,9 @@ export default function CandlestickChart({
         // -----------------------------------
 
         candleSeries.setData(formattedCandles);
-        volumeSeries.setData(formattedVolume);
+        if (mode !== "live") {
+            volumeSeries.setData(formattedVolume);
+        }
         // -----------------------------------
         // Replay Auto Follow
         // -----------------------------------
@@ -749,48 +739,52 @@ export default function CandlestickChart({
 
         chart.timeScale().fitContent();
 
-        const nextLiveMetadata: LiveMetadataItem[] = candles
-            .map((candle, index) => {
-                const timestamp = createISTTimestamp(candle.time);
-                const x = chart.timeScale().timeToCoordinate(timestamp as UTCTimestamp);
-                const highY = candleSeries.priceToCoordinate(Number(candle.high));
-                const lowY = candleSeries.priceToCoordinate(Number(candle.low));
-                const openY = candleSeries.priceToCoordinate(Number(candle.open));
-                const closeY = candleSeries.priceToCoordinate(Number(candle.close));
+        const updateLiveMetadata = () => {
+            const nextLiveMetadata: LiveMetadataItem[] = candles
+                .map((candle, index) => {
+                    const timestamp = createISTTimestamp(candle.time) as UTCTimestamp;
+                    const x = chart.timeScale().timeToCoordinate(timestamp);
+                    const highY = candleSeries.priceToCoordinate(Number(candle.high));
+                    const lowY = candleSeries.priceToCoordinate(Number(candle.low));
+                    const openY = candleSeries.priceToCoordinate(Number(candle.open));
+                    const closeY = candleSeries.priceToCoordinate(Number(candle.close));
 
-                if (
-                    x === null ||
-                    highY === null ||
-                    lowY === null ||
-                    openY === null ||
-                    closeY === null
-                ) {
-                    return null;
-                }
+                    if (
+                        x === null ||
+                        highY === null ||
+                        lowY === null ||
+                        openY === null ||
+                        closeY === null
+                    ) {
+                        return null;
+                    }
 
-                const range = Number(candle.high) - Number(candle.low);
-                const volumeChange = calculateVolumeChange(candles, index);
-                const bodyCenterY = (openY + closeY) / 2;
+                    const range = Number(candle.high) - Number(candle.low);
+                    const volumeChange = calculateVolumeChange(candles, index);
+                    const bodyCenterY = (openY + closeY) / 2;
 
-                return {
-                    key: `${candle.time}-${index}`,
-                    x,
-                    top: highY - 18,
-                    high: Number(candle.high),
-                    low: Number(candle.low),
-                    close: Number(candle.close),
-                    range,
-                    bodyCenterY,
-                    volume: Number(candle.volume),
-                    volumeChange,
-                    timeLabel: candle.time.slice(11, 16),
-                    highY,
-                    lowY,
-                };
-            })
-            .filter((item): item is LiveMetadataItem => item !== null);
+                    return {
+                        key: `${candle.time}-${index}`,
+                        x,
+                        top: highY - 18,
+                        high: Number(candle.high),
+                        low: Number(candle.low),
+                        close: Number(candle.close),
+                        range,
+                        bodyCenterY,
+                        volume: Number(candle.volume),
+                        volumeChange,
+                        timeLabel: candle.time.slice(11, 16),
+                        highY,
+                        lowY,
+                    };
+                })
+                .filter((item): item is LiveMetadataItem => item !== null);
 
-        setLiveMetadata(nextLiveMetadata);
+            setLiveMetadata(nextLiveMetadata);
+        };
+
+        let metadataAnimationFrame = requestAnimationFrame(updateLiveMetadata);
 
         // -----------------------------------
         // Resize handling
@@ -801,6 +795,8 @@ export default function CandlestickChart({
                 return;
             }
             chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+            cancelAnimationFrame(metadataAnimationFrame);
+            metadataAnimationFrame = requestAnimationFrame(updateLiveMetadata);
         };
 
         window.addEventListener("resize", handleResize);
@@ -824,9 +820,11 @@ export default function CandlestickChart({
                 handleChartClick
             );
 
+            cancelAnimationFrame(metadataAnimationFrame);
+
             chart.remove();
         };
-    }, [candles, marketEvents, onCrosshairMove, synchronizedTimestamp]);
+    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp]);
 
     return (
         <div className="relative w-full h-full">
@@ -888,7 +886,12 @@ export default function CandlestickChart({
             <div className="relative">
                 <div ref={chartContainerRef} className="relative" />
 
-                {mode === "live" && <LiveCandleMetadata metadata={liveMetadata} />}
+                {mode === "live" && (
+                    <LiveCandleMetadata
+                        metadata={liveMetadata}
+                        showStockCandleDetails={isStockChart}
+                    />
+                )}
             </div>
 
             {hoveredEvent && tooltipPosition && (
