@@ -152,34 +152,58 @@ function LiveCandleMetadata({
                     }}
                 >
                     {showStockCandleDetails && (
-                        <div
-                            className="absolute"
-                            style={{
-                                top: `${item.bodyCenterY - item.highY + 8}px`,
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                            }}
-                        >
+                        <>
                             <div
-                                className="
-                                    min-w-10
-                                    text-center
-                                    font-medium
-                                "
+                                className="absolute"
+                                style={{
+                                    top: "0px",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                }}
                             >
-                                {item.range.toFixed(1)}
+                                {Number(item.high).toFixed(1)}
                             </div>
 
                             <div
-                                className="
-                                    mx-auto
-                                    mt-1
-                                    h-0.5
-                                    w-5
-                                    bg-white
-                                "
-                            />
-                        </div>
+                                className="absolute"
+                                style={{
+                                    top: `${item.bodyCenterY - item.highY + 8}px`,
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                }}
+                            >
+                                <div
+                                    className="
+                                        min-w-10
+                                        text-center
+                                        font-medium
+                                    "
+                                >
+                                    {item.range.toFixed(1)}
+                                </div>
+
+                                <div
+                                    className="
+                                        mx-auto
+                                        mt-1
+                                        h-0.5
+                                        w-5
+                                        bg-white
+                                    "
+                                />
+                            </div>
+
+                            <div
+                                className="absolute"
+                                style={{
+                                    top: `${item.lowY - item.highY + 4}px`,
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                }}
+                            >
+                                {Number(item.low).toFixed(1)}
+                            </div>
+                        </>
                     )}
 
                     <div
