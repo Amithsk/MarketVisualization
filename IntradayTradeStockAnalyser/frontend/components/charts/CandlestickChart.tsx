@@ -151,60 +151,58 @@ function LiveCandleMetadata({
                         transform: "translateX(-50%)",
                     }}
                 >
+                    <div
+                        className="absolute"
+                        style={{
+                            top: "0px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {Number(item.high).toFixed(1)}
+                    </div>
+
                     {showStockCandleDetails && (
-                        <>
+                        <div
+                            className="absolute"
+                            style={{
+                                top: `${item.bodyCenterY - item.highY + 8}px`,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                            }}
+                        >
                             <div
-                                className="absolute"
-                                style={{
-                                    top: "0px",
-                                    left: "50%",
-                                    transform: "translateX(-50%)",
-                                }}
+                                className="
+                                    min-w-10
+                                    text-center
+                                    font-medium
+                                "
                             >
-                                {Number(item.high).toFixed(1)}
+                                {item.range.toFixed(1)}
                             </div>
 
                             <div
-                                className="absolute"
-                                style={{
-                                    top: `${item.bodyCenterY - item.highY + 8}px`,
-                                    left: "50%",
-                                    transform: "translateX(-50%)",
-                                }}
-                            >
-                                <div
-                                    className="
-                                        min-w-10
-                                        text-center
-                                        font-medium
-                                    "
-                                >
-                                    {item.range.toFixed(1)}
-                                </div>
-
-                                <div
-                                    className="
-                                        mx-auto
-                                        mt-1
-                                        h-0.5
-                                        w-5
-                                        bg-white
-                                    "
-                                />
-                            </div>
-
-                            <div
-                                className="absolute"
-                                style={{
-                                    top: `${item.lowY - item.highY + 4}px`,
-                                    left: "50%",
-                                    transform: "translateX(-50%)",
-                                }}
-                            >
-                                {Number(item.low).toFixed(1)}
-                            </div>
-                        </>
+                                className="
+                                    mx-auto
+                                    mt-1
+                                    h-0.5
+                                    w-5
+                                    bg-white
+                                "
+                            />
+                        </div>
                     )}
+
+                    <div
+                        className="absolute"
+                        style={{
+                            top: `${item.lowY - item.highY + 4}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {Number(item.low).toFixed(1)}
+                    </div>
 
                     <div
                         className="
@@ -673,6 +671,15 @@ export default function CandlestickChart({
             const mouseY = param.point.y;
 
             const matchedEvent = marketEvents.find((event) => {
+                if (
+                    typeof event.trade_date !== "string" ||
+                    !event.trade_date.trim() ||
+                    typeof event.candle_time !== "string" ||
+                    !event.candle_time.trim()
+                ) {
+                    return false;
+                }
+
                 const eventTimestamp = createISTTimestamp(
                     `${event.trade_date} ${event.candle_time}`
                 );
