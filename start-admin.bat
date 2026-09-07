@@ -27,6 +27,8 @@ REM -------------------------------
 start "Intraday Backend (8003)" cmd /k ^
 cd /d D:\MarketVisualization\IntradayTradeStockAnalyser ^&^
 call backend\IntradayTradeStockAnalyserenv\Scripts\activate ^&^
+set "ZERODHA_MARKET_DATA_BASE_URL=http://192.168.29.229:8001" ^&^
+echo Zerodha Market Data URL configured ^&^
 echo Running Intraday Backend on 8003 ^&^
 uvicorn backend.app:app --reload --host 127.0.0.1 --port 8003
 
