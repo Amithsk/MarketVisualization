@@ -8,6 +8,7 @@ import {
     CandlestickSeries,
     createSeriesMarkers,
     HistogramSeries,
+    Coordinate,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 
@@ -15,7 +16,7 @@ import { Candle } from "../../types/candle";
 import { MarketEvent } from "../../types/replay";
 
 type Props = {
-       candles: Candle[];
+    candles: Candle[];
     marketEvents?: MarketEvent[];
     title: string;
     onCrosshairMove?: (timestamp: number | null) => void;
@@ -30,6 +31,230 @@ type Props = {
     mode?: "live" | "replay";
 };
 
+const EMPTY_MARKET_EVENTS: MarketEvent[] = [];
+
+// -----------------------------------
+// LIVE CANDLE METADATA HELPERS
+// -----------------------------------
+
+function formatVolume(volume: number): string {
+
+    if (!Number.isFinite(volume)) {
+        return "0";
+    }
+
+    if (volume >= 1_000_000) {
+        return `${(volume / 1_000_000).toFixed(2)}M`;
+    }
+
+    if (volume >= 1_000) {
+        return `${(volume / 1_000).toFixed(0)}K`;
+    }
+
+    return volume.toString();
+}
+
+
+function calculateVolumeChange(
+    candles: Candle[],
+    index: number
+): number | null {
+
+    if (index === 0) {
+        return null;
+    }
+
+    const currentVolume =
+        Number(candles[index]?.volume);
+
+    const previousVolume =
+        Number(candles[index - 1]?.volume);
+
+    if (
+        !Number.isFinite(currentVolume) ||
+        !Number.isFinite(previousVolume) ||
+        previousVolume === 0
+    ) {
+        return null;
+    }
+
+    return (
+        ((currentVolume - previousVolume) /
+            previousVolume) *
+        100
+    );
+}
+
+type LiveMetadataItem = {
+
+    key: string;
+
+    x: Coordinate;
+
+    top: number;
+
+    high: number;
+
+    low: number;
+
+    close: number;
+
+    range: number;
+
+    bodyCenterY: number;
+
+    volume: number;
+
+    volumeChange: number | null;
+
+    timeLabel: string;
+
+    highY: Coordinate;
+
+    lowY: Coordinate;
+};
+
+function LiveCandleMetadata({
+    metadata,
+}: {
+    metadata: LiveMetadataItem[];
+}) {
+    if (!metadata.length) {
+        return null;
+    }
+
+    return (
+        <div
+            className="
+                pointer-events-none
+                absolute
+                inset-0
+                z-10
+            "
+        >
+            {metadata.map((item) => (
+                <div
+                    key={item.key}
+                    className="
+                        absolute
+                        text-[11px]
+                        leading-none
+                        whitespace-nowrap
+                        text-white
+                        text-center
+                    "
+                    style={{
+                        left: `${item.x}px`,
+                        top: `${item.top}px`,
+                        transform: "translateX(-50%)",
+                    }}
+                >
+                    <div>H {Number(item.high).toFixed(1)}</div>
+
+                    <div
+                        className="absolute"
+                        style={{
+                            top: `${item.bodyCenterY - item.highY + 8}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        <div
+                            className="
+                                min-w-10
+                                text-center
+                                font-medium
+                            "
+                        >
+                            {item.range.toFixed(1)}
+                        </div>
+
+                        <div
+                            className="
+                                mx-auto
+                                mt-1
+                                h-0.5
+                                w-5
+                                bg-white
+                            "
+                        />
+                    </div>
+
+                    <div
+                        className="absolute"
+                        style={{
+                            top: `${item.lowY - item.highY + 4}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        L {Number(item.low).toFixed(1)}
+                    </div>
+
+                    <div
+                        className="
+                            absolute
+                            font-medium
+                        "
+                        style={{
+                            top: `${item.lowY - item.highY + 24}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {formatVolume(item.volume)}
+                    </div>
+
+                    {item.volumeChange !== null && (
+                        <div
+                            className="
+                                absolute
+                                font-medium
+                            "
+                            style={{
+                                top: `${item.lowY - item.highY + 42}px`,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                            }}
+                        >
+                            {item.volumeChange >= 0
+                                ? `▲ ${Math.abs(item.volumeChange).toFixed(0)}%`
+                                : `▼ ${Math.abs(item.volumeChange).toFixed(0)}%`}
+                        </div>
+                    )}
+
+                    <div
+                        className="
+                            absolute
+                            text-gray-300
+                        "
+                        style={{
+                            top: `${item.lowY - item.highY + 62}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        C {Number(item.close).toFixed(1)}
+                    </div>
+
+                    <div
+                        className="
+                            absolute
+                            text-gray-300
+                        "
+                        style={{
+                            top: `${item.lowY - item.highY + 84}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {item.timeLabel}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
 // -----------------------------------
 // IST SAFE TIMESTAMP
 // -----------------------------------
@@ -71,8 +296,8 @@ function createISTTimestamp(dateTime: string): number {
 }
 
 export default function CandlestickChart({
-     candles,
-    marketEvents = [],
+    candles,
+    marketEvents = EMPTY_MARKET_EVENTS,
     title,
     onCrosshairMove,
     synchronizedTimestamp,
@@ -81,6 +306,12 @@ export default function CandlestickChart({
     mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // -----------------------------------
+    // Live Metadata Position State
+    // -----------------------------------
+
+    const [liveMetadata, setLiveMetadata] = useState<LiveMetadataItem[]>([]);
 
     // -----------------------------------
     // Hover State
@@ -518,6 +749,49 @@ export default function CandlestickChart({
 
         chart.timeScale().fitContent();
 
+        const nextLiveMetadata: LiveMetadataItem[] = candles
+            .map((candle, index) => {
+                const timestamp = createISTTimestamp(candle.time);
+                const x = chart.timeScale().timeToCoordinate(timestamp as UTCTimestamp);
+                const highY = candleSeries.priceToCoordinate(Number(candle.high));
+                const lowY = candleSeries.priceToCoordinate(Number(candle.low));
+                const openY = candleSeries.priceToCoordinate(Number(candle.open));
+                const closeY = candleSeries.priceToCoordinate(Number(candle.close));
+
+                if (
+                    x === null ||
+                    highY === null ||
+                    lowY === null ||
+                    openY === null ||
+                    closeY === null
+                ) {
+                    return null;
+                }
+
+                const range = Number(candle.high) - Number(candle.low);
+                const volumeChange = calculateVolumeChange(candles, index);
+                const bodyCenterY = (openY + closeY) / 2;
+
+                return {
+                    key: `${candle.time}-${index}`,
+                    x,
+                    top: highY - 18,
+                    high: Number(candle.high),
+                    low: Number(candle.low),
+                    close: Number(candle.close),
+                    range,
+                    bodyCenterY,
+                    volume: Number(candle.volume),
+                    volumeChange,
+                    timeLabel: candle.time.slice(11, 16),
+                    highY,
+                    lowY,
+                };
+            })
+            .filter((item): item is LiveMetadataItem => item !== null);
+
+        setLiveMetadata(nextLiveMetadata);
+
         // -----------------------------------
         // Resize handling
         // -----------------------------------
@@ -558,128 +832,64 @@ export default function CandlestickChart({
         <div className="relative w-full h-full">
             <div className="text-sm font-semibold mb-2 text-gray-300">{title}</div>
             {hoverData && (
-
-                <div
-                    className="
-        w-full
-        overflow-x-auto
-    "
-                >
-
-                    {
-
-                        hoverData && (
-
-                            <div
-                                className="
-                    flex
-                    min-w-max
-                    items-center
-                    gap-6
-                    rounded-md
-                    border
-                    border-gray-800
-                    bg-gray-900
-                    px-4
-                    py-2
-                    text-xs
-                    text-gray-300
-                    mb-3
-                "
-                            >
-
-                                <div
-                                    className="
-                        font-semibold
-                        text-white
-                    "
-                                >
-
-                                    {title}
-
-                                </div>
-
-                                <div>
-                                    Time:
-                                    <span
-                                        className="
-                            ml-1
-                            text-white
+                <div className="w-full overflow-x-auto">
+                    <div
+                        className="
+                            mb-3
+                            flex
+                            min-w-max
+                            items-center
+                            gap-6
+                            rounded-md
+                            border
+                            border-gray-800
+                            bg-gray-900
+                            px-4
+                            py-2
+                            text-xs
+                            text-gray-300
                         "
-                                    >
-                                        {hoverData.time}
-                                    </span>
-                                </div>
+                    >
+                        <div className="font-semibold text-white">{title}</div>
 
-                                <div>
-                                    O:
-                                    <span
-                                        className="
-                            ml-1
-                            text-green-400
-                        "
-                                    >
-                                        {hoverData.open}
-                                    </span>
-                                </div>
+                        <div>
+                            Time:
+                            <span className="ml-1 text-white">{hoverData.time}</span>
+                        </div>
 
-                                <div>
-                                    H:
-                                    <span
-                                        className="
-                            ml-1
-                            text-green-400
-                        "
-                                    >
-                                        {hoverData.high}
-                                    </span>
-                                </div>
+                        <div>
+                            O:
+                            <span className="ml-1 text-green-400">{hoverData.open}</span>
+                        </div>
 
-                                <div>
-                                    L:
-                                    <span
-                                        className="
-                            ml-1
-                            text-red-400
-                        "
-                                    >
-                                        {hoverData.low}
-                                    </span>
-                                </div>
+                        <div>
+                            H:
+                            <span className="ml-1 text-green-400">{hoverData.high}</span>
+                        </div>
 
-                                <div>
-                                    C:
-                                    <span
-                                        className="
-                            ml-1
-                            text-white
-                        "
-                                    >
-                                        {hoverData.close}
-                                    </span>
-                                </div>
+                        <div>
+                            L:
+                            <span className="ml-1 text-red-400">{hoverData.low}</span>
+                        </div>
 
-                                <div>
-                                    Vol:
-                                    <span
-                                        className="
-                            ml-1
-                            text-cyan-400
-                        "
-                                    >
-                                        {hoverData.volume}
-                                    </span>
-                                </div>
+                        <div>
+                            C:
+                            <span className="ml-1 text-white">{hoverData.close}</span>
+                        </div>
 
-                            </div>
-                        )
-                    }
-
+                        <div>
+                            Vol:
+                            <span className="ml-1 text-cyan-400">{hoverData.volume}</span>
+                        </div>
+                    </div>
                 </div>
-
             )}
 
-            <div ref={chartContainerRef} className="w-full" />
+            <div className="relative">
+                <div ref={chartContainerRef} className="relative" />
+
+                {mode === "live" && <LiveCandleMetadata metadata={liveMetadata} />}
+            </div>
 
             {hoveredEvent && tooltipPosition && (
                 <div
@@ -705,10 +915,10 @@ export default function CandlestickChart({
                 >
                     <div
                         className="
-                            text-cyan-400
-                            font-semibold
-                            text-sm
                             mb-2
+                            text-sm
+                            font-semibold
+                            text-cyan-400
                         "
                     >
                         {hoveredEvent.event_type}
@@ -716,9 +926,9 @@ export default function CandlestickChart({
 
                     <div
                         className="
-                            text-zinc-200
-                            leading-relaxed
                             mb-2
+                            leading-relaxed
+                            text-zinc-200
                         "
                     >
                         {hoveredEvent.explanation}
@@ -726,9 +936,9 @@ export default function CandlestickChart({
 
                     <div
                         className="
-                            text-amber-300
-                            italic
                             mb-2
+                            italic
+                            text-amber-300
                         "
                     >
                         {hoveredEvent.trading_implication}
@@ -736,10 +946,10 @@ export default function CandlestickChart({
 
                     <div
                         className="
+                            mt-2
                             flex
                             justify-between
                             text-zinc-400
-                            mt-2
                         "
                     >
                         <span>Strength</span>
@@ -748,10 +958,10 @@ export default function CandlestickChart({
 
                     <div
                         className="
+                            mt-1
                             flex
                             justify-between
                             text-zinc-400
-                            mt-1
                         "
                     >
                         <span>NIFTY</span>
