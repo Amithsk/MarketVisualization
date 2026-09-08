@@ -445,6 +445,75 @@ export default function SynchronizedCharts({
             "
         >
 
+            {/* -------------------------------- */}
+            {/* NIFTY CHART */}
+            {/* -------------------------------- */}
+
+            <CandlestickChart
+
+                candles={
+                    visibleNiftyCandles
+                }
+
+                title="NIFTY 50"
+
+                mode={mode}
+
+                currentCandleIndex={
+                    currentCandleIndex
+                }
+
+                onCrosshairMove={
+                    handleCrosshairMove
+                }
+
+                synchronizedTimestamp={
+                    synchronizedTimestampRef.current
+                }
+
+                showTimeline={
+                    mode !== "live"
+                }
+
+            />
+
+            {/* -------------------------------- */}
+            {/* STOCK CHART */}
+            {/* -------------------------------- */}
+
+            <CandlestickChart
+
+                candles={
+                    visibleStockCandles
+                }
+
+                marketEvents={
+                    visibleMarketEvents
+                }
+                mode={mode}
+                
+                title={
+                    stockName
+                }
+
+                currentCandleIndex={
+                    currentCandleIndex
+                }
+                
+                onCandleSelect={
+                    onCandleSelect
+                }
+
+                onCrosshairMove={
+                    handleCrosshairMove
+                }
+
+                synchronizedTimestamp={
+                    synchronizedTimestampRef.current
+                }
+
+            />
+
             {mode === "live" && liveVisibleRange && (
                 <div
                     className="
@@ -547,71 +616,6 @@ export default function SynchronizedCharts({
                     </button>
                 </div>
             )}
-
-            {/* -------------------------------- */}
-            {/* NIFTY CHART */}
-            {/* -------------------------------- */}
-
-            <CandlestickChart
-
-                candles={
-                    visibleNiftyCandles
-                }
-
-                title="NIFTY 50"
-
-                mode={mode}
-
-                currentCandleIndex={
-                    currentCandleIndex
-                }
-
-                onCrosshairMove={
-                    handleCrosshairMove
-                }
-
-                synchronizedTimestamp={
-                    synchronizedTimestampRef.current
-                }
-
-            />
-
-            {/* -------------------------------- */}
-            {/* STOCK CHART */}
-            {/* -------------------------------- */}
-
-            <CandlestickChart
-
-                candles={
-                    visibleStockCandles
-                }
-
-                marketEvents={
-                    visibleMarketEvents
-                }
-                mode={mode}
-                
-                title={
-                    stockName
-                }
-
-                currentCandleIndex={
-                    currentCandleIndex
-                }
-                
-                onCandleSelect={
-                    onCandleSelect
-                }
-
-                onCrosshairMove={
-                    handleCrosshairMove
-                }
-
-                synchronizedTimestamp={
-                    synchronizedTimestampRef.current
-                }
-
-            />
 
         </div>
     );

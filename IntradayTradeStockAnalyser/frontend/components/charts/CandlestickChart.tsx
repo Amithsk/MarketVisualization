@@ -23,6 +23,7 @@ type Props = {
     synchronizedTimestamp?: number | null;
     currentCandleIndex?: number;
     onCandleSelect?: (index: number) => void;
+    showTimeline?: boolean;
 
     // -----------------------------------
     // Chart Mode
@@ -314,6 +315,7 @@ export default function CandlestickChart({
     synchronizedTimestamp,
     currentCandleIndex,
     onCandleSelect,
+    showTimeline = true,
     mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -393,6 +395,7 @@ export default function CandlestickChart({
             crosshair: { mode: 1 },
             rightPriceScale: { borderColor: "#374151" },
             timeScale: {
+                visible: showTimeline,
                 borderColor: "#374151",
                 timeVisible: true,
                 secondsVisible: false,
@@ -884,11 +887,6 @@ export default function CandlestickChart({
                         "
                     >
                         <div className="font-semibold text-white">{title}</div>
-
-                        <div>
-                            Time:
-                            <span className="ml-1 text-white">{hoverData.time}</span>
-                        </div>
 
                         <div>
                             O:
