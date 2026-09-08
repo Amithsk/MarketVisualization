@@ -396,6 +396,7 @@ export default function CandlestickChart({
                 borderColor: "#374151",
                 timeVisible: true,
                 secondsVisible: false,
+                rightOffset: mode === "live" ? 2 : 0,
             },
         });
 
