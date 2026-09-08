@@ -147,14 +147,15 @@ function LiveCandleMetadata({
                     "
                     style={{
                         left: `${item.x}px`,
-                        top: `${item.top}px`,
+                        top: "0px",
+                        height: "100%",
                         transform: "translateX(-50%)",
                     }}
                 >
                     <div
                         className="absolute"
                         style={{
-                            top: `${7 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
+                            top: `${item.highY - 11 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -166,7 +167,7 @@ function LiveCandleMetadata({
                         <div
                             className="absolute"
                             style={{
-                                top: `${item.bodyCenterY - item.highY + 8}px`,
+                                top: `${item.bodyCenterY - 10}px`,
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
@@ -196,7 +197,7 @@ function LiveCandleMetadata({
                     <div
                         className="absolute"
                         style={{
-                            top: `${item.lowY - item.highY + 18 + Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
+                            top: `${item.lowY + Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -210,7 +211,7 @@ function LiveCandleMetadata({
                             font-medium
                         "
                         style={{
-                            top: `${item.lowY - item.highY + 24}px`,
+                            top: "calc(100% - 76px)",
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -230,7 +231,7 @@ function LiveCandleMetadata({
                                         : "text-gray-300"}
                             `}
                             style={{
-                                top: `${item.lowY - item.highY + 42}px`,
+                                top: "calc(100% - 58px)",
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
@@ -250,7 +251,7 @@ function LiveCandleMetadata({
                                 text-gray-300
                             "
                             style={{
-                                top: `${item.lowY - item.highY + 62}px`,
+                                top: "calc(100% - 38px)",
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
