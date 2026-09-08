@@ -231,7 +231,9 @@ function LiveCandleMetadata({
                                         : "text-gray-300"}
                             `}
                             style={{
-                                top: "calc(100% - 58px)",
+                                top: showStockCandleDetails
+                                    ? "calc(100% - 58px)"
+                                    : `calc(100% - ${76 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 20), 26)}px)`,
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
