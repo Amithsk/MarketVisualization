@@ -154,7 +154,7 @@ function LiveCandleMetadata({
                     <div
                         className="absolute"
                         style={{
-                            top: "0px",
+                            top: `${7 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -196,7 +196,7 @@ function LiveCandleMetadata({
                     <div
                         className="absolute"
                         style={{
-                            top: `${item.lowY - item.highY + 4}px`,
+                            top: `${item.lowY - item.highY + 18 + Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
