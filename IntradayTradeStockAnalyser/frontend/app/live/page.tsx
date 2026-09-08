@@ -5,6 +5,10 @@ import { useState } from "react";
 
 import StockSelector from "../../components/selectors/StockSelector";
 import SynchronizedCharts from "../../components/charts/SynchronizedCharts";
+import LiveTradePlanPanel from "../../components/live/LiveTradePlanPanel";
+import type {
+    LiveTradePlan,
+} from "../../components/live/LiveTradePlanPanel";
 import useLivePolling from "../../hooks/useLivePolling";
 import { Candle } from "../../types/candle";
 
@@ -22,6 +26,12 @@ export default function LivePage() {
     const [selectedStock, setSelectedStock] = useState<string>(
         DEFAULT_STOCKS[0]
     );
+
+    const [selectedStockCandle, setSelectedStockCandle] =
+        useState<Candle | null>(null);
+
+    const [tradePlans, setTradePlans] =
+        useState<LiveTradePlan[]>([]);
 
     const { nifty, stock } = useLivePolling(selectedStock);
 
@@ -83,7 +93,10 @@ export default function LivePage() {
                 <StockSelector
                     stocks={DEFAULT_STOCKS}
                     selectedStock={selectedStock}
-                    onSelectStock={(s) => setSelectedStock(s)}
+                    onSelectStock={(s) => {
+                        setSelectedStock(s);
+                        setSelectedStockCandle(null);
+                    }}
                 />
 
             </div>
@@ -97,7 +110,18 @@ export default function LivePage() {
                 stockCandles={stockCandles}
                 marketEvents={[]}
                 stockName={selectedStock}
-                 mode="live"
+                mode="live"
+                tradePlans={tradePlans}
+                onStockCandleSelect={
+                    setSelectedStockCandle
+                }
+            />
+
+            <LiveTradePlanPanel
+                selectedCandle={selectedStockCandle}
+                stockName={selectedStock}
+                plans={tradePlans}
+                onPlansChange={setTradePlans}
             />
 
         </div>

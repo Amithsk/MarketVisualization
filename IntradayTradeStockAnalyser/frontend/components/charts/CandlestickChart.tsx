@@ -14,6 +14,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { Candle } from "../../types/candle";
 import { MarketEvent } from "../../types/replay";
+import type {
+    LiveTradePlan,
+} from "../live/LiveTradePlanPanel";
 
 type Props = {
     candles: Candle[];
@@ -24,6 +27,7 @@ type Props = {
     currentCandleIndex?: number;
     onCandleSelect?: (index: number) => void;
     showTimeline?: boolean;
+    tradePlans?: LiveTradePlan[];
 
     // -----------------------------------
     // Chart Mode
@@ -113,6 +117,13 @@ type LiveMetadataItem = {
     highY: Coordinate;
 
     lowY: Coordinate;
+};
+
+type LifecycleSegmentItem = {
+    key: string;
+    left: number;
+    width: number;
+    color: string;
 };
 
 function LiveCandleMetadata({
@@ -316,6 +327,7 @@ export default function CandlestickChart({
     currentCandleIndex,
     onCandleSelect,
     showTimeline = true,
+    tradePlans = [],
     mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -327,6 +339,8 @@ export default function CandlestickChart({
     // -----------------------------------
 
     const [liveMetadata, setLiveMetadata] = useState<LiveMetadataItem[]>([]);
+    const [lifecycleSegments, setLifecycleSegments] =
+        useState<LifecycleSegmentItem[]>([]);
 
     // -----------------------------------
     // Hover State
@@ -822,7 +836,170 @@ export default function CandlestickChart({
             setLiveMetadata(nextLiveMetadata);
         };
 
-        let metadataAnimationFrame = requestAnimationFrame(updateLiveMetadata);
+        const updateLifecycleSegments = () => {
+            if (
+                mode !== "live" ||
+                !isStockChart ||
+                !candles.length ||
+                !tradePlans.length
+            ) {
+                setLifecycleSegments([]);
+                return;
+            }
+
+            const visibleStart =
+                createISTTimestamp(candles[0].time);
+            const visibleEnd =
+                createISTTimestamp(candles[candles.length - 1].time);
+
+            const createSegment = (
+                key: string,
+                startTime: string,
+                endTime: string,
+                color: string
+            ): LifecycleSegmentItem | null => {
+                let startTimestamp: number;
+                let endTimestamp: number;
+
+                try {
+                    startTimestamp = createISTTimestamp(startTime);
+                    endTimestamp = createISTTimestamp(endTime);
+                } catch {
+                    return null;
+                }
+
+                if (
+                    endTimestamp < visibleStart ||
+                    startTimestamp > visibleEnd
+                ) {
+                    return null;
+                }
+
+                const clippedStart =
+                    Math.max(startTimestamp, visibleStart);
+                const clippedEnd =
+                    Math.min(endTimestamp, visibleEnd);
+
+                const startX =
+                    chart
+                        .timeScale()
+                        .timeToCoordinate(clippedStart as UTCTimestamp);
+                const endX =
+                    chart
+                        .timeScale()
+                        .timeToCoordinate(clippedEnd as UTCTimestamp);
+
+                if (startX === null || endX === null) {
+                    return null;
+                }
+
+                const left =
+                    Math.min(startX, endX);
+                const width =
+                    Math.max(Math.abs(endX - startX), 3);
+
+                return {
+                    key,
+                    left,
+                    width,
+                    color,
+                };
+            };
+
+            const nextLifecycleSegments =
+                tradePlans
+                    .flatMap((plan) => {
+                        const currentCandleTime =
+                            candles[candles.length - 1].time;
+
+                        if (plan.status === "ACTIVE") {
+                            return [
+                                createSegment(
+                                    `${plan.id}-active`,
+                                    plan.decisionTime,
+                                    currentCandleTime,
+                                    "#FACC15"
+                                ),
+                            ];
+                        }
+
+                        if (plan.status === "CANCELLED") {
+                            if (!plan.cancelledAt) {
+                                return [];
+                            }
+
+                            return [
+                                createSegment(
+                                    `${plan.id}-cancelled`,
+                                    plan.decisionTime,
+                                    plan.cancelledAt,
+                                    "#EF4444"
+                                ),
+                            ];
+                        }
+
+                        if (plan.status === "EXECUTED") {
+                            if (!plan.executedAt) {
+                                return [];
+                            }
+
+                            return [
+                                createSegment(
+                                    `${plan.id}-planned`,
+                                    plan.decisionTime,
+                                    plan.executedAt,
+                                    "#FACC15"
+                                ),
+                                createSegment(
+                                    `${plan.id}-executed`,
+                                    plan.executedAt,
+                                    currentCandleTime,
+                                    "#3B82F6"
+                                ),
+                            ];
+                        }
+
+                        if (plan.status === "EXITED") {
+                            if (
+                                !plan.executedAt ||
+                                !plan.exitedAt
+                            ) {
+                                return [];
+                            }
+
+                            return [
+                                createSegment(
+                                    `${plan.id}-planned`,
+                                    plan.decisionTime,
+                                    plan.executedAt,
+                                    "#FACC15"
+                                ),
+                                createSegment(
+                                    `${plan.id}-exited`,
+                                    plan.executedAt,
+                                    plan.exitedAt,
+                                    "#3B82F6"
+                                ),
+                            ];
+                        }
+
+                        return [];
+                    })
+                    .filter(
+                        (segment): segment is LifecycleSegmentItem =>
+                            segment !== null
+                    );
+
+            setLifecycleSegments(nextLifecycleSegments);
+        };
+
+        const updateLiveOverlays = () => {
+            updateLiveMetadata();
+            updateLifecycleSegments();
+        };
+
+        let metadataAnimationFrame =
+            requestAnimationFrame(updateLiveOverlays);
 
         // -----------------------------------
         // Resize handling
@@ -834,7 +1011,7 @@ export default function CandlestickChart({
             }
             chart.applyOptions({ width: chartContainerRef.current.clientWidth });
             cancelAnimationFrame(metadataAnimationFrame);
-            metadataAnimationFrame = requestAnimationFrame(updateLiveMetadata);
+            metadataAnimationFrame = requestAnimationFrame(updateLiveOverlays);
         };
 
         window.addEventListener("resize", handleResize);
@@ -862,7 +1039,7 @@ export default function CandlestickChart({
 
             chart.remove();
         };
-    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp]);
+    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans]);
 
     return (
         <div className="relative w-full h-full">
@@ -924,6 +1101,35 @@ export default function CandlestickChart({
                         metadata={liveMetadata}
                         showStockCandleDetails={isStockChart}
                     />
+                )}
+
+                {mode === "live" && isStockChart && lifecycleSegments.length > 0 && (
+                    <div
+                        className="
+                            pointer-events-none
+                            absolute
+                            inset-0
+                            z-20
+                        "
+                    >
+                        {lifecycleSegments.map((segment) => (
+                            <div
+                                key={segment.key}
+                                className="
+                                    absolute
+                                    h-1
+                                    rounded-full
+                                "
+                                style={{
+                                    left: `${segment.left}px`,
+                                    width: `${segment.width}px`,
+                                    bottom: "22px",
+                                    backgroundColor: segment.color,
+                                    opacity: 0.9,
+                                }}
+                            />
+                        ))}
+                    </div>
                 )}
             </div>
 

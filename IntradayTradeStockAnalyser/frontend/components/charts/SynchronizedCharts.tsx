@@ -19,6 +19,11 @@ import CandlestickChart from
 import { Candle }
     from "../../types/candle";
 
+import type {
+    LiveTradePlan,
+}
+    from "../live/LiveTradePlanPanel";
+
 import {
     MarketEvent
 }
@@ -40,6 +45,13 @@ type Props = {
     onCandleSelect?: (
         index: number
     ) => void;
+
+    onStockCandleSelect?: (
+        candle: Candle,
+        index: number
+    ) => void;
+
+    tradePlans?: LiveTradePlan[];
 
     mode?: "live" | "replay";
 };
@@ -187,6 +199,10 @@ export default function SynchronizedCharts({
     currentCandleIndex,
 
     onCandleSelect,
+
+    onStockCandleSelect,
+
+    tradePlans = [],
 
     mode = "replay",
 
@@ -490,6 +506,11 @@ export default function SynchronizedCharts({
                 marketEvents={
                     visibleMarketEvents
                 }
+                tradePlans={
+                    tradePlans.filter((plan) =>
+                        plan.symbol === stockName
+                    )
+                }
                 mode={mode}
                 
                 title={
@@ -500,9 +521,19 @@ export default function SynchronizedCharts({
                     currentCandleIndex
                 }
                 
-                onCandleSelect={
-                    onCandleSelect
-                }
+                onCandleSelect={(index) => {
+                    onCandleSelect?.(index);
+
+                    const selectedCandle =
+                        visibleStockCandles[index];
+
+                    if (selectedCandle) {
+                        onStockCandleSelect?.(
+                            selectedCandle,
+                            index
+                        );
+                    }
+                }}
 
                 onCrosshairMove={
                     handleCrosshairMove
