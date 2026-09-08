@@ -33,6 +33,7 @@ export type LiveTradePlan = TradePlanDraft & {
     decisionTime: string;
     status: TradePlanStatus;
     cancelledAt?: string;
+    cancellationReason?: string;
     executedAt?: string;
     exitedAt?: string;
 };
@@ -123,6 +124,26 @@ export default function LiveTradePlanPanel({
 
     const [isDrawerOpen, setIsDrawerOpen] =
         useState(false);
+
+    const [
+        cancellationReason,
+        setCancellationReason,
+    ] = useState("");
+
+    const [
+        cancellationTime,
+        setCancellationTime,
+    ] = useState("");
+
+    const [
+        cancellingPlanId,
+        setCancellingPlanId,
+    ] = useState<string | null>(null);
+
+    const [
+        cancellationError,
+        setCancellationError,
+    ] = useState("");
 
     const activePlan =
         plans.find((plan) =>
@@ -220,6 +241,10 @@ export default function LiveTradePlanPanel({
         }
 
         setSelectedPlanId(null);
+        setCancellingPlanId(null);
+        setCancellationReason("");
+        setCancellationTime("");
+        setCancellationError("");
         setDraft(
             createDraftFromCandle(selectedCandle)
         );
@@ -261,6 +286,10 @@ export default function LiveTradePlanPanel({
         ]);
         setSelectedPlanId(nextPlan.id);
         setDraft(null);
+        setCancellingPlanId(null);
+        setCancellationReason("");
+        setCancellationTime("");
+        setCancellationError("");
     };
 
     const updateStatus = (
@@ -319,6 +348,82 @@ export default function LiveTradePlanPanel({
                 };
             })
         );
+
+        if (nextStatus !== "CANCELLED") {
+            setCancellingPlanId(null);
+            setCancellationReason("");
+            setCancellationTime("");
+            setCancellationError("");
+        }
+    };
+
+    const handleStartCancellation = () => {
+        if (
+            !selectedPlan ||
+            selectedPlan.status !== "ACTIVE"
+        ) {
+            return;
+        }
+
+        const actionTime =
+            selectedCandle?.time ||
+            new Date().toISOString();
+
+        setCancellingPlanId(selectedPlan.id);
+        setCancellationTime(actionTime);
+        setCancellationReason(
+            selectedPlan.cancellationReason || ""
+        );
+        setCancellationError("");
+    };
+
+    const handleConfirmCancellation = () => {
+        if (
+            !selectedPlan ||
+            selectedPlan.status !== "ACTIVE" ||
+            cancellingPlanId !== selectedPlan.id
+        ) {
+            return;
+        }
+
+        const trimmedReason =
+            cancellationReason.trim();
+
+        if (!trimmedReason) {
+            setCancellationError(
+                "Cancellation Reason is required."
+            );
+            return;
+        }
+
+        const actionTime =
+            cancellationTime ||
+            selectedCandle?.time ||
+            new Date().toISOString();
+
+        onPlansChange(
+            plans.map((plan) =>
+                plan.id === selectedPlan.id
+                    ? {
+                        ...plan,
+                        status: "CANCELLED",
+                        cancelledAt: actionTime,
+                        cancellationReason: trimmedReason,
+                    }
+                    : plan
+            )
+        );
+        setCancellingPlanId(null);
+        setCancellationReason("");
+        setCancellationTime("");
+        setCancellationError("");
+    };
+
+    const handleCancelCancellation = () => {
+        setCancellingPlanId(null);
+        setCancellationReason("");
+        setCancellationTime("");
+        setCancellationError("");
     };
 
     return (
@@ -617,25 +722,109 @@ export default function LiveTradePlanPanel({
                         )}
 
                         {selectedPlan && (
-                            <div className="flex flex-wrap gap-2">
-                                <StatusButton
-                                    disabled={selectedPlan.status !== "ACTIVE"}
-                                    onClick={() => updateStatus("CANCELLED")}
-                                >
-                                    Cancel Trade Plan
-                                </StatusButton>
-                                <StatusButton
-                                    disabled={selectedPlan.status !== "ACTIVE"}
-                                    onClick={() => updateStatus("EXECUTED")}
-                                >
-                                    Execute Trade
-                                </StatusButton>
-                                <StatusButton
-                                    disabled={selectedPlan.status !== "EXECUTED"}
-                                    onClick={() => updateStatus("EXITED")}
-                                >
-                                    Exit Trade
-                                </StatusButton>
+                            <div className="space-y-3">
+                                {selectedPlan.status === "CANCELLED" && (
+                                    <div
+                                        className="
+                                            rounded
+                                            border
+                                            border-gray-800
+                                            bg-gray-950
+                                            p-3
+                                        "
+                                    >
+                                        <Field label="Cancelled At">
+                                            <div className="text-white">
+                                                {selectedPlan.cancelledAt || "-"}
+                                            </div>
+                                        </Field>
+
+                                        <div className="mt-3">
+                                            <Field label="Cancellation Reason">
+                                                <div className="text-white">
+                                                    {selectedPlan.cancellationReason || "-"}
+                                                </div>
+                                            </Field>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {cancellingPlanId === selectedPlan.id && (
+                                    <div
+                                        className="
+                                            rounded
+                                            border
+                                            border-amber-500/40
+                                            bg-gray-950
+                                            p-3
+                                        "
+                                    >
+                                        <Field label="Cancellation Timestamp">
+                                            <div className="text-white">
+                                                {cancellationTime || "-"}
+                                            </div>
+                                        </Field>
+
+                                        <div className="mt-3">
+                                            <TextAreaField
+                                                label="Cancellation Reason"
+                                                value={cancellationReason}
+                                                onChange={(value) => {
+                                                    setCancellationReason(value);
+                                                    setCancellationError("");
+                                                }}
+                                            />
+                                        </div>
+
+                                        {cancellationError && (
+                                            <div className="mt-2 text-xs text-red-400">
+                                                {cancellationError}
+                                            </div>
+                                        )}
+
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <StatusButton
+                                                disabled={false}
+                                                onClick={handleConfirmCancellation}
+                                            >
+                                                Confirm Cancel
+                                            </StatusButton>
+                                            <StatusButton
+                                                disabled={false}
+                                                onClick={handleCancelCancellation}
+                                            >
+                                                Keep Active
+                                            </StatusButton>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2">
+                                    <StatusButton
+                                        disabled={
+                                            selectedPlan.status !== "ACTIVE" ||
+                                            cancellingPlanId === selectedPlan.id
+                                        }
+                                        onClick={handleStartCancellation}
+                                    >
+                                        Cancel Trade Plan
+                                    </StatusButton>
+                                    <StatusButton
+                                        disabled={
+                                            selectedPlan.status !== "ACTIVE" ||
+                                            cancellingPlanId === selectedPlan.id
+                                        }
+                                        onClick={() => updateStatus("EXECUTED")}
+                                    >
+                                        Execute Trade
+                                    </StatusButton>
+                                    <StatusButton
+                                        disabled={selectedPlan.status !== "EXECUTED"}
+                                        onClick={() => updateStatus("EXITED")}
+                                    >
+                                        Exit Trade
+                                    </StatusButton>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -665,6 +854,10 @@ export default function LiveTradePlanPanel({
                                 onClick={() => {
                                     setDraft(null);
                                     setSelectedPlanId(plan.id);
+                                    setCancellingPlanId(null);
+                                    setCancellationReason("");
+                                    setCancellationTime("");
+                                    setCancellationError("");
                                     setIsDrawerOpen(true);
                                 }}
                                 className="
