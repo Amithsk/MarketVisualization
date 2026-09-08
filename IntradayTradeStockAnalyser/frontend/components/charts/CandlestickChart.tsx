@@ -407,6 +407,12 @@ export default function CandlestickChart({
                 horzLines: { color: "#1F2937" },
             },
             crosshair: { mode: 1 },
+            handleScroll: {
+                mouseWheel: mode !== "live",
+            },
+            handleScale: {
+                mouseWheel: mode !== "live",
+            },
             rightPriceScale: { borderColor: "#374151" },
             timeScale: {
                 visible: showTimeline,
@@ -1109,7 +1115,7 @@ export default function CandlestickChart({
                             pointer-events-none
                             absolute
                             inset-0
-                            z-20
+                            z-0
                         "
                     >
                         {lifecycleSegments.map((segment) => (
@@ -1117,15 +1123,14 @@ export default function CandlestickChart({
                                 key={segment.key}
                                 className="
                                     absolute
-                                    h-1
-                                    rounded-full
                                 "
                                 style={{
                                     left: `${segment.left}px`,
                                     width: `${segment.width}px`,
-                                    bottom: "22px",
+                                    bottom: "0px",
+                                    height: "32px",
                                     backgroundColor: segment.color,
-                                    opacity: 0.9,
+                                    opacity: 0.35,
                                 }}
                             />
                         ))}
