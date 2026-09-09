@@ -899,10 +899,34 @@ export default function CandlestickChart({
                     return null;
                 }
 
-                const left =
-                    Math.min(startX, endX);
-                const width =
-                    Math.max(Math.abs(endX - startX), 3);
+                // Extend from the centre of the first candle cell to the
+                // centre of the last so both endpoint timestamps are colored.
+                const firstCandleX = candles.length > 1
+                    ? chart.timeScale().timeToCoordinate(
+                        createISTTimestamp(candles[0].time) as UTCTimestamp
+                    )
+                    : null;
+                const secondCandleX = candles.length > 1
+                    ? chart.timeScale().timeToCoordinate(
+                        createISTTimestamp(candles[1].time) as UTCTimestamp
+                    )
+                    : null;
+                const measuredCellWidth =
+                    firstCandleX !== null && secondCandleX !== null
+                        ? Math.abs(secondCandleX - firstCandleX)
+                        : 36;
+                const cellWidth = Math.max(
+                    18,
+                    Math.min(
+                        measuredCellWidth,
+                        48
+                    )
+                );
+                const left = Math.min(startX, endX) - cellWidth / 2;
+                const width = Math.max(
+                    Math.abs(endX - startX) + cellWidth,
+                    cellWidth
+                );
 
                 return {
                     key,
@@ -1100,7 +1124,10 @@ export default function CandlestickChart({
             )}
 
             <div className="relative">
-                <div ref={chartContainerRef} className="relative" />
+                <div
+                    ref={chartContainerRef}
+                    className="relative h-[400px]"
+                />
 
                 {mode === "live" && (
                     <LiveCandleMetadata
@@ -1115,7 +1142,7 @@ export default function CandlestickChart({
                             pointer-events-none
                             absolute
                             inset-0
-                            z-0
+                            z-20
                         "
                     >
                         {lifecycleSegments.map((segment) => (
@@ -1127,15 +1154,17 @@ export default function CandlestickChart({
                                 style={{
                                     left: `${segment.left}px`,
                                     width: `${segment.width}px`,
-                                    bottom: "0px",
-                                    height: "32px",
+                                    bottom: "2px",
+                                    height: "3px",
                                     backgroundColor: segment.color,
-                                    opacity: 0.35,
+                                    opacity: 0.7,
+                                    borderRadius: "2px",
                                 }}
                             />
                         ))}
                     </div>
                 )}
+
             </div>
 
             {hoveredEvent && tooltipPosition && (
