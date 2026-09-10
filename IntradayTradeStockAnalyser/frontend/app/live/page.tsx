@@ -70,34 +70,34 @@ export default function LivePage() {
 
             <div className="mb-6">
 
-                <h2 className="text-xl font-semibold">
-                    Live Intraday Analysis
-                </h2>
+                <div className="flex flex-wrap items-center gap-6">
+
+                    <h2 className="text-xl font-semibold">
+                        Live Intraday Analysis
+                    </h2>
+
+                    <div className="flex items-center gap-4 [&>div>label]:hidden">
+
+                        <span className="text-sm font-medium">
+                            Stock
+                        </span>
+
+                        <StockSelector
+                            stocks={DEFAULT_STOCKS}
+                            selectedStock={selectedStock}
+                            onSelectStock={(s) => {
+                                setSelectedStock(s);
+                                setSelectedStockCandle(null);
+                            }}
+                        />
+
+                    </div>
+
+                </div>
 
                 <p className="mt-1 text-sm text-gray-500">
                     Monitor NIFTY and the selected stock using live market data.
                 </p>
-
-            </div>
-
-            {/* -------------------------------- */}
-            {/* STOCK SELECTION */}
-            {/* -------------------------------- */}
-
-            <div className="mb-6 flex items-center gap-4">
-
-                <span className="text-sm font-medium">
-                    Stock
-                </span>
-
-                <StockSelector
-                    stocks={DEFAULT_STOCKS}
-                    selectedStock={selectedStock}
-                    onSelectStock={(s) => {
-                        setSelectedStock(s);
-                        setSelectedStockCandle(null);
-                    }}
-                />
 
             </div>
 
