@@ -54,6 +54,9 @@ const STRATEGIES = [
     "Support / Resistance",
 ];
 
+const tradePlanLabelStyle = { color: "#CBD5E1", opacity: 1 };
+const tradePlanHelperStyle = { color: "#94A3B8", opacity: 1 };
+
 function formatPrice(value: number): string {
 
     if (!Number.isFinite(value)) {
@@ -459,7 +462,7 @@ export default function LiveTradePlanPanel({
                     >
                         Trade Plan
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs" style={tradePlanHelperStyle}>
                         Select a stock candle, then record the trade idea.
                     </div>
                 </div>
@@ -484,7 +487,7 @@ export default function LiveTradePlanPanel({
             </div>
 
             {!selectedCandle && (
-                <div className="mb-4 text-xs text-gray-500">
+                <div className="mb-4 text-xs" style={tradePlanHelperStyle}>
                     Select a Stock candle to enable Trade Plan creation.
                 </div>
             )}
@@ -535,7 +538,7 @@ export default function LiveTradePlanPanel({
                             >
                                 Trade Plan
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs" style={tradePlanHelperStyle}>
                                 Existing plan workflow for the selected stock candle.
                             </div>
                         </div>
@@ -566,7 +569,7 @@ export default function LiveTradePlanPanel({
                         </Field>
 
                         <label className="block">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs" style={tradePlanLabelStyle}>
                                 Direction
                             </span>
                             <select
@@ -585,7 +588,7 @@ export default function LiveTradePlanPanel({
                         </label>
 
                         <label className="block">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs" style={tradePlanLabelStyle}>
                                 Strategy
                             </span>
                             <select
@@ -841,8 +844,8 @@ export default function LiveTradePlanPanel({
                             font-semibold
                             uppercase
                             tracking-wide
-                            text-gray-500
                         "
+                        style={tradePlanHelperStyle}
                     >
                         Plans
                     </div>
@@ -913,7 +916,7 @@ function Field({
 }) {
     return (
         <div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs" style={tradePlanLabelStyle}>
                 {label}
             </div>
             {children}
@@ -932,7 +935,7 @@ function NumberField({
 }) {
     return (
         <label className="block">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs" style={tradePlanLabelStyle}>
                 {label}
             </span>
             <input
@@ -956,7 +959,7 @@ function TextAreaField({
 }) {
     return (
         <label className="block">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs" style={tradePlanLabelStyle}>
                 {label}
             </span>
             <textarea
@@ -978,7 +981,7 @@ function Metric({
 }) {
     return (
         <div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs" style={tradePlanLabelStyle}>
                 {label}
             </div>
             <div className="text-sm font-semibold text-white">
