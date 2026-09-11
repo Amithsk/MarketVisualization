@@ -3,11 +3,13 @@
 class ReplayStore:
 
     stock_candles = []
+    stock_metadata = None
 
     @classmethod
     def set_stock_candles(
         cls,
-        candles
+        candles,
+        metadata=None
     ):
 
         cumulative_price_volume = 0.0
@@ -55,8 +57,14 @@ class ReplayStore:
             )
 
         cls.stock_candles = processed_candles
+        cls.stock_metadata = metadata
 
     @classmethod
     def get_stock_candles(cls):
 
         return cls.stock_candles
+
+    @classmethod
+    def get_stock_metadata(cls):
+
+        return cls.stock_metadata

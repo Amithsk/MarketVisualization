@@ -33,6 +33,7 @@ from backend.services.market_event_service import (
 from backend.services.ai_explanation.explanation_engine import (
     ExplanationEngine
 )
+from backend.services.replay_stock_fetch_service import ReplayStockFetchError
 
 
 class ReplayService:
@@ -98,6 +99,17 @@ class ReplayService:
                 ReplayStore
                 .get_stock_candles()
             )
+
+            prepared_metadata = ReplayStore.get_stock_metadata()
+            if prepared_metadata and (
+                prepared_metadata["trade_date"] != trade_date
+                or prepared_metadata["symbol"] != stock.strip().upper().removeprefix("NSE:")
+            ):
+                raise ReplayStockFetchError(
+                    "SELECTION_MISMATCH",
+                    "Fetched stock data does not match the current Replay selection",
+                    409,
+                )
 
             log_count(
                 "ReplayStore Stock Candles",

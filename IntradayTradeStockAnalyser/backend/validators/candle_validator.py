@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List
+import math
 
 from backend.models.candle_model import Candle
 
@@ -7,7 +8,7 @@ from backend.models.candle_model import Candle
 class CandleValidator:
 
     MARKET_START = "09:15"
-    MARKET_END = "15:15"
+    MARKET_END = "15:25"
 
     REQUIRED_FIELDS = [
         "time",
@@ -37,6 +38,11 @@ class CandleValidator:
 
     @classmethod
     def validate_ohlc(cls, candle: Candle):
+
+        if any(not math.isfinite(value) or value <= 0 for value in (
+            candle.open, candle.high, candle.low, candle.close
+        )):
+            raise ValueError(f"OHLC values must be positive at {candle.time}")
 
         if candle.high < candle.open:
             raise ValueError(
@@ -128,6 +134,11 @@ class CandleValidator:
                 candle.time,
                 "%Y-%m-%d %H:%M:%S"
             )
+
+            if current_time.minute % 5 != 0 or current_time.second != 0:
+                raise ValueError(
+                    f"Candle is not aligned to a five-minute boundary: {candle.time}"
+                )
 
             if previous_time:
 

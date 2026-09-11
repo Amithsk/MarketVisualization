@@ -12,11 +12,13 @@ from backend.api.replay import (  router as replay_router)
 from backend.api.live import (router as live_router)
 from fastapi.middleware.cors import (    CORSMiddleware)
 from backend.services.live_nifty_poller import LiveNiftyPoller
+from backend.services.replay_stock_fetch_service import ReplayStockFetchService
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
+    ReplayStockFetchService.log_market_data_configuration()
     LiveNiftyPoller.start()
 
     try:

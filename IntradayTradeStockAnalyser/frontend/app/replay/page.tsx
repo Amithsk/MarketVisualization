@@ -4,7 +4,8 @@
 
 import {
     useState,
-    useEffect
+    useEffect,
+    useRef
 } from "react";
 
 import SynchronizedCharts from
@@ -15,9 +16,6 @@ import TradeDateSelector from
 
 import StockSelector from
     "../../components/selectors/StockSelector";
-
-import UploadPanel from
-    "../../components/upload/UploadPanel";
 
 import { useReplayData }
     from "../../hooks/useReplayData";
@@ -52,6 +50,9 @@ import CandleExplanationPanel from
 
 import useReplayPlayback
     from "../../hooks/useReplayPlayback";
+
+import { fetchReplayStockCandles }
+    from "../../services/replayApi";
 
 
 import ReplayControls
@@ -115,6 +116,12 @@ export default function ReplayPage() {
 
     } = useTradeSelection();
 
+    const selectionRef = useRef({ date: selectedDate, stock: selectedStock });
+
+    useEffect(() => {
+        selectionRef.current = { date: selectedDate, stock: selectedStock };
+    }, [selectedDate, selectedStock]);
+
     // -----------------------------------
     // Replay Hook
     // -----------------------------------
@@ -166,11 +173,15 @@ export default function ReplayPage() {
     });
 
     // -----------------------------------
-    // Upload Status
+    // Prepared stock-data status
     // -----------------------------------
 
-    const [uploadSuccess, setUploadSuccess] =
+    const [dataReady, setDataReady] =
         useState(false);
+
+    const [fetchingStockData, setFetchingStockData] = useState(false);
+
+    const [stockFetchError, setStockFetchError] = useState<string | null>(null);
 
     const [
 
@@ -180,32 +191,28 @@ export default function ReplayPage() {
 
     ] = useState<number>(0);
 
-    const [
-
-        showUploadSection,
-
-        setShowUploadSection
-
-    ] = useState(true);
-
-    // -----------------------------------
-    // Reset Upload State
-    // On Stock Change
-    // -----------------------------------
-
     useEffect(() => {
+        setDataReady(false);
+        setStockFetchError(null);
+    }, [selectedDate, selectedStock]);
 
-        setUploadSuccess(false);
-
-    }, [selectedStock]);
-
-    // -----------------------------------
-    // Upload Success
-    // -----------------------------------
-
-    const handleUploadSuccess = () => {
-
-        setUploadSuccess(true);
+    const handleFetchStockData = async () => {
+        if (!selectedDate || !selectedStock || fetchingStockData) return;
+        const requestDate = selectedDate;
+        const requestStock = selectedStock;
+        try {
+            setFetchingStockData(true);
+            setDataReady(false);
+            setStockFetchError(null);
+            await fetchReplayStockCandles(requestDate, requestStock);
+            if (selectionRef.current.date === requestDate && selectionRef.current.stock === requestStock) setDataReady(true);
+        } catch (error: any) {
+            if (selectionRef.current.date === requestDate && selectionRef.current.stock === requestStock) {
+                setStockFetchError(error.message || "Failed to fetch stock data");
+            }
+        } finally {
+            setFetchingStockData(false);
+        }
     };
 
     // -----------------------------------
@@ -304,39 +311,6 @@ export default function ReplayPage() {
             {/* CONTROLS */}
             {/* -------------------------------- */}
 
-            <button
-
-                onClick={() =>
-
-                    setShowUploadSection(
-                        !showUploadSection
-                    )
-
-                }
-
-                className="
-        mb-4
-        px-4
-        py-2
-        bg-slate-800
-        rounded
-    "
-            >
-
-                {
-
-                    showUploadSection
-                        ?  "▼ Upload & Data Selection"
-                        : "▶ Upload & Data Selection"
-
-                }
-
-            </button>
-            {
-                showUploadSection && (
-                    <>
-
-
                         <div
                             className="
                     flex
@@ -399,9 +373,16 @@ export default function ReplayPage() {
 
                             />
 
-                            {/* -------------------------------- */}
-                            {/* Load Replay */}
-                            {/* -------------------------------- */}
+                            <button
+                                onClick={handleFetchStockData}
+                                disabled={!selectedDate || !selectedStock || fetchingStockData}
+                                className="
+                        bg-slate-700 hover:bg-slate-600 disabled:bg-gray-700
+                        disabled:cursor-not-allowed px-4 py-2 rounded-md text-sm font-medium
+                    "
+                            >
+                                {fetchingStockData ? "Fetching…" : "Fetch Stock Data"}
+                            </button>
 
                             <button
 
@@ -412,7 +393,8 @@ export default function ReplayPage() {
                                 disabled={
                                     !selectedDate ||
                                     !selectedStock ||
-                                    !uploadSuccess
+                                    !dataReady ||
+                                    fetchingStockData
                                 }
 
                                 className="
@@ -435,68 +417,12 @@ export default function ReplayPage() {
                         </div>
 
                         {/* -------------------------------- */}
-                        {/* Upload Panel */}
-                        {/* -------------------------------- */}
-
-                        <div
-                            className="
-                    mb-6
-                "
-                        >
-
-                            <UploadPanel
-
-                                selectedStock={
-                                    selectedStock
-                                }
-
-                                disabled={
-                                    !selectedDate ||
-                                    !selectedStock
-                                }
-
-                                onUploadSuccess={
-                                    handleUploadSuccess
-                                }
-
-                            />
-
-                        </div>
-
-                        {/* -------------------------------- */}
-                        {/* Upload Helper */}
-                        {/* -------------------------------- */}
-
-                        {
-
-                            !uploadSuccess &&
-
-                            selectedDate &&
-
-                            selectedStock && (
-
-                                <div
-                                    className="
-                            mb-4
-                            text-yellow-400
-                            text-sm
-                        "
-                                >
-
-                                    Upload stock candle CSV
-                                    before loading replay.
-
-                                </div>
-                            )
-                        }
-
-                        {/* -------------------------------- */}
                         {/* LOADING */}
                         {/* -------------------------------- */}
 
                         {
 
-                            (tradeLoading || replayLoading) && (
+                            (tradeLoading || replayLoading || fetchingStockData) && (
 
                                 <div
                                     className="
@@ -517,7 +443,7 @@ export default function ReplayPage() {
 
                         {
 
-                            (tradeError || replayError) && (
+                            (tradeError || replayError || stockFetchError) && (
 
                                 <div
                                     className="
@@ -529,16 +455,14 @@ export default function ReplayPage() {
                                     {
 
                                         tradeError ||
-                                        replayError
+                                        replayError ||
+                                        stockFetchError
                                     }
 
                                 </div>
                             )
                         }
 
-                    </>
-                )
-            }
             {/* -------------------------------- */}
             {/* REPLAY CONTROLS */}
             {/* -------------------------------- */}

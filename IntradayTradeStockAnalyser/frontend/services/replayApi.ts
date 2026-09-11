@@ -14,6 +14,25 @@ type ReplayApiResponse = {
     replay_data: ReplayData;
 };
 
+type StockFetchResponse = {
+    status: string;
+    message: string;
+    data?: { replay_ready?: boolean };
+};
+
+export async function fetchReplayStockCandles(tradeDate: string, symbol: string): Promise<void> {
+    const response = await fetch(`${BASE_URL}/api/v1/replay/stock-candles/fetch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trade_date: tradeDate, symbol }),
+        cache: "no-store"
+    });
+    const data: StockFetchResponse = await response.json();
+    if (!response.ok || data.status !== "success" || !data.data?.replay_ready) {
+        throw new Error(data.message || "Failed to fetch historical stock data");
+    }
+}
+
 export async function fetchReplayData(
     tradeDate: string,
     stock: string
