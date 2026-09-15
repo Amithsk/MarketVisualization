@@ -64,8 +64,8 @@ export async function executeTradePlan(
   payload?: {
     entry_timestamp?: string
   }
-): Promise<{ trade_id: number; status: "EXECUTED" }> {
-  return api<{ trade_id: number; status: "EXECUTED" }>(
+): Promise<{ trade_id: number; status: "EXECUTED"; entry_timestamp: string }> {
+  return api<{ trade_id: number; status: "EXECUTED"; entry_timestamp: string }>(
     `/trade-plans/${planId}/execute`,
     {
       method: "POST",
@@ -88,8 +88,8 @@ export async function exitTrade(
     exit_reason: string
     exit_timestamp: string
   }
-): Promise<{ status: "EXITED" }> {
-  return api<{ status: "EXITED" }>(
+): Promise<{ status: "EXITED"; exit_timestamp: string }> {
+  return api<{ status: "EXITED"; exit_timestamp: string }>(
     `/trades/${tradeId}/exit`,
     {
       method: "POST",

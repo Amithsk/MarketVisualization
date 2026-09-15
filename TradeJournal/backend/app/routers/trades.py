@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.deps import get_db
+from app.market_time import MARKET_TIMEZONE, to_api_time, to_market_time, to_storage_time
 
 router = APIRouter(prefix="/api", tags=["Trades"])
 
@@ -28,11 +29,11 @@ def execute_trade(plan_id: int,
             status_code=409,
             detail=f"Trade plan not executable (status={plan.plan_status})"
         )
-    trade_timestamp = (
-    payload.entry_timestamp
-    if payload.entry_timestamp
-    else datetime.now()
-           )
+    trade_timestamp = to_storage_time(
+        payload.entry_timestamp
+        if payload.entry_timestamp
+        else datetime.now(MARKET_TIMEZONE)
+    )
 
     trade = models.TradeLog(
         # REQUIRED FIELDS
@@ -69,6 +70,7 @@ def execute_trade(plan_id: int,
     return {
         "trade_id": trade.id,
         "status": "EXECUTED",
+        "entry_timestamp": to_api_time(trade.timestamp),
     }
 
 
@@ -88,13 +90,25 @@ def exit_trade(
     if trade.exit_timestamp:
         raise HTTPException(409, "Trade already exited")
 
+    exit_timestamp = to_storage_time(payload.exit_timestamp)
+    entry_timestamp = to_market_time(trade.timestamp)
+
+    if exit_timestamp < entry_timestamp.replace(tzinfo=None):
+        raise HTTPException(
+            status_code=422,
+            detail="Exit timestamp cannot be earlier than entry timestamp",
+        )
+
     trade.exit_price = payload.exit_price
     trade.exit_reason = payload.exit_reason
-    trade.exit_timestamp = payload.exit_timestamp
+    trade.exit_timestamp = exit_timestamp
 
     db.commit()
 
-    return {"status": "EXITED"}
+    return {
+        "status": "EXITED",
+        "exit_timestamp": to_api_time(trade.exit_timestamp),
+    }
 
 
 # --------------------------------------------------

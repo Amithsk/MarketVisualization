@@ -37,7 +37,7 @@ export default function TradeExecuteForm({
         return
       }
 
-      const entryTimestamp = `${tradeDate}T${entryTime}:00`
+      const entryTimestamp = `${tradeDate}T${entryTime}:00+05:30`
 
       await onSubmit({
         entry_timestamp: entryTimestamp,

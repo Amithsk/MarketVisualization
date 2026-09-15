@@ -27,8 +27,9 @@ export default function TradeExitForm({ onSubmit }: Props) {
 
     onSubmit({
       exit_price: Number(exitPrice),
-      // ensure backend-friendly ISO string
-      exit_timestamp: new Date(exitTimestamp).toISOString(),
+      // datetime-local is the trader's India-market wall time. Keep that
+      // wall time and send its explicit offset instead of converting to UTC.
+      exit_timestamp: `${exitTimestamp}:00+05:30`,
       exit_reason: exitReason,
     })
   }
