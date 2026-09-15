@@ -401,6 +401,7 @@ export default function CandlestickChart({
             layout: {
                 background: { type: ColorType.Solid, color: "#111827" },
                 textColor: "#D1D5DB",
+                fontSize: 11,
             },
             grid: {
                 vertLines: { color: "#1F2937" },
