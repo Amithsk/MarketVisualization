@@ -351,23 +351,9 @@ class ReplayService:
                 narrative_context
             )
 
-            serialized_nifty_candles = [
-
-                {
-
-                    **vars(candle),
-
-                    "time": (
-                        candle.time.strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        if candle.time
-                        else None
-                    )
-                }
-
-                for candle in nifty_candles
-            ]
+            serialized_nifty_candles = ReplayService._serialize_nifty_candles(
+                nifty_candles
+            )
 
             replay_payload = {
 
@@ -377,22 +363,7 @@ class ReplayService:
 
                 "stock_candles": stock_candles,
 
-                "nifty_candles": [
-
-                    {
-                        **vars(candle),
-
-                        "time": (
-                            candle.time.strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            )
-                            if candle.time
-                            else None
-                        )
-                    }
-
-                    for candle in nifty_candles
-                ],
+                "nifty_candles": serialized_nifty_candles,
 
                 # =====================================
                 # MARKET EVENTS
@@ -482,4 +453,18 @@ class ReplayService:
             log_error(error)
 
             raise
+
+    @staticmethod
+    def _serialize_nifty_candles(nifty_candles):
+        return [
+            {
+                **vars(candle),
+                "time": (
+                    candle.time.strftime("%Y-%m-%d %H:%M:%S")
+                    if candle.time
+                    else None
+                ),
+            }
+            for candle in nifty_candles
+        ]
 

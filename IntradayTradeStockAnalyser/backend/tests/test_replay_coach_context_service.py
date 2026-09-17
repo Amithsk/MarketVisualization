@@ -48,12 +48,34 @@ class ReplayCoachContextServiceTests(unittest.TestCase):
         self.assertTrue(any("OHLC" in error for error in result.exception.errors))
 
     def test_open_trade_and_unavailable_market_values(self):
-        context = ReplayCoachContextService.build_context(replay(exit_timestamp=None), "2026-09-11")
+        market = [
+            candle("09:15", volume=None, vwap=None),
+            candle("09:20", volume=None, vwap=None),
+            candle("09:25", volume=None, vwap=None),
+        ]
+        context = ReplayCoachContextService.build_context(
+            replay(market=market, exit_timestamp=None), "2026-09-11"
+        )
         self.assertIsNone(context["executed_trade"]["exit_candle_time"])
         self.assertTrue(context["data_quality"]["exit_candle_found"])
         self.assertFalse(context["data_quality"]["market_volume_available"])
         self.assertIsNone(context["market"]["candles"][0]["volume"])
         self.assertIsNone(context["market"]["candles"][0]["vwap"])
+
+    def test_market_volume_is_preserved_when_vwap_is_unavailable(self):
+        market = [
+            candle("09:15", volume=196170, vwap=None),
+            candle("09:20", volume=None, vwap=None),
+            candle("09:25", volume=71500, vwap=None),
+        ]
+
+        context = ReplayCoachContextService.build_context(replay(market=market), "2026-09-11")
+
+        self.assertEqual(context["market"]["candles"][0]["volume"], 196170)
+        self.assertIsNone(context["market"]["candles"][1]["volume"])
+        self.assertEqual(context["market"]["candles"][2]["volume"], 71500)
+        self.assertTrue(context["data_quality"]["market_volume_available"])
+        self.assertFalse(context["data_quality"]["market_vwap_available"])
 
     def test_missing_trade_is_rejected(self):
         with self.assertRaises(ReplayCoachContextValidationError):

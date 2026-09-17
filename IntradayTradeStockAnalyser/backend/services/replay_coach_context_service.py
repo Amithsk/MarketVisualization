@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from math import isfinite
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
@@ -110,8 +111,10 @@ class ReplayCoachContextService:
         if duplicates: errors.append(f"{source.title()} candles contain duplicate timestamps: {', '.join(cls._iso(item) for item in sorted(duplicates))}.")
         raw_volume = [item[1].get("volume") for item in parsed]
         raw_vwap = [item[1].get("vwap") for item in parsed]
-        # NIFTY repository explicitly uses zero placeholders; stock Candle defaults vwap to zero when uncalculated.
-        volume_available = source == "stock" and bool(parsed) and all(value is not None for value in raw_volume)
+        # Volume is independently available whenever at least one candle contains a real
+        # numeric value.  Do not let unavailable VWAP or null values on other candles
+        # discard genuine source volume.
+        volume_available = any(cls._is_valid_volume(value) for value in raw_volume)
         vwap_available = bool(parsed) and any(value not in (None, 0, 0.0) for value in raw_vwap)
         if not volume_available: warnings.append(f"{source.title()} volume is unavailable.")
         if not vwap_available: warnings.append(f"{source.title()} VWAP is unavailable.")
@@ -119,7 +122,7 @@ class ReplayCoachContextService:
             try: o, h, l, c = (float(candle[key]) for key in ("open", "high", "low", "close"))
             except (KeyError, TypeError, ValueError): errors.append(f"{source.title()} candle {index} has invalid OHLC values."); continue
             if not (l <= o <= h and l <= c <= h and l <= h): errors.append(f"{source.title()} candle {index} has invalid OHLC range.")
-            result.append({"time": cls._iso(timestamp), "open": cls._json_value(candle.get("open")), "high": cls._json_value(candle.get("high")), "low": cls._json_value(candle.get("low")), "close": cls._json_value(candle.get("close")), "volume": cls._json_value(candle.get("volume")) if volume_available else None, "vwap": cls._json_value(candle.get("vwap")) if vwap_available else None})
+            result.append({"time": cls._iso(timestamp), "open": cls._json_value(candle.get("open")), "high": cls._json_value(candle.get("high")), "low": cls._json_value(candle.get("low")), "close": cls._json_value(candle.get("close")), "volume": cls._json_value(candle.get("volume")), "vwap": cls._json_value(candle.get("vwap")) if vwap_available else None})
             times.append(timestamp)
         missing = cls._missing_times(times)
         return result, {"errors": errors, "warnings": warnings, "times": times, "missing": missing, "volume_available": volume_available, "vwap_available": vwap_available}
@@ -162,3 +165,12 @@ class ReplayCoachContextService:
 
     @staticmethod
     def _json_value(value): return float(value) if isinstance(value, Decimal) else value
+
+    @staticmethod
+    def _is_valid_volume(value):
+        if isinstance(value, bool) or value is None:
+            return False
+        try:
+            return isfinite(float(value))
+        except (TypeError, ValueError):
+            return False

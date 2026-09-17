@@ -17,19 +17,20 @@ class NiftyRepository:
         query = text("""
 
             SELECT
-                Date,
-                Open,
-                High,
-                Low,
-                Close
+                P.Date AS time,
+                P.Open AS open,
+                P.High AS high,
+                P.Low AS low,
+                P.Close AS close,
+                P.Volume AS volume
 
-            FROM nifty.nifty_prices
+            FROM nifty.nifty_prices P
 
-            WHERE DATE(Date) = :trade_date
-            AND TIME(Date) >= '09:15:00'
-            AND TIME(Date) <= '15:15:00'
+            WHERE DATE(P.Date) = :trade_date
+            AND TIME(P.Date) >= '09:15:00'
+            AND TIME(P.Date) <= '15:15:00'
 
-            ORDER BY Date ASC
+            ORDER BY P.Date ASC
 
         """)
 
@@ -58,11 +59,11 @@ class NiftyRepository:
 
                 close=float(row[4]),
 
-                # NIFTY volume unavailable
-                volume=0,
+                # Keep the database value intact; None means the source value is null.
+                volume=row[5],
 
-                # Placeholder VWAP
-                vwap=0
+                # nifty_prices does not provide VWAP.
+                vwap=None
             )
 
             candles.append(candle)
