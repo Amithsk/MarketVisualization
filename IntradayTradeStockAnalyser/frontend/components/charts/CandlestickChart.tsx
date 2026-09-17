@@ -13,7 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { Candle } from "../../types/candle";
-import { MarketEvent } from "../../types/replay";
+import { ExecutedTrade, MarketEvent } from "../../types/replay";
 import type {
     LiveTradePlan,
 } from "../live/LiveTradePlanPanel";
@@ -28,6 +28,7 @@ type Props = {
     onCandleSelect?: (index: number) => void;
     showTimeline?: boolean;
     tradePlans?: LiveTradePlan[];
+    executedTrade?: ExecutedTrade;
 
     // -----------------------------------
     // Chart Mode
@@ -328,6 +329,7 @@ export default function CandlestickChart({
     onCandleSelect,
     showTimeline = true,
     tradePlans = [],
+    executedTrade,
     mode = "replay",
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -642,6 +644,43 @@ export default function CandlestickChart({
                 candleSeries,
                 markers as any
             );
+        }
+
+        if (isStockChart && executedTrade) {
+            const markerTimeFor = (timestamp: string) => {
+                const executionTimestamp = createISTTimestamp(timestamp);
+
+                return [...formattedCandles]
+                    .reverse()
+                    .find((candle) => Number(candle.time) <= executionTimestamp)
+                    ?.time;
+            };
+
+            const entryTime = markerTimeFor(executedTrade.entry_timestamp);
+            const exitTime = executedTrade.exit_timestamp
+                ? markerTimeFor(executedTrade.exit_timestamp)
+                : undefined;
+
+            const executionMarkers = [
+                entryTime && {
+                    time: entryTime,
+                    position: "belowBar" as const,
+                    color: "#22C55E",
+                    shape: "arrowUp" as const,
+                    text: `Entry ${executedTrade.entry_price}`,
+                },
+                exitTime && executedTrade.exit_price !== null && {
+                    time: exitTime,
+                    position: "aboveBar" as const,
+                    color: "#EF4444",
+                    shape: "arrowDown" as const,
+                    text: `Exit ${executedTrade.exit_price}`,
+                },
+            ].filter(Boolean);
+
+            if (executionMarkers.length) {
+                createSeriesMarkers(candleSeries, executionMarkers as any);
+            }
         }
 
         // -----------------------------------
@@ -1070,7 +1109,7 @@ export default function CandlestickChart({
 
             chart.remove();
         };
-    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans]);
+    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans, executedTrade]);
 
     return (
         <div className="relative w-full h-full">

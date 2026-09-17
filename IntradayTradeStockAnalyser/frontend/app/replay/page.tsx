@@ -577,6 +577,10 @@ export default function ReplayPage() {
                                     .market_events
                             }
 
+                            executedTrade={
+                                replayData.executed_trade
+                            }
+
                             stockName={
                                 selectedStock
                             }

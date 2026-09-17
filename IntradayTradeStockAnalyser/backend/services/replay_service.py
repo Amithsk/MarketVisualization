@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session
 
 from backend.repositories.replay_repository import (
-    ReplayRepository
+    ReplayRepository,
 )
 
 from backend.services.nifty_service import (
@@ -70,9 +70,26 @@ class ReplayService:
                 )
             )
 
+            # Deprecated planning context retained only for existing Replay consumers.
+            # Executed-trade markers and future execution analysis must use
+            # executed_trade, which is sourced from TradeJournal trade_log.
+            executed_trade = (
+                ReplayRepository
+                .get_executed_trade(
+                    db,
+                    trade_date,
+                    stock,
+                )
+            )
+
             log_object(
                 "Trade Metadata",
                 trade_data
+            )
+
+            log_object(
+                "Executed Trade",
+                executed_trade
             )
 
             nifty_candles = (
@@ -355,6 +372,8 @@ class ReplayService:
             replay_payload = {
 
                 "trade_data": trade_data,
+
+                "executed_trade": executed_trade,
 
                 "stock_candles": stock_candles,
 

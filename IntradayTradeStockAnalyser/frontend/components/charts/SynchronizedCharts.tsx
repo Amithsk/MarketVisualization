@@ -25,6 +25,7 @@ import type {
     from "../live/LiveTradePlanPanel";
 
 import {
+    ExecutedTrade,
     MarketEvent
 }
     from "../../types/replay";
@@ -52,6 +53,8 @@ type Props = {
     ) => void;
 
     tradePlans?: LiveTradePlan[];
+
+    executedTrade?: ExecutedTrade;
 
     mode?: "live" | "replay";
 };
@@ -203,6 +206,8 @@ export default function SynchronizedCharts({
     onStockCandleSelect,
 
     tradePlans = [],
+
+    executedTrade,
 
     mode = "replay",
 
@@ -511,6 +516,7 @@ export default function SynchronizedCharts({
                         plan.symbol === stockName
                     )
                 }
+                executedTrade={executedTrade}
                 mode={mode}
                 
                 title={

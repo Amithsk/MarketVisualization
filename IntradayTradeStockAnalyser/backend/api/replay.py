@@ -14,6 +14,10 @@ from sqlalchemy.orm import Session
 from backend.services.replay_service import (
     ReplayService
 )
+from backend.repositories.replay_repository import (
+    ExecutedTradeNotFoundError,
+    MultipleExecutedTradesError,
+)
 
 from backend.utils.deps import (
     get_db
@@ -96,6 +100,31 @@ async def get_replay_data(
                 "error_code": error.code,
                 "message": str(error)
             }
+        )
+
+    except ExecutedTradeNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "executed_trade_not_found",
+                "message": (
+                    "No executed TradeJournal trade found for "
+                    f"{stock.strip().upper().removeprefix('NSE:')} on {trade_date}."
+                ),
+            },
+        )
+
+    except MultipleExecutedTradesError as error:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "multiple_executed_trades",
+                "message": (
+                    "Multiple executed TradeJournal trades found for "
+                    f"{stock.strip().upper().removeprefix('NSE:')} on {trade_date}."
+                ),
+                "trade_ids": error.trade_ids,
+            },
         )
 
     except Exception as error:

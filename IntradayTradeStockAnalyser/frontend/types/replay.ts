@@ -21,6 +21,25 @@ export type ReplayTradeData = {
     plan_status: string;
 };
 
+export type ExecutedTrade = {
+    trade_plan_id: number;
+    trade_id: number;
+    symbol: string;
+    side: "BUY" | "SELL";
+    entry_price: number;
+    entry_timestamp: string;
+    exit_price: number | null;
+    exit_timestamp: string | null;
+    quantity: number;
+    status: string;
+    pnl_amount: number | null;
+    pnl_pct: number | null;
+    trade_result: string | null;
+    exit_reason: string | null;
+    order_id: string | null;
+    execution_source: "TRADE_JOURNAL";
+};
+
 export type MarketContext = {
 
     preopen_price: number | null;
@@ -308,6 +327,8 @@ export type MarketEvent = {
 export type ReplayData = {
 
     trade_data: ReplayTradeData;
+
+    executed_trade: ExecutedTrade;
 
     stock_candles: Candle[];
 

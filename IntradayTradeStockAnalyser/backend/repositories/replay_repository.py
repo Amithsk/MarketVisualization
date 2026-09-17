@@ -4,7 +4,92 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
+class ExecutedTradeNotFoundError(Exception):
+    pass
+
+
+class MultipleExecutedTradesError(Exception):
+    def __init__(self, trade_ids: list[int]):
+        self.trade_ids = trade_ids
+        super().__init__("Multiple executed TradeJournal trades found")
+
+
 class ReplayRepository:
+
+    @staticmethod
+    def get_executed_trade(
+        db: Session,
+        trade_date: str,
+        stock: str,
+    ):
+        normalized_symbol = stock.strip().upper().removeprefix("NSE:")
+
+        query = text("""
+            SELECT
+                trade_plan.id AS trade_plan_id,
+                trade_plan.trade_id AS trade_id,
+                trade_log.timestamp AS entry_timestamp,
+                trade_log.symbol AS symbol,
+                trade_log.order_id AS order_id,
+                trade_log.side AS side,
+                trade_log.quantity AS quantity,
+                trade_log.price AS price,
+                trade_log.status AS status,
+                trade_log.entry_price AS entry_price,
+                trade_log.exit_price AS exit_price,
+                trade_log.exit_timestamp AS exit_timestamp,
+                trade_log.pnl_amount AS pnl_amount,
+                trade_log.pnl_pct AS pnl_pct,
+                trade_log.trade_result AS trade_result,
+                trade_log.exit_reason AS exit_reason
+            FROM trade_plan
+            INNER JOIN trade_log
+                ON trade_plan.trade_id = trade_log.id
+            WHERE trade_plan.plan_date = :trade_date
+              AND trade_plan.symbol = :stock
+              AND trade_plan.plan_status = 'EXECUTED'
+              AND trade_plan.trade_id IS NOT NULL
+        """)
+
+        rows = db.execute(
+            query,
+            {"trade_date": trade_date, "stock": normalized_symbol},
+        ).mappings().all()
+
+        if not rows:
+            raise ExecutedTradeNotFoundError()
+
+        if len(rows) > 1:
+            raise MultipleExecutedTradesError(
+                [int(row["trade_id"]) for row in rows]
+            )
+
+        row = rows[0]
+
+        def as_float(value):
+            return float(value) if value is not None else None
+
+        def as_timestamp(value):
+            return value.isoformat() if value is not None else None
+
+        return {
+            "trade_plan_id": int(row["trade_plan_id"]),
+            "trade_id": int(row["trade_id"]),
+            "symbol": row["symbol"],
+            "side": row["side"].value if hasattr(row["side"], "value") else row["side"],
+            "entry_price": as_float(row["entry_price"]),
+            "entry_timestamp": as_timestamp(row["entry_timestamp"]),
+            "exit_price": as_float(row["exit_price"]),
+            "exit_timestamp": as_timestamp(row["exit_timestamp"]),
+            "quantity": int(row["quantity"]),
+            "status": row["status"].value if hasattr(row["status"], "value") else row["status"],
+            "pnl_amount": as_float(row["pnl_amount"]),
+            "pnl_pct": as_float(row["pnl_pct"]),
+            "trade_result": row["trade_result"].value if hasattr(row["trade_result"], "value") else row["trade_result"],
+            "exit_reason": row["exit_reason"],
+            "order_id": row["order_id"],
+            "execution_source": "TRADE_JOURNAL",
+        }
 
     @staticmethod
     def get_trade_metadata(
