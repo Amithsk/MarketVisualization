@@ -27,6 +27,7 @@ from backend.services.replay_stock_fetch_service import (
     ReplayStockFetchService,
 )
 from backend.services.replay_coach_context_service import ReplayCoachContextService, ReplayCoachContextValidationError
+from backend.services.replay_coach_service import ReplayCoachError, ReplayCoachService
 
 router = APIRouter()
 
@@ -153,3 +154,28 @@ async def get_replay_coach_context(trade_date: str, stock: str, db: Session = De
     except Exception as error:
         print(f"Replay Coach context preview failed: {error}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(error)})
+
+
+@router.post("/api/v1/replay/coach/start")
+async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(get_db)):
+    """Create one OpenAI-backed Coach review from validated Replay evidence."""
+    try:
+        replay_data = ReplayService.get_replay_data(db, trade_date, stock)
+        coach_context = ReplayCoachContextService.build_context(replay_data, trade_date)
+        result = ReplayCoachService.start(coach_context)
+        return JSONResponse(status_code=200, content={
+            "status": "success", "trade_date": coach_context["trade_date"],
+            "stock": coach_context["stock"]["symbol"], **result,
+        })
+    except ReplayCoachContextValidationError as error:
+        return JSONResponse(status_code=422, content={"status": "coach_context_invalid", "message": "Replay data cannot be used for Coach analysis.", "errors": error.errors})
+    except ReplayCoachError as error:
+        return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": error.public_message})
+    except ExecutedTradeNotFoundError:
+        return JSONResponse(status_code=404, content={"status": "executed_trade_not_found", "message": f"No executed trade found for {stock.strip().upper().removeprefix('NSE:')} on {trade_date}."})
+    except MultipleExecutedTradesError as error:
+        return JSONResponse(status_code=409, content={"status": "multiple_executed_trades", "message": str(error), "trade_ids": error.trade_ids})
+    except ReplayStockFetchError as error:
+        return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": str(error)})
+    except Exception:
+        return JSONResponse(status_code=500, content={"status": "error", "error_code": "REPLAY_COACH_FAILED", "message": "Replay Coach analysis is unavailable."})
