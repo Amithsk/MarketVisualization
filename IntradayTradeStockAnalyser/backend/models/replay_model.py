@@ -1,12 +1,32 @@
 #IntradayTradeStockAnalyser/backend/models/replay_response.py
 
+from datetime import date
 from typing import (
     List,
     Optional,
     Any
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class ReplayStockFetchRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "trade_date": "2026-09-16",
+            "symbol": "BHARTIARTL",
+        }
+    })
+    trade_date: date
+    symbol: str = Field(min_length=1)
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("Symbol is required.")
+        return normalized
 
 
 class MarketContextResponse(BaseModel):

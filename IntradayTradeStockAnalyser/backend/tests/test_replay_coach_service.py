@@ -8,10 +8,11 @@ from unittest.mock import patch
 from pydantic import ValidationError
 
 from backend.models.replay_coach_model import ReplayCoachAnalysis
-from backend.services.replay_coach_service import (
-    ReplayCoachConfigurationError, ReplayCoachResponseError, ReplayCoachService,
-    ReplayCoachSessionStore, ReplayCoachTimeoutError,
+from backend.services.replay_coach_openai_service import (
+    ReplayCoachConfigurationError, ReplayCoachOpenAIService, ReplayCoachResponseError,
+    ReplayCoachTimeoutError,
 )
+from backend.services.replay_coach_service import ReplayCoachService, ReplayCoachSessionStore
 from backend.api.replay import start_replay_coach
 
 
@@ -51,7 +52,7 @@ class ReplayCoachServiceTests(TestCase):
     def test_valid_context_calls_openai_once_with_only_context_and_retains_response_id(self):
         responses = FakeResponses(analysis())
         client = SimpleNamespace(responses=responses)
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachService, "_client", return_value=client):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachOpenAIService, "_client", return_value=client):
             result = ReplayCoachService.start(context())
         self.assertEqual(len(responses.calls), 1)
         sent = json.loads(responses.calls[0]["input"][1]["content"])
@@ -62,15 +63,15 @@ class ReplayCoachServiceTests(TestCase):
         self.assertEqual(result["analysis"], analysis())
 
     def test_missing_key_does_not_create_client(self):
-        with patch.dict(os.environ, {}, clear=True), patch.object(ReplayCoachService, "_client") as client:
-            with self.assertRaises(ReplayCoachConfigurationError): ReplayCoachService.analyze(context())
+        with patch.dict(os.environ, {}, clear=True), patch.object(ReplayCoachOpenAIService, "_client") as client:
+            with self.assertRaises(ReplayCoachConfigurationError): ReplayCoachOpenAIService.analyze(context())
         client.assert_not_called()
 
     def test_timeout_and_invalid_output_are_safe_errors(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachService, "_client", return_value=SimpleNamespace(responses=FakeResponses(TimeoutError()))):
-            with self.assertRaises(ReplayCoachTimeoutError): ReplayCoachService.analyze(context())
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachService, "_client", return_value=SimpleNamespace(responses=FakeResponses({}))):
-            with self.assertRaises(ReplayCoachResponseError): ReplayCoachService.analyze(context())
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachOpenAIService, "_client", return_value=SimpleNamespace(responses=FakeResponses(TimeoutError()))):
+            with self.assertRaises(ReplayCoachTimeoutError): ReplayCoachOpenAIService.analyze(context())
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False), patch.object(ReplayCoachOpenAIService, "_client", return_value=SimpleNamespace(responses=FakeResponses({}))):
+            with self.assertRaises(ReplayCoachResponseError): ReplayCoachOpenAIService.analyze(context())
 
     def test_buy_and_sell_risk_reward_are_validated(self):
         ReplayCoachAnalysis.model_validate(analysis("BUY"))

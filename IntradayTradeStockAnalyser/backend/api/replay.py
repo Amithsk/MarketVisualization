@@ -2,7 +2,6 @@
 from fastapi import (
     APIRouter,
     Depends,
-    Body
 )
 
 from fastapi.responses import (
@@ -27,24 +26,26 @@ from backend.services.replay_stock_fetch_service import (
     ReplayStockFetchService,
 )
 from backend.services.replay_coach_context_service import ReplayCoachContextService, ReplayCoachContextValidationError
-from backend.services.replay_coach_service import ReplayCoachError, ReplayCoachService
+from backend.services.replay_coach_openai_service import ReplayCoachError
+from backend.services.replay_coach_service import ReplayCoachService
+from backend.models.replay_model import ReplayStockFetchRequest
 
 router = APIRouter()
 
 
 @router.post("/api/v1/replay/stock-candles/fetch")
-async def fetch_replay_stock_candles(payload: dict = Body(...)):
-    trade_date = payload.get("trade_date") if isinstance(payload, dict) else None
-    symbol = payload.get("symbol") if isinstance(payload, dict) else None
+async def fetch_replay_stock_candles(request: ReplayStockFetchRequest):
+    trade_date = request.trade_date
+    symbol = request.symbol
     try:
         result = ReplayStockFetchService.fetch(trade_date, symbol)
         return JSONResponse(status_code=200, content={"status": "success", "message": "Historical stock candles fetched successfully", "data": result})
     except ReplayStockFetchError as error:
         print(f"Replay stock fetch failed: code={error.code}")
-        return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": str(error), "data": {"trade_date": trade_date, "symbol": (symbol or "").strip().upper(), "replay_ready": False}})
+        return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": str(error), "data": {"trade_date": trade_date.isoformat(), "symbol": symbol, "replay_ready": False}})
     except Exception:
         print("Replay stock fetch failed: code=INTERNAL_ERROR")
-        return JSONResponse(status_code=500, content={"status": "error", "error_code": "INTERNAL_ERROR", "message": "Unable to prepare historical stock candles", "data": {"trade_date": trade_date, "symbol": (symbol or "").strip().upper(), "replay_ready": False}})
+        return JSONResponse(status_code=500, content={"status": "error", "error_code": "INTERNAL_ERROR", "message": "Unable to prepare historical stock candles", "data": {"trade_date": trade_date.isoformat(), "symbol": symbol, "replay_ready": False}})
 
 
 @router.get("/api/v1/replay")

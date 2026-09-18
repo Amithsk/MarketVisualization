@@ -45,11 +45,14 @@ class ReplayStockFetchService:
         return normalized if normalized.startswith("NSE:") else f"NSE:{normalized}"
 
     @staticmethod
-    def validate_trade_date(trade_date: str) -> date:
-        try:
-            parsed = date.fromisoformat(trade_date)
-        except (TypeError, ValueError):
-            raise ReplayStockFetchError("INVALID_TRADE_DATE", "Trade date must be an ISO date")
+    def validate_trade_date(trade_date: str | date) -> date:
+        if isinstance(trade_date, date):
+            parsed = trade_date
+        else:
+            try:
+                parsed = date.fromisoformat(trade_date)
+            except (TypeError, ValueError):
+                raise ReplayStockFetchError("INVALID_TRADE_DATE", "Trade date must be an ISO date")
         now = datetime.now(IST)
         if parsed > now.date():
             raise ReplayStockFetchError("FUTURE_TRADE_DATE", "Trade date cannot be in the future")
@@ -134,7 +137,7 @@ class ReplayStockFetchService:
         return candle
 
     @classmethod
-    def fetch(cls, trade_date: str, symbol: str) -> Dict[str, Any]:
+    def fetch(cls, trade_date: str | date, symbol: str) -> Dict[str, Any]:
         requested_date = cls.validate_trade_date(trade_date)
         upstream_symbol = cls.normalize_symbol(symbol)
         normalized_symbol = upstream_symbol.removeprefix("NSE:")
