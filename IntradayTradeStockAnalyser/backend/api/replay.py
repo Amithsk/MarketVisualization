@@ -163,7 +163,7 @@ async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(
     try:
         replay_data = ReplayService.get_replay_data(db, trade_date, stock)
         coach_context = ReplayCoachContextService.build_context(replay_data, trade_date)
-        result = ReplayCoachService.start(coach_context)
+        result = ReplayCoachService.start(coach_context, db)
         return JSONResponse(status_code=200, content={
             "status": "success", "trade_date": coach_context["trade_date"],
             "stock": coach_context["stock"]["symbol"], **result,

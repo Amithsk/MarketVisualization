@@ -45,13 +45,19 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
+    PROMPT_VERSION = "replay_coach_prompt_v1"
+    COACH_SCHEMA_VERSION = "replay_coach_schema_v2"
+
+    @classmethod
+    def requested_model(cls) -> str:
+        return os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
     SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only the supplied executed trade and candle evidence. Use whole-session stock and NIFTY Futures candles, but distinguish information knowable at a decision time from later outcomes. Every important conclusion needs candle timestamps and numeric evidence. Never invent VWAP, indicators, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons must state their calculation. Alternative plans are retrospective learning examples, not guarantees. Return only JSON conforming to the supplied schema."""
 
     @classmethod
     def analyze(cls, context: Dict[str, Any]) -> tuple[ReplayCoachAnalysis, str, Dict[str, Any]]:
         # Read at request time so a missing key affects only this endpoint.
         openai_api_key = os.getenv("OPENAI_API_KEY")
-        openai_model = os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
+        openai_model = cls.requested_model()
         timeout_seconds = cls._timeout_seconds()
         diagnostics = cls._request_diagnostics(context, openai_model, timeout_seconds)
         print(f"OpenAI API key configured: {bool(openai_api_key)}")
