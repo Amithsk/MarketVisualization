@@ -1,7 +1,8 @@
 //IntradayTradeStockAnalyser/frontend/services/replayApi.ts
 
 import {
-    ReplayData
+    ReplayData,
+    ReplayCoachStartResponse
 } from "../types/replay";
 
 const BASE_URL =
@@ -101,4 +102,23 @@ export async function fetchReplayData(
     );
 
     return data.replay_data;
+}
+
+export async function startReplayCoach(tradeDate: string, stock: string, signal?: AbortSignal): Promise<ReplayCoachStartResponse> {
+    const response = await fetch(
+        `${BASE_URL}/api/v1/replay/coach/start?trade_date=${encodeURIComponent(tradeDate)}&stock=${encodeURIComponent(stock)}`,
+        { method: "POST", cache: "no-store", signal }
+    );
+    const data = await response.json();
+    if (!response.ok || data.status !== "success") {
+        const messages: Record<string, string> = {
+            OPENAI_NOT_CONFIGURED: "Coach analysis is not configured on the backend.",
+            OPENAI_TIMEOUT: "Coach analysis took too long. Please try again.",
+            OPENAI_API_FAILED: "Coach analysis could not be generated. Please try again.",
+            INVALID_COACH_RESPONSE: "Coach returned an invalid analysis response.",
+        };
+        if (data.status === "coach_context_invalid") throw new Error("Coach analysis is unavailable because the Replay evidence is incomplete.");
+        throw new Error(messages[data.error_code] || "Coach analysis could not be generated. Please try again.");
+    }
+    return data as ReplayCoachStartResponse;
 }

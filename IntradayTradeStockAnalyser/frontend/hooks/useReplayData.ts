@@ -55,6 +55,8 @@ export function useReplayData() {
                 replayPayload
             );
 
+            return replayPayload;
+
         } catch (err: any) {
 
             setError(
@@ -63,6 +65,7 @@ export function useReplayData() {
 
                 "Replay fetch failed"
             );
+            throw err;
 
         } finally {
 

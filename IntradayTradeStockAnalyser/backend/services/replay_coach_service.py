@@ -3,7 +3,7 @@ from typing import Any, Dict
 from uuid import uuid4
 
 from backend.services.replay_coach_openai_service import (
-    ReplayCoachError,
+    ReplayCoachError, ReplayCoachResponseError,
     ReplayCoachOpenAIService,
 )
 
@@ -22,6 +22,11 @@ class ReplayCoachSessionStore:
 class ReplayCoachService:
     @classmethod
     def start(cls, context: Dict[str, Any]) -> Dict[str, Any]:
-        analysis, response_id = ReplayCoachOpenAIService.analyze(context)
+        analysis, response_id, _usage = ReplayCoachOpenAIService.analyze(context)
         session_id = ReplayCoachSessionStore.create(context["trade_date"], context["stock"]["symbol"], response_id)
-        return {"coach_session_id": session_id, "openai_response_id": response_id, "analysis": analysis.model_dump(mode="json")}
+        try:
+            serialized_analysis = analysis.model_dump(mode="json")
+        except Exception as error:
+            print(f"Replay Coach response diagnostic: reason=RESPONSE_SERIALIZATION_FAILED error_type={type(error).__name__}")
+            raise ReplayCoachResponseError() from error
+        return {"coach_session_id": session_id, "openai_response_id": response_id, "analysis": serialized_analysis}

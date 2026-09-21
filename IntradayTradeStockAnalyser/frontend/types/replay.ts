@@ -384,3 +384,58 @@ export type ReplayData = {
 
     narrative_context: NarrativeContext;
 };
+
+export type CoachEvidence = {
+    time: string;
+    stock_values: string;
+    market_values: string;
+    calculation: string | null;
+};
+
+export type CoachPoint = {
+    point: string;
+    evidence: CoachEvidence[];
+    why_it_matters?: string;
+};
+
+export type ExecutedTradeAnalysis = {
+    summary: string;
+    good: CoachPoint[];
+    bad: CoachPoint[];
+    how_to_improve: { action: string; rule: string; example_using_this_trade: string }[];
+};
+
+export type AlternativeTradePlan = {
+    name: string;
+    decision: "TAKE" | "WAIT" | "NO_TRADE";
+    side: "BUY" | "SELL" | null;
+    entry_condition: string;
+    entry_price: number | null;
+    stop_price: number | null;
+    target_price: number | null;
+    risk: number | null;
+    reward: number | null;
+    risk_reward_ratio: number | null;
+    rating: number;
+    why_good: string[];
+    risks: string[];
+    evidence_times: string[];
+};
+
+export type KeyLearning = { lesson: string; numeric_rule: string; example_using_this_trade: string };
+
+export type CoachAnalysis = {
+    executed_trade_analysis: ExecutedTradeAnalysis;
+    alternative_trade_plans: AlternativeTradePlan[];
+    key_learning: KeyLearning;
+    limitations: string[];
+};
+
+export type ReplayCoachStartResponse = {
+    status: "success";
+    coach_session_id: string;
+    openai_response_id: string;
+    trade_date: string;
+    stock: string;
+    analysis: CoachAnalysis;
+};

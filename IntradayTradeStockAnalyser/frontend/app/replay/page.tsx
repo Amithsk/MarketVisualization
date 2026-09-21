@@ -51,8 +51,14 @@ import CandleExplanationPanel from
 import useReplayPlayback
     from "../../hooks/useReplayPlayback";
 
-import { fetchReplayStockCandles }
+import { fetchReplayStockCandles, startReplayCoach }
     from "../../services/replayApi";
+
+import ReplayCoachPanel
+    from "../../components/replay/ReplayCoachPanel";
+
+import { CoachAnalysis }
+    from "../../types/replay";
 
 
 import ReplayControls
@@ -117,6 +123,9 @@ export default function ReplayPage() {
     } = useTradeSelection();
 
     const selectionRef = useRef({ date: selectedDate, stock: selectedStock });
+    const coachAbortRef = useRef<AbortController | null>(null);
+    const completedCoachKeyRef = useRef<string | null>(null);
+    const activeCoachKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         selectionRef.current = { date: selectedDate, stock: selectedStock };
@@ -182,6 +191,11 @@ export default function ReplayPage() {
     const [fetchingStockData, setFetchingStockData] = useState(false);
 
     const [stockFetchError, setStockFetchError] = useState<string | null>(null);
+    const [coachAnalysis, setCoachAnalysis] = useState<CoachAnalysis | null>(null);
+    const [coachSessionId, setCoachSessionId] = useState<string | null>(null);
+    const [openaiResponseId, setOpenaiResponseId] = useState<string | null>(null);
+    const [coachLoading, setCoachLoading] = useState(false);
+    const [coachError, setCoachError] = useState<string | null>(null);
 
     const [
 
@@ -192,9 +206,46 @@ export default function ReplayPage() {
     ] = useState<number>(0);
 
     useEffect(() => {
+        coachAbortRef.current?.abort();
+        activeCoachKeyRef.current = null;
+        completedCoachKeyRef.current = null;
         setDataReady(false);
         setStockFetchError(null);
+        setCoachAnalysis(null);
+        setCoachSessionId(null);
+        setOpenaiResponseId(null);
+        setCoachLoading(false);
+        setCoachError(null);
     }, [selectedDate, selectedStock]);
+
+    useEffect(() => () => coachAbortRef.current?.abort(), []);
+
+    const runCoachAnalysis = async (tradeDate: string, stock: string, tradeId: string | number, retry = false) => {
+        const key = `${tradeDate}:${stock}:${tradeId}`;
+        if ((!retry && (activeCoachKeyRef.current === key || completedCoachKeyRef.current === key)) || selectionRef.current.date !== tradeDate || selectionRef.current.stock !== stock) return;
+        coachAbortRef.current?.abort();
+        const controller = new AbortController();
+        coachAbortRef.current = controller;
+        activeCoachKeyRef.current = key;
+        setCoachLoading(true);
+        setCoachError(null);
+        try {
+            const response = await startReplayCoach(tradeDate, stock, controller.signal);
+            if (!controller.signal.aborted && selectionRef.current.date === tradeDate && selectionRef.current.stock === stock && activeCoachKeyRef.current === key) {
+                setCoachAnalysis(response.analysis);
+                setCoachSessionId(response.coach_session_id);
+                setOpenaiResponseId(response.openai_response_id);
+                completedCoachKeyRef.current = key;
+            }
+        } catch (error: any) {
+            if (error?.name !== "AbortError" && !controller.signal.aborted && activeCoachKeyRef.current === key) setCoachError(error?.message || "Coach analysis could not be generated. Please try again.");
+        } finally {
+            if (activeCoachKeyRef.current === key) {
+                activeCoachKeyRef.current = null;
+                setCoachLoading(false);
+            }
+        }
+    };
 
     const handleFetchStockData = async () => {
         if (!selectedDate || !selectedStock || fetchingStockData) return;
@@ -233,7 +284,7 @@ export default function ReplayPage() {
             return;
         }
 
-        await fetchReplayData({
+        const loadedReplay = await fetchReplayData({
 
             tradeDate:
                 selectedDate,
@@ -241,6 +292,10 @@ export default function ReplayPage() {
             stock:
                 selectedStock
         });
+
+        if (loadedReplay?.executed_trade?.trade_id !== undefined && selectionRef.current.date === selectedDate && selectionRef.current.stock === selectedStock) {
+            runCoachAnalysis(selectedDate, selectedStock, loadedReplay.executed_trade.trade_id);
+        }
     };
 
 
@@ -597,6 +652,18 @@ export default function ReplayPage() {
                     </div>
                 )
             }
+
+            {replayData && <ReplayCoachPanel
+                analysis={coachAnalysis}
+                loading={coachLoading}
+                error={coachError}
+                onRetry={() => {
+                    if (selectedDate && selectedStock && replayData.executed_trade?.trade_id !== undefined) {
+                        completedCoachKeyRef.current = null;
+                        runCoachAnalysis(selectedDate, selectedStock, replayData.executed_trade.trade_id, true);
+                    }
+                }}
+            />}
 
 
             {/* -------------------------------- */}
