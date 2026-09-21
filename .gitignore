@@ -35,6 +35,10 @@ IntradayTradeIndexAnalyser/frontend/node_modules/
 IntradayTradeIndexAnalyser/frontend/.next
 
 
+#To ignore the .env file which contains sensitive information like API keys
+IntradayTradeStockAnalyser/.env
+
+
 
 
 
