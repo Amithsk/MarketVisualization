@@ -22,7 +22,6 @@ from backend.services.replay_narrative_service import (
 from backend.utils.debug_logger import (
     log_count,
     log_info,
-    log_object,
     log_step,
     log_error,
 )
@@ -85,16 +84,6 @@ class ReplayService:
                 )
             )
 
-            log_object(
-                "Trade Metadata",
-                trade_data
-            )
-
-            log_object(
-                "Executed Trade",
-                executed_trade
-            )
-
             nifty_candles = (
                 NiftyService
                 .get_nifty_candles(
@@ -107,13 +96,6 @@ class ReplayService:
                 "NIFTY Candles",
                 nifty_candles
             )
-
-            if nifty_candles:
-
-                log_object(
-                    "First NIFTY Candle",
-                    vars(nifty_candles[0])
-                )
 
             stock_candles = (
                 ReplayStore
@@ -136,13 +118,6 @@ class ReplayService:
                 stock_candles
             )
 
-            if stock_candles:
-
-                log_object(
-                    "First ReplayStore Candle",
-                    vars(stock_candles[0])
-                )
-
             stock_candles = [
 
                 candle.to_dict()
@@ -154,13 +129,6 @@ class ReplayService:
                 "Serialized Stock Candles",
                 stock_candles
             )
-
-            if stock_candles:
-
-                log_object(
-                    "First Serialized Stock Candle",
-                    stock_candles[0]
-                )
 
             # =========================================
             # MARKET EVENT GENERATION
@@ -183,13 +151,6 @@ class ReplayService:
                 "Generated Market Events",
                 market_events
             )
-
-            if market_events:
-
-                log_object(
-                    "First Market Event",
-                    vars(market_events[0])
-                )
 
             serialized_market_events = [
 
@@ -246,13 +207,6 @@ class ReplayService:
                 serialized_market_events
             )
 
-            if serialized_market_events:
-
-                log_object(
-                    "First Serialized Market Event",
-                    serialized_market_events[0]
-                )
-
             # =========================================
             # MARKET CONTEXT
             # =========================================
@@ -265,22 +219,12 @@ class ReplayService:
                 )
             )
 
-            log_object(
-                "Market Context",
-                market_context
-            )
-
             market_behavior = (
                 ReplayRepository
                 .get_market_behavior(
                     db,
                     trade_date
                 )
-            )
-
-            log_object(
-                "Market Behavior",
-                market_behavior
             )
 
             market_open_behavior = (
@@ -291,22 +235,12 @@ class ReplayService:
                 )
             )
 
-            log_object(
-                "Market Open Behavior",
-                market_open_behavior
-            )
-
             execution_control = (
                 ReplayRepository
                 .get_execution_control(
                     db,
                     trade_date
                 )
-            )
-
-            log_object(
-                "Execution Control",
-                execution_control
             )
 
             stock_selection_context = (
@@ -318,11 +252,6 @@ class ReplayService:
                 )
             )
 
-            log_object(
-                "Stock Selection Context",
-                stock_selection_context
-            )
-
             trade_construction = (
                 ReplayRepository
                 .get_trade_construction(
@@ -330,11 +259,6 @@ class ReplayService:
                     trade_date,
                     stock
                 )
-            )
-
-            log_object(
-                "Trade Construction",
-                trade_construction
             )
 
             narrative_context = (
@@ -347,11 +271,6 @@ class ReplayService:
                     stock_selection_context=stock_selection_context,
                     trade_construction=trade_construction
                 )
-            )
-
-            log_object(
-                "Narrative Context",
-                narrative_context
             )
 
             serialized_nifty_candles = ReplayService._serialize_nifty_candles(
@@ -414,7 +333,7 @@ class ReplayService:
                 "explanation_context"
             ] = explanation_context
 
-            logger.info("Replay data prepared: trade_date=%s symbol=%s trade_id=%s stock_candles=%s market_candles=%s market_events=%s executed_trade_present=%s explanation_context_present=%s", trade_date, stock, replay_payload.get("executed_trade", {}).get("trade_id"), len(replay_payload["stock_candles"]), len(replay_payload["nifty_candles"]), len(replay_payload["market_events"]), bool(replay_payload.get("executed_trade")), bool(replay_payload.get("explanation_context")))
+            logger.info("Replay context ready: trade_date=%s symbol=%s stock_candle_count=%s market_candle_count=%s market_event_count=%s executed_trade_present=%s", trade_date, stock, len(replay_payload["stock_candles"]), len(replay_payload["nifty_candles"]), len(replay_payload["market_events"]), bool(replay_payload.get("executed_trade")))
 
             return replay_payload
 

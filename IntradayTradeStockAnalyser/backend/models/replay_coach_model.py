@@ -1,5 +1,10 @@
-"""Provider and application contracts for a Replay Coach review."""
-from decimal import Decimal, ROUND_HALF_UP
+"""Persisted and frontend-facing Replay Coach contracts.
+
+Provider transport types deliberately live in ``replay_coach_provider_model``.
+Keeping this model independent allows completed historical analyses to remain
+readable while the provider contract evolves safely.
+"""
+from decimal import Decimal
 from typing import Annotated, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
 
@@ -14,13 +19,10 @@ class ExecutedTradeAnalysis(CoachModel):
 class AlternativePlanBase(CoachModel):
     name: str; entry_condition: str; rating: int = Field(ge=1, le=10); why_good: List[str]; risks: List[str]; evidence_times: List[str]
 
-class ProviderTradeAlternativePlan(AlternativePlanBase):
-    """Only non-derived trade inputs are accepted from the provider."""
+class TradeAlternativePlan(AlternativePlanBase):
     plan_type: Literal["TRADE"]; side: Literal["BUY", "SELL"]
     entry_price: Decimal; stop_price: Decimal; target_price: Decimal
     numeric_explanation: str; invalidation_condition: str
-
-class TradeAlternativePlan(ProviderTradeAlternativePlan):
     risk: Decimal; reward: Decimal; risk_reward_ratio: Decimal
     @field_serializer("entry_price", "stop_price", "target_price", "risk", "reward", "risk_reward_ratio", when_used="json")
     def serialize_decimal(self, value: Decimal) -> float: return float(value)
@@ -83,35 +85,10 @@ class NoTradeAlternativePlan(AlternativePlanBase):
     @property
     def risk_reward_ratio(self) -> None: return None
 
-ProviderAlternativeTradePlan = Annotated[Union[ProviderTradeAlternativePlan, WaitAlternativePlan, NoTradeAlternativePlan], Field(discriminator="plan_type")]
 AlternativeTradePlan = Annotated[Union[TradeAlternativePlan, WaitAlternativePlan, NoTradeAlternativePlan], Field(discriminator="plan_type")]
 class KeyLearning(CoachModel): lesson: str; numeric_rule: str; example_using_this_trade: str
-class ProviderReplayCoachAnalysis(CoachModel):
-    executed_trade_analysis: ExecutedTradeAnalysis; alternative_trade_plans: List[ProviderAlternativeTradePlan]; key_learning: KeyLearning; limitations: List[str]
-    @model_validator(mode="after")
-    def require_learning_alternatives(self):
-        if not {"TRADE", "WAIT", "NO_TRADE"}.issubset({plan.plan_type for plan in self.alternative_trade_plans}): raise ValueError("Analysis must include TRADE, WAIT, and NO_TRADE alternatives.")
-        return self
-class ReplayCoachAnalysis(ProviderReplayCoachAnalysis): alternative_trade_plans: List[AlternativeTradePlan]
-
-MONEY_QUANTUM, RATIO_QUANTUM = Decimal("0.0001"), Decimal("0.0001")
-def to_application_analysis(provider: ProviderReplayCoachAnalysis) -> ReplayCoachAnalysis:
-    """Calculate arithmetic using Decimal and four-decimal ROUND_HALF_UP policy."""
-    plans = []
-    for plan in provider.alternative_trade_plans:
-        if not isinstance(plan, ProviderTradeAlternativePlan): plans.append(plan); continue
-        entry, stop, target = plan.entry_price, plan.stop_price, plan.target_price
-        if plan.side == "BUY":
-            if not stop < entry < target: raise ValueError("BUY TRADE requires stop_price < entry_price < target_price.")
-            risk, reward = entry - stop, target - entry
-        else:
-            if not target < entry < stop: raise ValueError("SELL TRADE requires target_price < entry_price < stop_price.")
-            risk, reward = stop - entry, entry - target
-        if risk <= 0: raise ValueError("TRADE plan risk must be positive.")
-        risk = risk.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP); reward = reward.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
-        ratio = (reward / risk).quantize(RATIO_QUANTUM, rounding=ROUND_HALF_UP)
-        # Replace provider prose so displayed arithmetic cannot contradict these values.
-        explanation = f"Backend-calculated risk {risk:f}, reward {reward:f}, R:R {ratio:f}."
-        values = plan.model_dump(); values["numeric_explanation"] = explanation
-        plans.append(TradeAlternativePlan(**values, risk=risk, reward=reward, risk_reward_ratio=ratio))
-    return ReplayCoachAnalysis(executed_trade_analysis=provider.executed_trade_analysis, alternative_trade_plans=plans, key_learning=provider.key_learning, limitations=provider.limitations)
+class ReplayCoachAnalysis(CoachModel):
+    executed_trade_analysis: ExecutedTradeAnalysis
+    alternative_trade_plans: List[AlternativeTradePlan]
+    key_learning: KeyLearning
+    limitations: List[str]

@@ -1,14 +1,17 @@
 """Isolated OpenAI client for the Replay Coach request path."""
 import json
 import os
+import logging
 from time import perf_counter
 from typing import Any, Dict
 
 import httpx
 from pydantic import ValidationError
 
-from backend.models.replay_coach_model import ProviderReplayCoachAnalysis, ReplayCoachAnalysis, to_application_analysis
-from backend.services.replay_coach_config import load_replay_coach_environment
+from backend.models.replay_coach_model import ReplayCoachAnalysis
+from backend.models.replay_coach_provider_model import ProviderReplayCoachTransport
+from backend.services.replay_coach_adapter import to_application_analysis
+from backend.services.replay_coach_config import load_replay_coach_environment, replay_coach_max_output_tokens
 
 
 class ReplayCoachError(Exception):
@@ -45,36 +48,37 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
-    PROMPT_VERSION = "replay_coach_prompt_v1"
-    COACH_SCHEMA_VERSION = "replay_coach_schema_v2"
+    PROMPT_VERSION = "replay_coach_prompt_v3"
+    COACH_SCHEMA_VERSION = "replay_coach_schema_v4"
 
     @classmethod
     def requested_model(cls) -> str:
         return os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
-    SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only the supplied executed trade and candle evidence. Use whole-session stock and NIFTY Futures candles, but distinguish information knowable at a decision time from later outcomes. Every important conclusion needs candle timestamps and numeric evidence. Never invent VWAP, indicators, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons must state their calculation. Alternative plans are retrospective learning examples, not guarantees. Return only JSON conforming to the supplied schema."""
+    SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only supplied trade and candle evidence. Distinguish decision-time information from later outcomes. Important conclusions need timestamps and numeric evidence. Never invent indicators, VWAP, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons state their calculation. Alternatives are learning examples, not guarantees. Return exactly the keyed trade, wait, and no_trade objects required by the schema. The key is authoritative: do not emit plan_type. TRADE requires direction and prices; WAIT and NO_TRADE must not include them. Give each plan concise non-empty reason, trigger_condition, invalidation_condition, and a supplied candle evidence_time or null. Return only schema-conforming JSON."""
 
     @classmethod
-    def analyze(cls, context: Dict[str, Any]) -> tuple[ReplayCoachAnalysis, str, Dict[str, Any]]:
+    def request_kwargs(cls, model: str, input_text: str, max_output_tokens: int) -> Dict[str, Any]:
+        """Construct the exact SDK kwargs; callers must never log `input`."""
+        return {"model": model, "input": [{"role": "developer", "content": cls.SYSTEM_INSTRUCTIONS}, {"role": "user", "content": input_text}], "text": {"format": {"type": "json_schema", "name": cls.SCHEMA_NAME, "strict": True, "schema": cls._strict_schema()}}, "max_output_tokens": max_output_tokens}
+
+    @classmethod
+    def analyze(cls, context: Dict[str, Any], request_id: str = "none", analysis_id=None, lifecycle=None) -> tuple[ReplayCoachAnalysis, str, Dict[str, Any]]:
         # Read at request time so a missing key affects only this endpoint.
         openai_api_key = os.getenv("OPENAI_API_KEY")
         openai_model = cls.requested_model()
         timeout_seconds = cls._timeout_seconds()
+        max_output_tokens, max_output_source = replay_coach_max_output_tokens()
         diagnostics = cls._request_diagnostics(context, openai_model, timeout_seconds)
-        print(f"OpenAI API key configured: {bool(openai_api_key)}")
-        print(f"Replay Coach model: {openai_model}")
         if not openai_api_key:
             raise ReplayCoachConfigurationError()
         started_at = perf_counter()
+        logger = logging.getLogger(__name__)
+        input_text = json.dumps(context, default=str)
+        logger.info("Replay Coach provider request configured: request_id=%s analysis_id=%s model=%s method=responses.create schema_name=%s max_output_tokens_source=%s requested_max_output_tokens=%s reasoning_effort=unset input_character_count=%s input_byte_count=%s timeout_seconds=%s stream=False structured_output=True", request_id, analysis_id if analysis_id is not None else "none", openai_model, cls.SCHEMA_NAME, max_output_source, max_output_tokens, len(input_text), len(input_text.encode("utf-8")), timeout_seconds)
         try:
             client = cls._client(openai_api_key, timeout_seconds)
-            response = client.responses.create(
-                model=openai_model,
-                input=[
-                    {"role": "developer", "content": cls.SYSTEM_INSTRUCTIONS},
-                    {"role": "user", "content": json.dumps(context, default=str)},
-                ],
-                text={"format": {"type": "json_schema", "name": cls.SCHEMA_NAME, "strict": True, "schema": cls._strict_schema()}},
-            )
+            if lifecycle is not None: lifecycle.provider_call_attempted = True; lifecycle.active_operation = "PROVIDER_CALL"
+            response = client.responses.create(**cls.request_kwargs(openai_model, input_text, max_output_tokens))
             duration_ms = round((perf_counter() - started_at) * 1000)
         except (TimeoutError, httpx.TimeoutException) as error:
             cls._log_timeout(diagnostics, started_at)
@@ -93,12 +97,19 @@ class ReplayCoachOpenAIService:
         # Usage is available on a received provider response even when its output
         # is incomplete, refused, malformed, or fails our Pydantic contract.
         response_id = getattr(response, "id", None)
+        if lifecycle is not None:
+            lifecycle.provider_response_received = True; lifecycle.provider_response_id = response_id
         usage = cls._usage_summary(response, duration_ms, context)
         status = getattr(response, "status", None) or "unknown"
         output_text = getattr(response, "output_text", None)
-        cls._log_response_received(response_id, status, output_text, usage)
+        logger.info("Replay Coach provider response received: request_id=%s analysis_id=%s provider_call_attempted=True provider_response_received=True response_id_present=%s status=%s model=%s requested_max_output_tokens=%s response_max_output_tokens=%s usage_object_present=%s input_tokens=%s output_tokens=%s total_tokens=%s cached_input_tokens=%s reasoning_tokens=%s output_text_present=%s output_text_length=%s output_item_count=%s incomplete_reason=%s provider_error_present=%s refusal_present=%s duration_ms=%s", request_id, analysis_id if analysis_id is not None else "none", bool(response_id), status, usage["model"], max_output_tokens, getattr(response, "max_output_tokens", None) if getattr(response, "max_output_tokens", None) is not None else "unavailable", getattr(response, "usage", None) is not None, *[usage[k] if usage[k] is not None else "unavailable" for k in ("input_tokens", "output_tokens", "total_tokens", "cached_input_tokens", "reasoning_tokens")], bool(output_text), len(output_text) if isinstance(output_text, str) else 0, len(getattr(response, "output", None) or []), cls._incomplete_reason(response) if status == "incomplete" else "none", bool(getattr(response, "error", None)), cls._has_refusal(response), duration_ms)
 
         if status != "completed":
+            output_items = getattr(response, "output", None) or []
+            types = [type(item).__name__ for item in output_items]
+            visible = usage["output_tokens"] - usage["reasoning_tokens"] if isinstance(usage["output_tokens"], int) and isinstance(usage["reasoning_tokens"], int) else "unavailable"
+            diagnostic = "USAGE_UNAVAILABLE" if getattr(response, "usage", None) is None else "MODEL_OR_CONTEXT_LIMIT_POSSIBLE"
+            logger.warning("Replay Coach provider response incomplete: request_id=%s analysis_id=%s response_id=%s incomplete_reason=%s requested_max_output_tokens=%s response_max_output_tokens=%s usage_object_present=%s input_tokens=%s output_tokens=%s reasoning_tokens=%s visible_output_tokens=%s output_text_length=%s output_item_count=%s output_item_types=%s provider_error_present=%s refusal_present=%s token_limit_diagnostic=%s", request_id, analysis_id if analysis_id is not None else "none", response_id, cls._incomplete_reason(response), max_output_tokens, getattr(response, "max_output_tokens", None) if getattr(response, "max_output_tokens", None) is not None else "unavailable", getattr(response, "usage", None) is not None, usage["input_tokens"] if usage["input_tokens"] is not None else "unavailable", usage["output_tokens"] if usage["output_tokens"] is not None else "unavailable", usage["reasoning_tokens"] if usage["reasoning_tokens"] is not None else "unavailable", visible, len(output_text) if isinstance(output_text, str) else 0, len(output_items), types, bool(getattr(response, "error", None)), cls._has_refusal(response), diagnostic)
             cls._log_response_diagnostic(
                 "PROVIDER_RESPONSE_INCOMPLETE",
                 response_id=response_id,
@@ -121,10 +132,10 @@ class ReplayCoachOpenAIService:
             cls._log_response_diagnostic("PROVIDER_JSON_INVALID", response_id=response_id, status=status)
             raise ReplayCoachResponseError() from error
         try:
-            provider_analysis = ProviderReplayCoachAnalysis.model_validate(decoded_output)
-            analysis = to_application_analysis(provider_analysis)
+            provider_analysis = ProviderReplayCoachTransport.model_validate(decoded_output)
+            analysis = to_application_analysis(provider_analysis, context)
         except (ValidationError, ValueError) as error:
-            cls._log_validation_error(response_id, status, error)
+            cls._log_validation_error(response_id, status, error, decoded_output)
             raise ReplayCoachResponseError() from error
         if not response_id:
             cls._log_response_diagnostic("PROVIDER_RESPONSE_INCOMPLETE", response_id=None, status=status, incomplete_reason="missing_response_id")
@@ -161,17 +172,7 @@ class ReplayCoachOpenAIService:
     @staticmethod
     def _log_timeout(diagnostics: Dict[str, Any], started_at: float) -> None:
         elapsed_ms = round((perf_counter() - started_at) * 1000)
-        print(
-            "Replay Coach provider exception: reason=PROVIDER_TIMEOUT "
-            f"trade_date={diagnostics['trade_date']} "
-            f"symbol={diagnostics['symbol']} "
-            f"model={diagnostics['model']} "
-            f"configured_timeout_seconds={diagnostics['timeout_seconds']} "
-            f"elapsed_ms={elapsed_ms} "
-            f"evidence_bytes={diagnostics['evidence_bytes']} "
-            f"approx_input_tokens={diagnostics['approx_input_tokens']} "
-            "provider_response_id_received=False"
-        )
+        logging.getLogger(__name__).error("Replay Coach provider exception: reason=PROVIDER_TIMEOUT model=%s elapsed_ms=%s", diagnostics["model"], elapsed_ms)
 
     @classmethod
     def _log_provider_exception(cls, error: Exception, model: str, started_at: float) -> None:
@@ -182,18 +183,7 @@ class ReplayCoachOpenAIService:
         error_code = getattr(error, "code", None)
         error_type = getattr(error, "type", None)
         elapsed_ms = round((perf_counter() - started_at) * 1000)
-        print(
-            "Replay Coach provider exception: "
-            f"reason={cls._provider_exception_reason(error, status_code)} "
-            f"exception_class={type(error).__name__} "
-            f"http_status={status_code} "
-            f"provider_error_code={error_code} "
-            f"provider_error_type={error_type} "
-            f"provider_message={cls._sanitize_provider_message(error)} "
-            f"provider_request_id={request_id} "
-            f"model={model} method=responses.create "
-            f"elapsed_ms={elapsed_ms} schema_name={cls.SCHEMA_NAME}"
-        )
+        logging.getLogger(__name__).error("Replay Coach provider exception: reason=%s exception_class=%s http_status=%s provider_error_code=%s provider_error_type=%s provider_request_id=%s model=%s elapsed_ms=%s", cls._provider_exception_reason(error, status_code), type(error).__name__, status_code, error_code, error_type, request_id, model, elapsed_ms)
 
     @staticmethod
     def _sanitize_provider_message(error: Exception) -> str:
@@ -228,25 +218,12 @@ class ReplayCoachOpenAIService:
         return False
 
     @staticmethod
-    def _log_response_received(response_id: Any, status: str, output_text: Any, usage: Dict[str, Any]) -> None:
-        length = len(output_text) if isinstance(output_text, str) else 0
-        print(
-            "Replay Coach provider response received: "
-            f"provider_response_id_present={bool(response_id)} "
-            f"status={status} output_text_length={length} "
-            f"model={usage['model']} input_tokens={usage['input_tokens']} "
-            f"output_tokens={usage['output_tokens']} total_tokens={usage['total_tokens']} "
-            f"cached_input_tokens={usage['cached_input_tokens']} "
-            f"reasoning_tokens={usage['reasoning_tokens']}"
-        )
-
-    @staticmethod
     def _log_response_diagnostic(reason: str, **fields: Any) -> None:
         values = " ".join(f"{name}={value}" for name, value in fields.items())
-        print(f"Replay Coach response diagnostic: reason={reason} {values}".rstrip())
+        logging.getLogger(__name__).warning("Replay Coach validation failure: reason=%s %s", reason, values)
 
     @classmethod
-    def _log_validation_error(cls, response_id: Any, status: str, error: ValidationError) -> None:
+    def _log_validation_error(cls, response_id: Any, status: str, error: ValidationError, output: Any) -> None:
         sanitized_errors = [
             {"path": ".".join(str(part) for part in item["loc"]), "type": item["type"], "message": item["msg"]}
             for item in error.errors(include_url=False)
@@ -256,7 +233,13 @@ class ReplayCoachOpenAIService:
             response_id=response_id,
             status=status,
             errors=sanitized_errors,
+            **cls._plan_structure(output),
         )
+
+    @staticmethod
+    def _plan_structure(value: Any) -> Dict[str, Any]:
+        plans = value.get("alternative_trade_plans") if isinstance(value, dict) else None
+        return {"plan_keys": sorted(plans) if isinstance(plans, dict) else None, "plan_type": type(plans).__name__}
 
     @staticmethod
     def _usage_summary(response: Any, duration_ms: int, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -277,20 +260,7 @@ class ReplayCoachOpenAIService:
 
     @staticmethod
     def _log_usage(context: Dict[str, Any], response_id: str, usage: Dict[str, Any]) -> None:
-        print(
-            "Replay Coach baseline completed: "
-            f"trade_date={context.get('trade_date')} "
-            f"symbol={context.get('stock', {}).get('symbol')} "
-            f"provider_response_id={response_id} "
-            f"model={usage['model']} "
-            f"input_tokens={usage['input_tokens']} "
-            f"output_tokens={usage['output_tokens']} "
-            f"total_tokens={usage['total_tokens']} "
-            f"cached_input_tokens={usage['cached_input_tokens']} "
-            f"reasoning_tokens={usage['reasoning_tokens']} "
-            f"duration_ms={usage['duration_ms']} "
-            f"evidence_bytes={usage['evidence_bytes']}"
-        )
+        logging.getLogger(__name__).info("Replay Coach request completed: response_id=%s model=%s input_tokens=%s output_tokens=%s total_tokens=%s reasoning_tokens=%s duration_ms=%s", response_id, usage["model"], usage["input_tokens"], usage["output_tokens"], usage["total_tokens"], usage["reasoning_tokens"], usage["duration_ms"])
 
     @staticmethod
     def _is_rate_limit_error(error: Exception) -> bool:
@@ -314,7 +284,7 @@ class ReplayCoachOpenAIService:
     def _strict_schema():
         # The provider must not supply derived arithmetic.  The application
         # contract adds risk/reward/R:R only after deterministic calculation.
-        schema = ProviderReplayCoachAnalysis.model_json_schema()
+        schema = ProviderReplayCoachTransport.model_json_schema()
 
         def visit(value):
             if isinstance(value, dict):
@@ -335,4 +305,20 @@ class ReplayCoachOpenAIService:
                 for child in value: visit(child)
 
         visit(schema)
+        # Keep the provider-facing branch self-contained: OpenAI receives one
+        # fixed object, not references, unions, or an array it could duplicate.
+        scalar = lambda kind: {"type": kind}
+        nullable_time = {"anyOf": [scalar("string"), scalar("null")]}
+        common = {
+            "rating": {"type": "integer", "minimum": 1, "maximum": 10},
+            "reason": {"type": "string", "minLength": 1},
+            "trigger_condition": {"type": "string", "minLength": 1},
+            "invalidation_condition": {"type": "string", "minLength": 1},
+            "evidence_time": nullable_time,
+        }
+        def closed(properties):
+            return {"type": "object", "additionalProperties": False, "properties": properties, "required": list(properties)}
+        trade = closed({"direction": {"type": "string", "enum": ["LONG", "SHORT"]}, "entry": scalar("number"), "stop": scalar("number"), "target": scalar("number"), **common})
+        wait = closed(dict(common))
+        schema["properties"]["alternative_trade_plans"] = closed({"trade": trade, "wait": wait, "no_trade": closed(dict(common))})
         return schema

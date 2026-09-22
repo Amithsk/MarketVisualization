@@ -12,7 +12,6 @@ from backend.utils.debug_logger import (
     log_count,
     log_error,
     log_info,
-    log_object,
     log_step,
 )
 
@@ -167,13 +166,6 @@ class EventRepository:
                 "Prepared DB Payload",
                 values
             )
-
-            if values:
-
-                log_object(
-                    "First Event Payload",
-                    values[0]
-                )
 
             db.execute(
                 query,

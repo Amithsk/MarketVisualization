@@ -43,4 +43,5 @@ IntradayTradeStockAnalyser/.env
 
 
 
-    
+
+replay_coach_request_*.json

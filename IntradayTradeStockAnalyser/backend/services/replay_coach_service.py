@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 import logging
+from dataclasses import dataclass
+from time import perf_counter
 from typing import Any, Dict
 from uuid import uuid4
 
@@ -25,6 +27,15 @@ class ReplayCoachSessionStore:
         cls._sessions[session_id] = {"trade_date": trade_date, "stock": stock, "openai_response_id": response_id}
         return session_id
 
+@dataclass
+class ReplayCoachLifecycle:
+    request_id: str
+    analysis_id: int | None = None
+    provider_call_attempted: bool = False
+    provider_response_received: bool = False
+    provider_response_id: str | None = None
+    active_operation: str = "START"
+    started_at: float = 0.0
 
 class ReplayCoachService:
     STALE_PROCESSING_SECONDS = 180.0
@@ -45,7 +56,7 @@ class ReplayCoachService:
         }
 
     @classmethod
-    def start(cls, context: Dict[str, Any], db=None, repository=ReplayCoachRepository, session_factory=SessionLocal, request_id: str = "none") -> Dict[str, Any]:
+    def start(cls, context: Dict[str, Any], db=None, repository=ReplayCoachRepository, session_factory=SessionLocal, request_id: str = "none", lifecycle=None) -> Dict[str, Any]:
         # db=None retains the existing isolated service-test seam; production always supplies a session.
         if db is None:
             result = cls._generate(context)
@@ -55,7 +66,8 @@ class ReplayCoachService:
         identity = cls.identity(context)
         logger = logging.getLogger(__name__)
         prefix = identity["evidence_hash"][:12]
-        record, claimed = repository.claim(db, identity, cls._stale_processing_seconds())
+        record, claimed = repository.claim(db, identity, cls._stale_processing_seconds(), request_id=request_id)
+        if lifecycle is not None and record: lifecycle.analysis_id = record["id"]
         logger.info("Replay Coach record lookup: request_id=%s analysis_id=%s record_found=%s status=%s safe_error_code=%s lease_expired=not_applicable result_matches_current_identity=%s", request_id, record.get("id") if record else None, bool(record), record.get("status") if record else "none", record.get("safe_error_code") if record else None, bool(record))
         if record and record["status"] == "COMPLETED":
             logger.info("Replay Coach decision: request_id=%s analysis_id=%s action=REUSE_COMPLETED reason=IDENTITY_MATCH provider_will_be_called=False", request_id, record["id"])
@@ -79,7 +91,7 @@ class ReplayCoachService:
         if close:
             close()
         try:
-            result = cls._generate(context)
+            result = cls._generate(context, request_id=request_id, analysis_id=record["id"], lifecycle=lifecycle)
             cls._persist(repository, session_factory, "complete", record["id"], result.pop("_persisted_analysis"), result["openai_response_id"], result.pop("_usage"))
             print(f"Replay Coach record completed: analysis_id={record['id']} evidence_hash_prefix={prefix}")
             result.update({"result_source": "generated", "reused": False, "analysis_id": record["id"], "model": result.get("model")})
@@ -120,8 +132,8 @@ class ReplayCoachService:
               f"transaction_state=rolled_back rollback_succeeded={rollback_succeeded} fresh_session=True")
 
     @classmethod
-    def _generate(cls, context: Dict[str, Any]) -> Dict[str, Any]:
-        analysis, response_id, _usage = ReplayCoachOpenAIService.analyze(context)
+    def _generate(cls, context: Dict[str, Any], request_id: str = "none", analysis_id=None, lifecycle=None) -> Dict[str, Any]:
+        analysis, response_id, _usage = ReplayCoachOpenAIService.analyze(context, request_id=request_id, analysis_id=analysis_id, lifecycle=lifecycle)
         return cls._result(context, analysis, response_id, _usage, "generated") | {
             "_usage": _usage,
             "_persisted_analysis": analysis.model_dump(mode="json", exclude_computed_fields=True),
