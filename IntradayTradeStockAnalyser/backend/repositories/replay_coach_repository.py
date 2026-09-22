@@ -50,7 +50,7 @@ class ReplayCoachRepository:
 
     @staticmethod
     def complete(db: Session, analysis_id: int, analysis: Dict[str, Any], response_id: str, usage: Dict[str, Any]):
-        db.execute(text("""UPDATE replay_coach_analysis SET status='COMPLETED', actual_model=:actual_model,
+        result = db.execute(text("""UPDATE replay_coach_analysis SET status='COMPLETED', actual_model=:actual_model,
             openai_response_id=:provider_response_id, analysis_json=CAST(:analysis_json AS JSON),
             input_tokens=:input_tokens, output_tokens=:output_tokens, total_tokens=:total_tokens,
             cached_tokens=:cached_input_tokens, reasoning_tokens=:reasoning_tokens,
@@ -58,9 +58,14 @@ class ReplayCoachRepository:
             WHERE id=:id AND status='PROCESSING'"""), {"id": analysis_id, "actual_model": usage.get("model"), "provider_response_id": response_id,
             "analysis_json": json.dumps(analysis, separators=(",", ":")), **usage})
         db.commit()
+        if result.rowcount != 1:
+            raise RuntimeError("Replay Coach completion lost its PROCESSING claim.")
 
     @staticmethod
     def fail(db: Session, analysis_id: int, reason: str):
-        db.execute(text("""UPDATE replay_coach_analysis SET status='FAILED', failure_reason=:reason, updated_at=CURRENT_TIMESTAMP
-            WHERE id=:id AND status='PROCESSING'"""), {"id": analysis_id, "reason": reason[:64]})
+        result = db.execute(text("""UPDATE replay_coach_analysis SET status='FAILED', safe_error_code=:code,
+            failure_reason=:reason, updated_at=CURRENT_TIMESTAMP
+            WHERE id=:id AND status='PROCESSING'"""), {"id": analysis_id, "code": reason[:64], "reason": reason[:64]})
         db.commit()
+        if result.rowcount != 1:
+            raise RuntimeError("Replay Coach failure update lost its PROCESSING claim.")

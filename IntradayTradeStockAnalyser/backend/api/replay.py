@@ -1,4 +1,9 @@
 #IntradayTradeStockAnalyser/backend/api/replay.py
+import hashlib
+import json
+import logging
+from time import perf_counter
+from uuid import uuid4
 from fastapi import (
     APIRouter,
     Depends,
@@ -31,6 +36,7 @@ from backend.services.replay_coach_service import ReplayCoachService
 from backend.models.replay_model import ReplayStockFetchRequest
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/api/v1/replay/stock-candles/fetch")
@@ -160,10 +166,16 @@ async def get_replay_coach_context(trade_date: str, stock: str, db: Session = De
 @router.post("/api/v1/replay/coach/start")
 async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(get_db)):
     """Create one OpenAI-backed Coach review from validated Replay evidence."""
+    request_id, started = uuid4().hex[:12], perf_counter()
+    symbol = stock.strip().upper().removeprefix("NSE:")
+    logger.info("Replay Coach request started: request_id=%s method=POST path=/api/v1/replay/coach/start trade_date=%s symbol=%s", request_id, trade_date, symbol)
     try:
         replay_data = ReplayService.get_replay_data(db, trade_date, stock)
         coach_context = ReplayCoachContextService.build_context(replay_data, trade_date)
-        result = ReplayCoachService.start(coach_context, db)
+        canonical = json.dumps(coach_context, sort_keys=True, separators=(",", ":"), default=str)
+        logger.info("Replay Coach context ready: request_id=%s trade_id=%s stock_candles=%s market_candles=%s context_version=%s evidence_hash_prefix=%s evidence_bytes=%s warnings_count=%s", request_id, coach_context["executed_trade"]["trade_id"], len(coach_context["stock"]["candles"]), len(coach_context["market"]["candles"]), coach_context.get("context_version"), hashlib.sha256(canonical.encode()).hexdigest()[:12], len(canonical.encode()), len(coach_context.get("data_quality", {})))
+        result = ReplayCoachService.start(coach_context, db, request_id=request_id)
+        logger.info("Replay Coach request completed: request_id=%s analysis_id=%s http_status=200 public_error_code=none result_source=%s reused=%s provider_called=%s duration_ms=%s", request_id, result.get("analysis_id"), result.get("result_source", "generated"), result.get("reused", False), result.get("result_source") != "stored", round((perf_counter()-started)*1000))
         return JSONResponse(status_code=200, content={
             "status": "success", "trade_date": coach_context["trade_date"],
             "stock": coach_context["stock"]["symbol"], **result,
@@ -171,6 +183,7 @@ async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(
     except ReplayCoachContextValidationError as error:
         return JSONResponse(status_code=422, content={"status": "coach_context_invalid", "message": "Replay data cannot be used for Coach analysis.", "errors": error.errors})
     except ReplayCoachError as error:
+        logger.warning("Replay Coach request completed: request_id=%s analysis_id=none http_status=%s public_error_code=%s result_source=none reused=False provider_called=False duration_ms=%s", request_id, error.status_code, error.code, round((perf_counter()-started)*1000))
         return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": error.public_message})
     except ExecutedTradeNotFoundError:
         return JSONResponse(status_code=404, content={"status": "executed_trade_not_found", "message": f"No executed trade found for {stock.strip().upper().removeprefix('NSE:')} on {trade_date}."})
@@ -178,5 +191,6 @@ async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(
         return JSONResponse(status_code=409, content={"status": "multiple_executed_trades", "message": str(error), "trade_ids": error.trade_ids})
     except ReplayStockFetchError as error:
         return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": str(error)})
-    except Exception:
+    except Exception as error:
+        logger.error("Replay Coach request completed: request_id=%s analysis_id=none http_status=500 public_error_code=REPLAY_COACH_FAILED result_source=none reused=False provider_called=False duration_ms=%s exception_class=%s", request_id, round((perf_counter()-started)*1000), type(error).__name__)
         return JSONResponse(status_code=500, content={"status": "error", "error_code": "REPLAY_COACH_FAILED", "message": "Replay Coach analysis is unavailable."})

@@ -1,5 +1,6 @@
 #IntradayTradeStockAnalyser/backend/services/replay_service.py
 
+import logging
 from sqlalchemy.orm import Session
 
 from backend.repositories.replay_repository import (
@@ -33,6 +34,8 @@ from backend.services.market_event_service import (
 from backend.services.ai_explanation.explanation_engine import (
     ExplanationEngine
 )
+
+logger = logging.getLogger(__name__)
 from backend.services.replay_stock_fetch_service import ReplayStockFetchError
 
 
@@ -411,36 +414,7 @@ class ReplayService:
                 "explanation_context"
             ] = explanation_context
 
-            log_step(
-                "REPLAY PAYLOAD GENERATED"
-            )
-
-            log_info(
-                "Replay Payload Keys",
-                list(replay_payload.keys())
-            )
-
-            log_count(
-                "Replay Payload Stock Candles",
-                replay_payload["stock_candles"]
-            )
-
-            log_count(
-                "Replay Payload NIFTY Candles",
-                replay_payload["nifty_candles"]
-            )
-
-            log_count(
-                "Replay Payload Market Events",
-                replay_payload["market_events"]
-            )
-
-            log_object(
-                "Explanation Context",
-                replay_payload[
-                    "explanation_context"
-                ]
-            )
+            logger.info("Replay data prepared: trade_date=%s symbol=%s trade_id=%s stock_candles=%s market_candles=%s market_events=%s executed_trade_present=%s explanation_context_present=%s", trade_date, stock, replay_payload.get("executed_trade", {}).get("trade_id"), len(replay_payload["stock_candles"]), len(replay_payload["nifty_candles"]), len(replay_payload["market_events"]), bool(replay_payload.get("executed_trade")), bool(replay_payload.get("explanation_context")))
 
             return replay_payload
 

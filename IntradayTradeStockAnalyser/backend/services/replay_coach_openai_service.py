@@ -7,7 +7,7 @@ from typing import Any, Dict
 import httpx
 from pydantic import ValidationError
 
-from backend.models.replay_coach_model import ReplayCoachAnalysis
+from backend.models.replay_coach_model import ProviderReplayCoachAnalysis, ReplayCoachAnalysis, to_application_analysis
 from backend.services.replay_coach_config import load_replay_coach_environment
 
 
@@ -121,8 +121,9 @@ class ReplayCoachOpenAIService:
             cls._log_response_diagnostic("PROVIDER_JSON_INVALID", response_id=response_id, status=status)
             raise ReplayCoachResponseError() from error
         try:
-            analysis = ReplayCoachAnalysis.model_validate(decoded_output)
-        except ValidationError as error:
+            provider_analysis = ProviderReplayCoachAnalysis.model_validate(decoded_output)
+            analysis = to_application_analysis(provider_analysis)
+        except (ValidationError, ValueError) as error:
             cls._log_validation_error(response_id, status, error)
             raise ReplayCoachResponseError() from error
         if not response_id:
@@ -311,7 +312,9 @@ class ReplayCoachOpenAIService:
 
     @staticmethod
     def _strict_schema():
-        schema = ReplayCoachAnalysis.model_json_schema()
+        # The provider must not supply derived arithmetic.  The application
+        # contract adds risk/reward/R:R only after deterministic calculation.
+        schema = ProviderReplayCoachAnalysis.model_json_schema()
 
         def visit(value):
             if isinstance(value, dict):
