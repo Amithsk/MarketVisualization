@@ -14,6 +14,7 @@ from backend.services.replay_coach_openai_service import (
 )
 from backend.models.replay_coach_model import ReplayCoachAnalysis
 from backend.repositories.replay_coach_repository import ReplayCoachRepository
+from backend.services.replay_coach_response_presenter import ReplayCoachResponsePresenter
 from backend.utils.database import SessionLocal
 
 
@@ -143,7 +144,7 @@ class ReplayCoachService:
     def _result(cls, context: Dict[str, Any], analysis: ReplayCoachAnalysis, response_id: str, usage: Dict[str, Any], source: str, record=None) -> Dict[str, Any]:
         session_id = ReplayCoachSessionStore.create(context["trade_date"], context["stock"]["symbol"], response_id or "stored")
         try:
-            serialized_analysis = analysis.model_dump(mode="json")
+            serialized_analysis = ReplayCoachResponsePresenter.present(analysis)
         except Exception as error:
             print(f"Replay Coach response diagnostic: reason=RESPONSE_SERIALIZATION_FAILED error_type={type(error).__name__}")
             raise ReplayCoachResponseError() from error
