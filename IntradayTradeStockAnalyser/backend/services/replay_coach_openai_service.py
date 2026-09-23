@@ -48,13 +48,17 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
-    PROMPT_VERSION = "replay_coach_prompt_v3"
+    PROMPT_VERSION = "replay_coach_prompt_v4"
     COACH_SCHEMA_VERSION = "replay_coach_schema_v4"
 
     @classmethod
     def requested_model(cls) -> str:
         return os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
-    SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only supplied trade and candle evidence. Distinguish decision-time information from later outcomes. Important conclusions need timestamps and numeric evidence. Never invent indicators, VWAP, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons state their calculation. Alternatives are learning examples, not guarantees. Return exactly the keyed trade, wait, and no_trade objects required by the schema. The key is authoritative: do not emit plan_type. TRADE requires direction and prices; WAIT and NO_TRADE must not include them. Give each plan concise non-empty reason, trigger_condition, invalidation_condition, and a supplied candle evidence_time or null. Return only schema-conforming JSON."""
+    SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only supplied trade and candle evidence. Distinguish decision-time information from later outcomes. Important conclusions need timestamps and numeric evidence. Never invent indicators, VWAP, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons state their calculation. Alternatives are learning examples, not guarantees.
+
+For an EXECUTED trade_data.plan_status, trade_data is the original documented plan linked to executed_trade; executed_trade is the actual execution and result, not a duplicate of the plan. Use documented_plan as the deterministic calculation of that plan. If documented_plan.stop_present is true, the trade has a documented stop: never say the stop was missing or risk was undefined, and use documented_plan.risk and documented_plan.risk_reward_ratio. If documented_plan.target_price is non-null, use documented_plan.reward and documented_plan.risk_reward_ratio. LONG risk is planned entry minus planned stop and reward is planned target minus planned entry; SHORT risk is planned stop minus planned entry and reward is planned entry minus planned target. You may critique stop distance, stop placement, low R:R, or target placement, but never a missing stop when stop_present is true. Do not infer broker-order placement or a missing documented stop from order_id=null, no executed_trade.stop_price, or execution_source=TRADE_JOURNAL. Do not ask or attempt to recalculate the supplied documented_plan values.
+
+Each issue appears once, with its evidence beneath it. Each how_to_improve item must prescribe an action rather than repeat criticism; do not repeat a missing-stop statement across sections. Return exactly the keyed trade, wait, and no_trade objects required by the schema. The key is authoritative: do not emit plan_type. TRADE requires direction and prices; WAIT and NO_TRADE must not include them. Give each plan concise non-empty reason, trigger_condition, invalidation_condition, and a supplied candle evidence_time or null. Return only schema-conforming JSON."""
 
     @classmethod
     def request_kwargs(cls, model: str, input_text: str, max_output_tokens: int) -> Dict[str, Any]:

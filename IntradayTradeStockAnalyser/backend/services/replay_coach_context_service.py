@@ -19,7 +19,7 @@ class ReplayCoachContextValidationError(ValueError):
 class ReplayCoachContextService:
     """Transforms an assembled Replay response without fetching or mutating it."""
 
-    CONTEXT_VERSION = "replay_coach_v1"
+    CONTEXT_VERSION = "replay_coach_v2"
     INTERVAL_MINUTES = 5
 
     @classmethod
@@ -73,10 +73,15 @@ class ReplayCoachContextService:
             "entry_timestamp": cls._iso(entry_time), "entry_candle_time": cls._iso(entry_candle),
             "exit_timestamp": cls._iso(exit_time), "exit_candle_time": cls._iso(exit_candle),
         })
+        trade_data = cls._documented_trade_data(data.get("trade_data"))
         return {
             "context_version": cls.CONTEXT_VERSION, "trade_date": selected_date.isoformat(),
             "timezone": "Asia/Kolkata", "candle_interval_minutes": cls.INTERVAL_MINUTES,
             "executed_trade": executed_trade,
+            # Keep the original documented plan alongside its deterministic,
+            # Coach-only summary.  The public Replay response is untouched.
+            "trade_data": trade_data,
+            "documented_plan": cls._documented_plan(trade_data),
             "stock": {"symbol": str(trade["symbol"]).upper().removeprefix("NSE:"), "candle_count": len(stock), "candles": stock},
             "market": {"symbol": "NIFTY_FUTURES", "candle_count": len(market), "candles": market},
             "data_quality": {
@@ -88,6 +93,37 @@ class ReplayCoachContextService:
                 "stock_missing_timestamps": [cls._iso(value) for value in stock_report["missing"]],
                 "market_missing_timestamps": [cls._iso(value) for value in market_report["missing"]], "warnings": warnings,
             },
+        }
+
+    @classmethod
+    def _documented_trade_data(cls, value: Any) -> Dict[str, Any]:
+        """Return only the existing plan fields relevant to execution review."""
+        value = value if isinstance(value, dict) else {}
+        return {
+            key: cls._json_value(value.get(key))
+            for key in ("planned_entry_price", "planned_stop_price", "planned_target_price", "position_type", "plan_status")
+        }
+
+    @classmethod
+    def _documented_plan(cls, trade_data: Dict[str, Any]) -> Dict[str, Any]:
+        entry = cls._finite_number(trade_data.get("planned_entry_price"))
+        stop = cls._finite_number(trade_data.get("planned_stop_price"))
+        target = cls._finite_number(trade_data.get("planned_target_price"))
+        position_type = trade_data.get("position_type")
+        position_type = str(position_type).upper() if position_type is not None else None
+        risk = reward = ratio = None
+        if entry is not None and stop is not None:
+            risk = entry - stop if position_type == "LONG" else stop - entry if position_type == "SHORT" else None
+        if entry is not None and target is not None:
+            reward = target - entry if position_type == "LONG" else entry - target if position_type == "SHORT" else None
+        risk = round(risk, 4) if risk is not None else None
+        reward = round(reward, 4) if reward is not None else None
+        if risk is not None and reward is not None and risk > 0:
+            ratio = round(reward / risk, 4)
+        return {
+            "entry_price": entry, "stop_price": stop, "target_price": target,
+            "position_type": position_type, "risk": risk, "reward": reward,
+            "risk_reward_ratio": ratio, "stop_present": stop is not None,
         }
 
     @classmethod
@@ -174,3 +210,13 @@ class ReplayCoachContextService:
             return isfinite(float(value))
         except (TypeError, ValueError):
             return False
+
+    @staticmethod
+    def _finite_number(value):
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            number = float(value)
+            return number if isfinite(number) else None
+        except (TypeError, ValueError):
+            return None
