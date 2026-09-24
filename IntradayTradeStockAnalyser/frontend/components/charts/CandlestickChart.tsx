@@ -152,11 +152,13 @@ function LiveCandleMetadata({
                     key={item.key}
                     className="
                         absolute
-                        text-[11px]
+                        text-[14px]
                         leading-none
                         whitespace-nowrap
-                        text-white
+                        text-slate-950
                         text-center
+                        font-black
+                        tracking-tight
                     "
                     style={{
                         left: `${item.x}px`,
@@ -171,41 +173,11 @@ function LiveCandleMetadata({
                             top: `${item.highY - 11 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
+                            textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
                         }}
                     >
                         {Number(item.high).toFixed(1)}
                     </div>
-
-                    {showStockCandleDetails && (
-                        <div
-                            className="absolute"
-                            style={{
-                                top: `${item.bodyCenterY - 10}px`,
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                            }}
-                        >
-                            <div
-                                className="
-                                    min-w-10
-                                    text-center
-                                    font-medium
-                                "
-                            >
-                                {item.range.toFixed(1)}
-                            </div>
-
-                            <div
-                                className="
-                                    mx-auto
-                                    mt-1
-                                    h-0.5
-                                    w-5
-                                    bg-white
-                                "
-                            />
-                        </div>
-                    )}
 
                     <div
                         className="absolute"
@@ -213,18 +185,35 @@ function LiveCandleMetadata({
                             top: `${item.lowY + Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 4), 12)}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
+                            textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
                         }}
                     >
                         {Number(item.low).toFixed(1)}
                     </div>
 
+                    {showStockCandleDetails && (
+                        <div
+                            className="absolute"
+                            style={{
+                                top: `${item.bodyCenterY - 7}px`,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
+                            }}
+                        >
+                            {item.range.toFixed(1)}
+                        </div>
+                    )}
+
                     <div
                         className="
                             absolute
-                            font-medium
+                            font-black
                         "
                         style={{
-                            top: "calc(100% - 76px)",
+                            top: showStockCandleDetails
+                                ? "calc(100% - 82px)"
+                                : "calc(100% - 76px)",
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -245,8 +234,8 @@ function LiveCandleMetadata({
                             `}
                             style={{
                                 top: showStockCandleDetails
-                                    ? "calc(100% - 58px)"
-                                    : `calc(100% - ${76 - Math.min(Math.max(Math.abs(item.lowY - item.highY) * 0.15, 20), 26)}px)`,
+                                    ? "calc(100% - 60px)"
+                                    : "calc(100% - 54px)",
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
@@ -261,19 +250,18 @@ function LiveCandleMetadata({
 
                     {showStockCandleDetails && (
                         <div
-                            className="
-                                absolute
-                                text-gray-300
-                            "
+                            className="absolute"
                             style={{
                                 top: "calc(100% - 38px)",
                                 left: "50%",
                                 transform: "translateX(-50%)",
+                                textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
                             }}
                         >
                             C {Number(item.close).toFixed(1)}
                         </div>
                     )}
+
                 </div>
             ))}
         </div>
@@ -360,6 +348,27 @@ export default function CandlestickChart({
         console.log("[EVENT HOVER STATE]", hoveredEvent);
     }, [hoveredEvent]);
 
+    // Keep the latest candle's OHLC summary visible before the user hovers
+    // the chart. Crosshair movement continues to replace it with the candle
+    // under the pointer.
+    useEffect(() => {
+        const latestCandle = candles[candles.length - 1];
+
+        if (!latestCandle) {
+            setHoverData(null);
+            return;
+        }
+
+        setHoverData({
+            time: latestCandle.time,
+            open: latestCandle.open,
+            high: latestCandle.high,
+            low: latestCandle.low,
+            close: latestCandle.close,
+            volume: latestCandle.volume,
+        });
+    }, [candles]);
+
     // -----------------------------------
     // Synchronized Hover Effect
     // -----------------------------------
@@ -401,13 +410,14 @@ export default function CandlestickChart({
             width: chartContainerRef.current.clientWidth,
             height: 400,
             layout: {
-                background: { type: ColorType.Solid, color: "#111827" },
-                textColor: "#D1D5DB",
-                fontSize: 11,
+                background: { type: ColorType.Solid, color: "#FFFFFF" },
+                textColor: "#111827",
+                fontSize: 13,
+                fontFamily: "Arial Black, Arial, sans-serif",
             },
             grid: {
-                vertLines: { color: "#1F2937" },
-                horzLines: { color: "#1F2937" },
+                vertLines: { color: "#E5E7EB" },
+                horzLines: { color: "#E5E7EB" },
             },
             crosshair: { mode: 1 },
             handleScroll: {
@@ -416,10 +426,10 @@ export default function CandlestickChart({
             handleScale: {
                 mouseWheel: mode !== "live",
             },
-            rightPriceScale: { borderColor: "#374151" },
+            rightPriceScale: { borderColor: "#CBD5E1" },
             timeScale: {
                 visible: showTimeline,
-                borderColor: "#374151",
+                borderColor: "#CBD5E1",
                 timeVisible: true,
                 secondsVisible: false,
                 rightOffset: mode === "live" ? 2 : 0,
@@ -492,6 +502,23 @@ export default function CandlestickChart({
         candleSeries.setData(formattedCandles);
         if (mode !== "live") {
             volumeSeries.setData(formattedVolume);
+        }
+
+        // Live candles need a deliberately tight price window. The default
+        // autoscale reserves more room than this compact view can afford,
+        // making nearby levels (for example 986 and 988) look almost equal.
+        if (mode === "live" && formattedCandles.length > 0) {
+            const lows = formattedCandles.map((candle) => Number(candle.low));
+            const highs = formattedCandles.map((candle) => Number(candle.high));
+            const lowestPrice = Math.min(...lows);
+            const highestPrice = Math.max(...highs);
+            const priceRange = highestPrice - lowestPrice;
+            const pricePadding = Math.max(priceRange * 0.06, 0.25);
+
+            candleSeries.priceScale().setVisibleRange({
+                from: lowestPrice - pricePadding,
+                to: highestPrice + pricePadding,
+            });
         }
         // -----------------------------------
         // Replay Auto Follow
@@ -1111,10 +1138,12 @@ export default function CandlestickChart({
         };
     }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans, executedTrade]);
 
+    const summaryData = hoverData ?? candles[candles.length - 1];
+
     return (
         <div className="relative w-full h-full">
             <div className="text-sm font-semibold mb-2 text-gray-300">{title}</div>
-            {hoverData && (
+            {summaryData && (
                 <div className="w-full overflow-x-auto">
                     <div
                         className="
@@ -1137,27 +1166,27 @@ export default function CandlestickChart({
 
                         <div>
                             O:
-                            <span className="ml-1 text-green-400">{hoverData.open}</span>
+                            <span className="ml-1 text-green-400">{summaryData.open}</span>
                         </div>
 
                         <div>
                             H:
-                            <span className="ml-1 text-green-400">{hoverData.high}</span>
+                            <span className="ml-1 text-green-400">{summaryData.high}</span>
                         </div>
 
                         <div>
                             L:
-                            <span className="ml-1 text-red-400">{hoverData.low}</span>
+                            <span className="ml-1 text-red-400">{summaryData.low}</span>
                         </div>
 
                         <div>
                             C:
-                            <span className="ml-1 text-white">{hoverData.close}</span>
+                            <span className="ml-1 text-white">{summaryData.close}</span>
                         </div>
 
                         <div>
                             Vol:
-                            <span className="ml-1 text-cyan-400">{hoverData.volume}</span>
+                            <span className="ml-1 text-cyan-400">{summaryData.volume}</span>
                         </div>
                     </div>
                 </div>
