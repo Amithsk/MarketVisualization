@@ -31,7 +31,7 @@ class ReplayCoachContextServiceTests(unittest.TestCase):
         self.assertEqual(context["stock"]["candle_count"], 3)
         self.assertEqual(payload, original)
         self.assertNotIn("market_events", context)
-        self.assertNotIn("trade_data", context)
+        self.assertIn("trade_data", context)
         self.assertEqual(context["executed_trade"]["entry_candle_time"], "2026-09-11T09:15:00+05:30")
         self.assertEqual(context["executed_trade"]["exit_candle_time"], "2026-09-11T09:25:00+05:30")
 
