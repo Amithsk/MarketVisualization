@@ -5,8 +5,7 @@ import logging
 from typing import Any, Dict
 
 from backend.models.replay_coach_model import (
-    NoTradeAlternativePlan, ReplayCoachAnalysis, TradeAlternativePlan,
-    WaitAlternativePlan,
+    FullSessionPlan, ReplayCoachAnalysis,
 )
 from backend.models.replay_coach_provider_model import ProviderReplayCoachTransport
 
@@ -50,28 +49,59 @@ def _evidence_times(value: str | None, allowed_times: set[str]) -> list[str]:
 def to_application_analysis(provider: ProviderReplayCoachTransport, context: Dict[str, Any]) -> ReplayCoachAnalysis:
     """Validate evidence references and derive all trade arithmetic locally."""
     allowed_times = _allowed_evidence_times(context)
-    plans = []
-    for plan_type, plan in (("TRADE", provider.alternative_trade_plans.trade), ("WAIT", provider.alternative_trade_plans.wait), ("NO_TRADE", provider.alternative_trade_plans.no_trade)):
-        reason = _meaningful(plan.reason, "reason")
-        trigger = _meaningful(plan.trigger_condition, "trigger_condition")
-        invalidation = _meaningful(plan.invalidation_condition, "invalidation_condition")
-        evidence_times = _evidence_times(plan.evidence_time, allowed_times)
-        common = dict(entry_condition=trigger, rating=plan.rating, why_good=[reason], risks=[invalidation], evidence_times=evidence_times)
-        if plan_type == "TRADE":
-            entry, stop, target = (Decimal(str(plan.entry)), Decimal(str(plan.stop)), Decimal(str(plan.target)))
-            side = "BUY" if plan.direction == "LONG" else "SELL"
-            if side == "BUY":
-                valid, risk, reward = stop < entry < target, entry - stop, target - entry
-            else:
-                valid, risk, reward = target < entry < stop, stop - entry, entry - target
-            if not valid or risk <= 0 or reward <= 0:
-                raise ValueError("TRADE prices must define positive risk and reward for its direction.")
-            risk = risk.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
-            reward = reward.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
-            ratio = (reward / risk).quantize(RATIO_QUANTUM, rounding=ROUND_HALF_UP)
-            plans.append(TradeAlternativePlan(name="Alternative Trade", plan_type="TRADE", side=side, entry_price=entry, stop_price=stop, target_price=target, numeric_explanation=f"Backend-calculated risk {risk:f}, reward {reward:f}, R:R {ratio:f}.", invalidation_condition=invalidation, risk=risk, reward=reward, risk_reward_ratio=ratio, **common))
-        elif plan_type == "WAIT":
-            plans.append(WaitAlternativePlan(name="Wait for Confirmation", plan_type="WAIT", confirmation_price=None, confirmation_zone=None, candle_time_condition=trigger, numeric_explanation=reason, immediate_execution_rejection=invalidation, **common))
-        else:
-            plans.append(NoTradeAlternativePlan(name="No Trade", plan_type="NO_TRADE", numeric_reasons=[reason], invalidating_market_stock_conditions=[invalidation], reconsideration_condition=None, **common))
-    return ReplayCoachAnalysis(executed_trade_analysis=provider.executed_trade_analysis, alternative_trade_plans=plans, key_learning=provider.key_learning, limitations=provider.limitations)
+    plan = provider.best_full_session_plan
+    decision_times = [_required_evidence_time(value, allowed_times, "decision_evidence_times") for value in plan.decision_evidence_times]
+    outcome_times = [_required_evidence_time(value, allowed_times, "outcome_evidence_times") for value in plan.outcome_evidence_times]
+    decision_time = _required_evidence_time(plan.decision_time, allowed_times, "decision_time")
+    if decision_time and any(value > decision_time for value in decision_times): raise ValueError("decision_evidence_times cannot be after decision_time.")
+    if plan.decision == "TAKE":
+        entry, stop, target = float(plan.entry_price), float(plan.stop_price), float(plan.target_price)
+        valid = stop < entry < target if plan.direction == "LONG" else target < entry < stop if plan.direction == "SHORT" else False
+        if not valid: raise ValueError("TAKE prices must have valid direction ordering.")
+        risk, reward = (entry - stop, target - entry) if plan.direction == "LONG" else (stop - entry, entry - target)
+        ratio = round(reward / risk, 4)
+        status = "MEETS_RULE" if ratio >= 4 else "BELOW_RULE"
+    else:
+        entry = stop = target = risk = reward = ratio = None; status = "NOT_APPLICABLE"
+    application_values = plan.model_dump()
+    application_values.update({"decision_time": decision_time, "decision_evidence_times": decision_times, "outcome_evidence_times": outcome_times, "entry_price": entry, "stop_price": stop, "target_price": target, "risk": risk, "reward": reward, "reward_to_risk": ratio, "ratio_status": status})
+    application_plan = FullSessionPlan(**application_values)
+    return ReplayCoachAnalysis(executed_trade_analysis=provider.executed_trade_analysis, best_full_session_plan=application_plan, key_learning=provider.key_learning, limitations=provider.limitations)
+
+
+def _required_evidence_time(value: str, allowed_times: set[str], field: str) -> str:
+    if not isinstance(value, str): raise ValueError(f"{field} must contain supplied candle timestamps.")
+    # The provider is instructed to use canonical timestamps, but can return the
+    # display clock format.  Resolve HH:mm only when it identifies one supplied
+    # candle exactly; this remains evidence validation, not a guessed timestamp.
+    if len(value) == 5 and value[2] == ":":
+        matches = [time for time in allowed_times if time[11:16] == value]
+        if len(matches) == 1:
+            return matches[0]
+        raise ValueError(f"{field} HH:mm must identify exactly one supplied candle timestamp.")
+    try: parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error: raise ValueError(f"{field} contains an invalid timestamp.") from error
+    # Some structured responses retain the supplied date and clock but omit the
+    # offset.  Resolve that representation only to an exact candle on that
+    # date and clock; it is not treated as an arbitrary local-time conversion.
+    if parsed.tzinfo is None:
+        matches = []
+        for allowed in allowed_times:
+            try:
+                candidate = datetime.fromisoformat(allowed)
+                if candidate.date() == parsed.date() and candidate.time().replace(tzinfo=None) == parsed.time():
+                    matches.append(allowed)
+            except ValueError:
+                continue
+        if len(matches) == 1:
+            return matches[0]
+        raise ValueError(f"{field} timestamp without timezone must identify exactly one supplied candle.")
+    # Preserve the supplied canonical timestamp, while accepting an equivalent
+    # instant represented with a different ISO timezone offset.
+    for allowed in allowed_times:
+        try:
+            if datetime.fromisoformat(allowed) == parsed:
+                return allowed
+        except ValueError:
+            continue
+    raise ValueError(f"{field} must match a supplied stock or market candle timestamp.")

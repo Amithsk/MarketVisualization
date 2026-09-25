@@ -87,9 +87,16 @@ class NoTradeAlternativePlan(AlternativePlanBase):
 
 AlternativeTradePlan = Annotated[Union[TradeAlternativePlan, WaitAlternativePlan, NoTradeAlternativePlan], Field(discriminator="plan_type")]
 class KeyLearning(CoachModel): lesson: str; numeric_rule: str; example_using_this_trade: str
+class FullSessionPlan(CoachModel):
+    decision: Literal["TAKE", "WAIT", "NO_TRADE"]; trade_name: str; direction: Literal["LONG", "SHORT", "NEUTRAL"]; opportunity_score: int
+    score_explanation: str; market_story: str; setup_explanation: str; decision_time: Optional[str] = None; entry_trigger: str
+    entry_price: Optional[float] = None; entry_price_upper: Optional[float] = None; stop_price: Optional[float] = None; target_price: Optional[float] = None
+    risk: Optional[float] = None; reward: Optional[float] = None; reward_to_risk: Optional[float] = None; required_reward_to_risk: float = 4.0; ratio_status: str
+    invalidation_condition: str; volume_explanation: str; nifty_explanation: str; beginner_lesson: str
+    decision_evidence_times: List[str] = []; outcome_evidence_times: List[str] = []
 class ReplayCoachAnalysis(CoachModel):
     executed_trade_analysis: ExecutedTradeAnalysis
-    alternative_trade_plans: List[AlternativeTradePlan]
+    best_full_session_plan: Optional[FullSessionPlan] = None
     key_learning: KeyLearning
     limitations: List[str]
 
@@ -98,14 +105,6 @@ class CoachDisplayRow(CoachModel):
     explanation: str; graph_times: List[str]; status: str
 class CoachDisplaySection(CoachModel):
     title: str; decision: str; overall_rating: int; valid: bool; rows: List[CoachDisplayRow]
-class CoachPlanRow(CoachModel):
-    component: str; recommendation: str; explanation: str
-class CoachPlanDisplay(CoachModel):
-    title: str; decision: Literal["TAKE", "WAIT", "NO_TRADE"]; status_label: str; rows: List[CoachPlanRow]
-class CoachDecisionOption(CoachModel):
-    title: str; decision: Literal["TAKE", "WAIT", "NO_TRADE"]; status: str; rows: List[CoachPlanRow]
-class CoachChecklistRow(CoachModel):
-    check: str; current_value: str; required_value: str; status: str
 class ExecutedTradeVerdictRow(CoachModel):
     component: str; value: str; meaning: str
 class ExecutedTradeVerdict(CoachModel):
@@ -127,9 +126,7 @@ class CoachDisplay(CoachModel):
     trade_result: TradeResultDisplay
     decision_quality_score: DecisionQualityScore
     executed_trade_verdict: ExecutedTradeVerdict
-    my_best_trade_plan: CoachPlanDisplay
-    decision_options: List[CoachDecisionOption]
-    recommended_decision_checklist: List[CoachChecklistRow]
+    best_full_session_plan: Optional[FullSessionPlan] = None
     next_trade_focus: NextTradeFocus
     shared_graph_times: List[str] = []
     execution_times: dict[str, str] = {}

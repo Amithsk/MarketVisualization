@@ -48,8 +48,8 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
-    PROMPT_VERSION = "replay_coach_prompt_v7"
-    COACH_SCHEMA_VERSION = "replay_coach_schema_v5"
+    PROMPT_VERSION = "replay_coach_prompt_v10"
+    COACH_SCHEMA_VERSION = "replay_coach_schema_v7"
 
     @classmethod
     def requested_model(cls) -> str:
@@ -67,6 +67,8 @@ Each issue appears once, with its evidence beneath it. Each how_to_improve item 
     SYSTEM_INSTRUCTIONS += """
 
 The application supplies authoritative coaching_facts and deterministic market metrics. Interpret only supplied facts; never calculate scores, statuses, risk/reward, thresholds, levels, touch counts, or best decisions. Every observation must name the supplied number, its baseline, what it means for the planned direction, and what to inspect on the chart. Do not use generic phrases such as 'configured threshold', 'mandatory rules', 'conditions become measurable', 'price invalidates the setup', 'structural stop required', or 'wait for confirmation'. State an exact supplied value, or say 'Not established from the available pre-entry evidence.' Do not invent prices, levels, times, thresholds, or indicators. Do not use incomplete or after-entry candle values to justify the original entry. A profitable outcome does not prove the original decision was strong. Keep explanations to two short sentences and return no scores, ratings, or status badges."""
+
+    SYSTEM_INSTRUCTIONS += """ For best_full_session_plan, independently review the complete supplied stock and NIFTY sessions from their first to final candle. Do not evaluate or reuse the executed trade, documented plan, P&L, entry, stop, target, direction, or decision score when selecting this opportunity. Search VWAP rejection/reclaim, breakout/retest, support/resistance, opening-range, pullback and volume-supported momentum categories, and return exactly one strongest concrete historical TAKE plan: LONG or SHORT only, with a non-null decision time, entry, structural stop, target, invalidation and decision evidence. Do not return NEUTRAL, WAIT, NO_TRADE or Not applicable. Decision evidence must be completed at or before decision_time; later candles are outcome evidence only. Use exact supplied candle timestamps and evidence values. The 4:1 ratio evaluates the selected real plan; never alter prices to manufacture it."""
 
     @classmethod
     def request_kwargs(cls, model: str, input_text: str, max_output_tokens: int) -> Dict[str, Any]:
@@ -333,20 +335,4 @@ The application supplies authoritative coaching_facts and deterministic market m
                 for child in value: visit(child)
 
         visit(schema)
-        # Keep the provider-facing branch self-contained: OpenAI receives one
-        # fixed object, not references, unions, or an array it could duplicate.
-        scalar = lambda kind: {"type": kind}
-        nullable_time = {"anyOf": [scalar("string"), scalar("null")]}
-        common = {
-            "rating": {"type": "integer", "minimum": 1, "maximum": 10},
-            "reason": {"type": "string", "minLength": 1},
-            "trigger_condition": {"type": "string", "minLength": 1},
-            "invalidation_condition": {"type": "string", "minLength": 1},
-            "evidence_time": nullable_time,
-        }
-        def closed(properties):
-            return {"type": "object", "additionalProperties": False, "properties": properties, "required": list(properties)}
-        trade = closed({"direction": {"type": "string", "enum": ["LONG", "SHORT"]}, "entry": scalar("number"), "stop": scalar("number"), "target": scalar("number"), **common})
-        wait = closed(dict(common))
-        schema["properties"]["alternative_trade_plans"] = closed({"trade": trade, "wait": wait, "no_trade": closed(dict(common))})
         return schema

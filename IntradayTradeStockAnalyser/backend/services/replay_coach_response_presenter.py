@@ -5,7 +5,7 @@ import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from backend.models.replay_coach_model import CoachChecklistRow, CoachDecisionOption, CoachDisplay, CoachDisplayRow, CoachDisplaySection, CoachPlanDisplay, CoachPlanRow, ExecutedTradeVerdict, ExecutedTradeVerdictRow, ReplayCoachAnalysis
+from backend.models.replay_coach_model import CoachDisplay, CoachDisplayRow, CoachDisplaySection, ExecutedTradeVerdict, ExecutedTradeVerdictRow, ReplayCoachAnalysis
 from backend.services.replay_coach_scoring_service import ReplayCoachScoringService
 
 
@@ -73,8 +73,6 @@ class ReplayCoachResponsePresenter:
         wait = CoachDisplaySection(title="Wait for Confirmation", decision="WAIT", overall_rating=10-total if not take_valid else total, valid=True, rows=wait_rows)
         no_trade = CoachDisplaySection(title="No Trade", decision="NO_TRADE", overall_rating=10-total if not take_valid else max(0, 6-total), valid=True, rows=component_rows)
         best = wait if not take_valid else take
-        best_section, decision_options = cls._decision_presentations(context, economics, timing, stock, nifty, volume, structural_stop, ratio, required, take_valid)
-        checklist = cls._recommended_checklist(timing, stock, nifty, volume, structural_stop, ratio, required, context)
         pnl = trade.get("pnl_amount")
         profitable = isinstance(pnl, (int, float)) and pnl >= 0
         result = {
@@ -91,9 +89,7 @@ class ReplayCoachResponsePresenter:
             shared_graph_times=shared_times,
             execution_times={key: value for key, value in {"entry": trade.get("entry_timestamp"), "exit": trade.get("exit_timestamp")}.items() if value},
             executed_trade_verdict=executed,
-            my_best_trade_plan=best_section,
-            decision_options=decision_options,
-            recommended_decision_checklist=checklist,
+            best_full_session_plan=analysis.best_full_session_plan,
         ).model_dump(mode="json"))
 
     @staticmethod

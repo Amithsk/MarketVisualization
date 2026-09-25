@@ -157,18 +157,14 @@ class ReplayCoachService:
         decision_quality = ReplayCoachScoringService.score(context)
         if lifecycle is not None: lifecycle.active_operation = "COACH_PRESENTATION"
         coach_display = ReplayCoachResponsePresenter.coach_display(analysis, context, decision_quality)
-        try:
-            option_statuses = cls._decision_option_statuses(coach_display["decision_options"])
-        except (KeyError, TypeError, ValueError) as error:
-            print(f"Replay Coach response diagnostic: reason=PRESENTATION_OPTION_CONTRACT_INVALID error_type={type(error).__name__}")
-            raise ReplayCoachResponseError() from error
         result = {"coach_session_id": session_id, "openai_response_id": response_id, "analysis": serialized_analysis, "coach_display": coach_display, "model": usage.get("model") or ReplayCoachOpenAIService.requested_model()}
         logging.getLogger(__name__).info(
-            "Replay Coach presentation built: request_id=unavailable analysis_id=%s result_source=%s decision_score=%s best_decision=%s take_status=%s wait_status=%s no_trade_status=%s score_version=%s presentation_version=%s duration_ms=%s",
+            "Replay Coach presentation built: request_id=unavailable analysis_id=%s result_source=%s decision_score=%s full_session_decision=%s direction=%s opportunity_score=%s score_version=%s presentation_version=%s duration_ms=%s",
             record.get("id") if record else "none", source,
             coach_display["decision_quality_score"]["overall_score"],
-            coach_display["my_best_trade_plan"]["decision"],
-            option_statuses["TAKE"], option_statuses["WAIT"], option_statuses["NO_TRADE"],
+            (coach_display.get("best_full_session_plan") or {}).get("decision", "unavailable"),
+            (coach_display.get("best_full_session_plan") or {}).get("direction", "unavailable"),
+            (coach_display.get("best_full_session_plan") or {}).get("opportunity_score", "unavailable"),
             coach_display["decision_quality_score"]["score_version"],
             coach_display["presentation_version"],
             usage.get("duration_ms", "unavailable"),

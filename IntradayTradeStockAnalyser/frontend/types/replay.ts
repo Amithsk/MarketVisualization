@@ -432,10 +432,7 @@ export type CoachAnalysis = {
 };
 export type CoachDisplayRow = { component: string; value: string; rating: number; rating_max: number; explanation: string; graph_times: string[]; status: string };
 export type CoachDisplaySection = { title: string; decision: string; overall_rating: number; valid: boolean; rows: CoachDisplayRow[] };
-export type CoachPlanRow = { component: string; recommendation: string; explanation: string };
-export type CoachPlanDisplay = { title: string; decision: "TAKE" | "WAIT" | "NO_TRADE"; status_label: string; rows: CoachPlanRow[] };
-export type CoachDecisionOption = { title: string; decision: "TAKE" | "WAIT" | "NO_TRADE"; status: string; rows: CoachPlanRow[] };
-export type CoachChecklistRow = { check: string; current_value: string; required_value: string; status: string };
+export type FullSessionPlan = { decision: "TAKE" | "WAIT" | "NO_TRADE"; trade_name: string; direction: "LONG" | "SHORT" | "NEUTRAL"; opportunity_score: number; score_explanation: string; market_story: string; setup_explanation: string; decision_time: string | null; entry_trigger: string; entry_price: number | null; entry_price_upper: number | null; stop_price: number | null; target_price: number | null; risk: number | null; reward: number | null; reward_to_risk: number | null; required_reward_to_risk: number; ratio_status: string; invalidation_condition: string; volume_explanation: string; nifty_explanation: string; beginner_lesson: string; decision_evidence_times: string[]; outcome_evidence_times: string[] };
 export type ExecutedTradeVerdict = { title: string; outcome_status: string; plan_standard_status: string; rows: { component: string; value: string; meaning: string }[] };
 export type DecisionQualityComponent = { component: string; label: string; score: number; maximum_score: number; status: string; observed_value: string; baseline: string; calculation: string; beginner_explanation: string; improvement_condition: string; graph_times: string[] };
 export type CoachDisplay = {
@@ -445,8 +442,7 @@ export type CoachDisplay = {
     next_trade_focus: { component: string; current_score: number; target_score: number; message: string };
     shared_graph_times: string[];
     execution_times: { entry?: string; exit?: string };
-    executed_trade_verdict: ExecutedTradeVerdict; my_best_trade_plan: CoachPlanDisplay; decision_options: CoachDecisionOption[]; detailed_evidence_available: boolean;
-    recommended_decision_checklist: CoachChecklistRow[];
+    executed_trade_verdict: ExecutedTradeVerdict; best_full_session_plan?: FullSessionPlan | null; detailed_evidence_available: boolean;
 };
 
 export type ReplayCoachStartResponse = {

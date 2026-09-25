@@ -35,9 +35,30 @@ class ProviderAlternativeTradePlans(CoachModel):
     wait: ProviderWaitAlternativePlan
     no_trade: ProviderNoTradeAlternativePlan
 
+class ProviderBestFullSessionPlan(CoachModel):
+    decision: Literal["TAKE"]
+    trade_name: str = Field(min_length=1, max_length=120)
+    direction: Literal["LONG", "SHORT"]
+    opportunity_score: int = Field(ge=1, le=10)
+    score_explanation: str = Field(min_length=1, max_length=600)
+    market_story: str = Field(min_length=1, max_length=1200)
+    setup_explanation: str = Field(min_length=1, max_length=1200)
+    decision_time: str
+    entry_trigger: str = Field(min_length=1, max_length=600)
+    entry_price: float
+    entry_price_upper: Optional[float] = None
+    stop_price: float
+    target_price: float
+    invalidation_condition: str = Field(min_length=1, max_length=600)
+    volume_explanation: str = Field(min_length=1, max_length=800)
+    nifty_explanation: str = Field(min_length=1, max_length=800)
+    beginner_lesson: str = Field(min_length=1, max_length=800)
+    decision_evidence_times: list[str] = Field(default_factory=list, max_length=12)
+    outcome_evidence_times: list[str] = Field(default_factory=list, max_length=12)
+
 
 class ProviderReplayCoachTransport(CoachModel):
     executed_trade_analysis: ExecutedTradeAnalysis
-    alternative_trade_plans: ProviderAlternativeTradePlans
+    best_full_session_plan: ProviderBestFullSessionPlan
     key_learning: KeyLearning
     limitations: list[str]
