@@ -80,7 +80,7 @@ class ReplayCoachService:
                 print(f"Replay Coach stored analysis invalid: analysis_id={record['id']} evidence_hash_prefix={prefix} error_type={type(error).__name__}")
                 raise ReplayCoachResponseError() from error
             print(f"Replay Coach stored analysis reused: trade_date={identity['trade_date']} symbol={identity['normalized_symbol']} analysis_id={record['id']} evidence_hash_prefix={prefix} provider_called=False")
-            return cls._result(context, analysis, record.get("provider_response_id"), {"model": record.get("actual_model")}, "stored", record)
+            return cls._result(context, analysis, record.get("provider_response_id"), {"model": record.get("actual_model")}, "stored", record, lifecycle=lifecycle)
         if not claimed:
             logger.warning("Replay Coach decision: request_id=%s analysis_id=%s action=SUPPRESS_CONCURRENT reason=PROCESSING_NOT_STALE provider_will_be_called=False", request_id, record.get("id") if record else None)
             print(f"Replay Coach concurrent request suppressed: trade_date={identity['trade_date']} symbol={identity['normalized_symbol']} evidence_hash_prefix={prefix}")
@@ -93,6 +93,7 @@ class ReplayCoachService:
             close()
         try:
             result = cls._generate(context, request_id=request_id, analysis_id=record["id"], lifecycle=lifecycle)
+            if lifecycle is not None: lifecycle.active_operation = "COMPLETION_PERSISTENCE"
             cls._persist(repository, session_factory, "complete", record["id"], result.pop("_persisted_analysis"), result["openai_response_id"], result.pop("_usage"))
             print(f"Replay Coach record completed: analysis_id={record['id']} evidence_hash_prefix={prefix}")
             result.update({"result_source": "generated", "reused": False, "analysis_id": record["id"], "model": result.get("model")})
@@ -135,23 +136,56 @@ class ReplayCoachService:
     @classmethod
     def _generate(cls, context: Dict[str, Any], request_id: str = "none", analysis_id=None, lifecycle=None) -> Dict[str, Any]:
         analysis, response_id, _usage = ReplayCoachOpenAIService.analyze(context, request_id=request_id, analysis_id=analysis_id, lifecycle=lifecycle)
-        return cls._result(context, analysis, response_id, _usage, "generated") | {
+        return cls._result(context, analysis, response_id, _usage, "generated", lifecycle=lifecycle) | {
             "_usage": _usage,
             "_persisted_analysis": analysis.model_dump(mode="json", exclude_computed_fields=True),
         }
 
     @classmethod
-    def _result(cls, context: Dict[str, Any], analysis: ReplayCoachAnalysis, response_id: str, usage: Dict[str, Any], source: str, record=None) -> Dict[str, Any]:
+    def _result(cls, context: Dict[str, Any], analysis: ReplayCoachAnalysis, response_id: str, usage: Dict[str, Any], source: str, record=None, lifecycle=None) -> Dict[str, Any]:
         session_id = ReplayCoachSessionStore.create(context["trade_date"], context["stock"]["symbol"], response_id or "stored")
         try:
+            if lifecycle is not None: lifecycle.active_operation = "API_SERIALIZATION"
             serialized_analysis = ReplayCoachResponsePresenter.present(analysis)
         except Exception as error:
             print(f"Replay Coach response diagnostic: reason=RESPONSE_SERIALIZATION_FAILED error_type={type(error).__name__}")
             raise ReplayCoachResponseError() from error
-        result = {"coach_session_id": session_id, "openai_response_id": response_id, "analysis": serialized_analysis}
+        if lifecycle is not None: lifecycle.active_operation = "COACH_SCORING"
+        # score() is called inside the presenter; keeping this explicit stage
+        # identifies a scoring failure before display construction.
+        from backend.services.replay_coach_scoring_service import ReplayCoachScoringService
+        decision_quality = ReplayCoachScoringService.score(context)
+        if lifecycle is not None: lifecycle.active_operation = "COACH_PRESENTATION"
+        coach_display = ReplayCoachResponsePresenter.coach_display(analysis, context, decision_quality)
+        try:
+            option_statuses = cls._decision_option_statuses(coach_display["decision_options"])
+        except (KeyError, TypeError, ValueError) as error:
+            print(f"Replay Coach response diagnostic: reason=PRESENTATION_OPTION_CONTRACT_INVALID error_type={type(error).__name__}")
+            raise ReplayCoachResponseError() from error
+        result = {"coach_session_id": session_id, "openai_response_id": response_id, "analysis": serialized_analysis, "coach_display": coach_display, "model": usage.get("model") or ReplayCoachOpenAIService.requested_model()}
+        logging.getLogger(__name__).info(
+            "Replay Coach presentation built: request_id=unavailable analysis_id=%s result_source=%s decision_score=%s best_decision=%s take_status=%s wait_status=%s no_trade_status=%s score_version=%s presentation_version=%s duration_ms=%s",
+            record.get("id") if record else "none", source,
+            coach_display["decision_quality_score"]["overall_score"],
+            coach_display["my_best_trade_plan"]["decision"],
+            option_statuses["TAKE"], option_statuses["WAIT"], option_statuses["NO_TRADE"],
+            coach_display["decision_quality_score"]["score_version"],
+            coach_display["presentation_version"],
+            usage.get("duration_ms", "unavailable"),
+        )
         if record is not None:
-            result.update({"result_source": source, "reused": source == "stored", "analysis_id": record["id"], "generated_at": str(record.get("completed_at")), "model": usage.get("model")})
+            result.update({"result_source": source, "reused": source == "stored", "analysis_id": record["id"], "generated_at": str(record.get("completed_at")), "model": usage.get("model") or record.get("requested_model") or ReplayCoachOpenAIService.requested_model()})
         return result
+
+    @staticmethod
+    def _decision_option_statuses(decision_options: list[dict[str, Any]]) -> dict[str, str]:
+        """Validate the serialized presentation contract without relying on option order."""
+        statuses = {option["decision"]: option["status"] for option in decision_options}
+        required = {"TAKE", "WAIT", "NO_TRADE"}
+        missing = required.difference(statuses)
+        if missing:
+            raise ValueError(f"missing decision option(s): {', '.join(sorted(missing))}")
+        return {decision: statuses[decision] for decision in required}
 
     @classmethod
     def _stale_processing_seconds(cls) -> float:

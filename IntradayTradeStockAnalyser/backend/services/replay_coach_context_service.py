@@ -5,6 +5,7 @@ from decimal import Decimal
 from math import isfinite
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
+from backend.services.replay_coach_decision_context import ReplayCoachDecisionContext
 
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -19,7 +20,7 @@ class ReplayCoachContextValidationError(ValueError):
 class ReplayCoachContextService:
     """Transforms an assembled Replay response without fetching or mutating it."""
 
-    CONTEXT_VERSION = "replay_coach_v2"
+    CONTEXT_VERSION = "replay_coach_v3"
     INTERVAL_MINUTES = 5
 
     @classmethod
@@ -74,6 +75,8 @@ class ReplayCoachContextService:
             "exit_timestamp": cls._iso(exit_time), "exit_candle_time": cls._iso(exit_candle),
         })
         trade_data = cls._documented_trade_data(data.get("trade_data"))
+        documented_plan = cls._documented_plan(trade_data)
+        decision_context = ReplayCoachDecisionContext.build(stock, market, cls._iso(entry_time), documented_plan)
         return {
             "context_version": cls.CONTEXT_VERSION, "trade_date": selected_date.isoformat(),
             "timezone": "Asia/Kolkata", "candle_interval_minutes": cls.INTERVAL_MINUTES,
@@ -81,7 +84,9 @@ class ReplayCoachContextService:
             # Keep the original documented plan alongside its deterministic,
             # Coach-only summary.  The public Replay response is untouched.
             "trade_data": trade_data,
-            "documented_plan": cls._documented_plan(trade_data),
+            "documented_plan": documented_plan,
+            "decision_context": decision_context,
+            "coaching_facts": cls._coaching_facts(executed_trade, documented_plan, decision_context),
             "stock": {"symbol": str(trade["symbol"]).upper().removeprefix("NSE:"), "candle_count": len(stock), "candles": stock},
             "market": {"symbol": "NIFTY_FUTURES", "candle_count": len(market), "candles": market},
             "data_quality": {
@@ -94,6 +99,16 @@ class ReplayCoachContextService:
                 "market_missing_timestamps": [cls._iso(value) for value in market_report["missing"]], "warnings": warnings,
             },
         }
+
+    @staticmethod
+    def _coaching_facts(trade: Dict[str, Any], plan: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any]:
+        """Compact deterministic facts for provider interpretation; raw evidence remains available."""
+        timing, stock, nifty = facts.get("decision_timing", {}), facts.get("stock_direction", {}), facts.get("nifty_direction", {})
+        volume, economics, levels = facts.get("stock_relative_volume", {}), facts.get("risk_economics", {}), facts.get("support_resistance", [])
+        support = next((level for level in levels if level.get("level_type") == "SUPPORT"), None)
+        threshold = 1.2
+        median = volume.get("previous_5_candle_median")
+        return {"decision_time": timing.get("entry_time"), "last_completed_stock_candle_time": timing.get("last_completed_stock_candle_time"), "containing_candle_start": timing.get("containing_candle_start"), "containing_candle_end": timing.get("containing_candle_end"), "containing_candle_complete_at_entry": timing.get("containing_candle_complete_at_entry"), "planned_direction": plan.get("position_type"), "entry_price": economics.get("entry"), "stop_price": economics.get("stop"), "target_price": economics.get("target"), "quantity": trade.get("quantity"), "risk_per_share": economics.get("risk"), "reward_per_share": economics.get("reward"), "reward_risk_ratio": economics.get("reward_risk_ratio"), "required_reward_risk_ratio": economics.get("required_ratio"), "stock_close": stock.get("last_completed_close"), "stock_vwap": stock.get("vwap"), "distance_from_vwap_points": stock.get("distance_from_vwap_points"), "distance_from_vwap_pct": stock.get("distance_from_vwap_pct"), "stock_direction": stock.get("classification"), "nifty_direction": nifty.get("classification"), "stock_completed_volume": volume.get("last_completed_volume"), "stock_previous_five_candle_median_volume": median, "stock_relative_volume": volume.get("ratio_vs_5_candle_median"), "required_relative_volume": threshold, "required_volume_value": round(median * threshold, 4) if isinstance(median, (int, float)) else None, "support": support, "structural_stop": {"status": "ESTABLISHED" if economics.get("take_valid") and support else "NOT_ESTABLISHED", "price": economics.get("stop") if economics.get("take_valid") and support else None, "reason": "No pre-entry level supports the calculated stop." if not (economics.get("take_valid") and support) else "Pre-entry structure supports the stop."}}
 
     @classmethod
     def _documented_trade_data(cls, value: Any) -> Dict[str, Any]:

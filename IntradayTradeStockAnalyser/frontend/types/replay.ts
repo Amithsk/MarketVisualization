@@ -430,6 +430,24 @@ export type CoachAnalysis = {
     key_learning: KeyLearning;
     limitations: string[];
 };
+export type CoachDisplayRow = { component: string; value: string; rating: number; rating_max: number; explanation: string; graph_times: string[]; status: string };
+export type CoachDisplaySection = { title: string; decision: string; overall_rating: number; valid: boolean; rows: CoachDisplayRow[] };
+export type CoachPlanRow = { component: string; recommendation: string; explanation: string };
+export type CoachPlanDisplay = { title: string; decision: "TAKE" | "WAIT" | "NO_TRADE"; status_label: string; rows: CoachPlanRow[] };
+export type CoachDecisionOption = { title: string; decision: "TAKE" | "WAIT" | "NO_TRADE"; status: string; rows: CoachPlanRow[] };
+export type CoachChecklistRow = { check: string; current_value: string; required_value: string; status: string };
+export type ExecutedTradeVerdict = { title: string; outcome_status: string; plan_standard_status: string; rows: { component: string; value: string; meaning: string }[] };
+export type DecisionQualityComponent = { component: string; label: string; score: number; maximum_score: number; status: string; observed_value: string; baseline: string; calculation: string; beginner_explanation: string; improvement_condition: string; graph_times: string[] };
+export type CoachDisplay = {
+    presentation_version: string;
+    trade_result: { status: string; pnl_amount: number | null; summary: string };
+    decision_quality_score: { score_version: string; overall_score: number; maximum_score: number; summary: string; components: DecisionQualityComponent[] };
+    next_trade_focus: { component: string; current_score: number; target_score: number; message: string };
+    shared_graph_times: string[];
+    execution_times: { entry?: string; exit?: string };
+    executed_trade_verdict: ExecutedTradeVerdict; my_best_trade_plan: CoachPlanDisplay; decision_options: CoachDecisionOption[]; detailed_evidence_available: boolean;
+    recommended_decision_checklist: CoachChecklistRow[];
+};
 
 export type ReplayCoachStartResponse = {
     status: "success";
@@ -438,4 +456,5 @@ export type ReplayCoachStartResponse = {
     trade_date: string;
     stock: string;
     analysis: CoachAnalysis;
+    coach_display: CoachDisplay;
 };

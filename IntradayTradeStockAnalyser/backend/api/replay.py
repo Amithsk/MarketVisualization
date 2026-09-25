@@ -2,6 +2,7 @@
 import hashlib
 import json
 import logging
+import re
 from time import perf_counter
 from uuid import uuid4
 from fastapi import (
@@ -193,5 +194,16 @@ async def start_replay_coach(trade_date: str, stock: str, db: Session = Depends(
     except ReplayStockFetchError as error:
         return JSONResponse(status_code=error.status_code, content={"status": "error", "error_code": error.code, "message": str(error)})
     except Exception as error:
+        message = " ".join(str(error).split())[:240]
+        match = re.search(r"'([^']+)' object has no attribute '([^']+)'", message)
+        object_type = match.group(1) if match else "unavailable"
+        attribute = match.group(2) if match else "unavailable"
+        logger.exception(
+            "Replay Coach internal failure: request_id=%s analysis_id=%s operation=%s exception_class=%s attribute=%s object_type=%s provider_called=%s provider_response_received=%s provider_response_id_present=%s duration_ms=%s message=%r",
+            request_id, lifecycle.analysis_id if lifecycle.analysis_id is not None else "none",
+            lifecycle.active_operation, type(error).__name__, attribute, object_type,
+            lifecycle.provider_call_attempted, lifecycle.provider_response_received,
+            bool(lifecycle.provider_response_id), round((perf_counter()-started)*1000), message,
+        )
         logger.error("Replay Coach request completed: request_id=%s analysis_id=%s http_status=500 public_error_code=REPLAY_COACH_FAILED result_source=none reused=False provider_called=%s provider_response_received=%s provider_response_id_present=%s duration_ms=%s exception_class=%s", request_id, lifecycle.analysis_id if lifecycle.analysis_id is not None else "none", lifecycle.provider_call_attempted, lifecycle.provider_response_received, bool(lifecycle.provider_response_id), round((perf_counter()-started)*1000), type(error).__name__)
         return JSONResponse(status_code=500, content={"status": "error", "error_code": "REPLAY_COACH_FAILED", "message": "Replay Coach analysis is unavailable."})

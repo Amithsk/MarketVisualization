@@ -192,6 +192,7 @@ export default function ReplayPage() {
 
     const [stockFetchError, setStockFetchError] = useState<string | null>(null);
     const [coachAnalysis, setCoachAnalysis] = useState<CoachAnalysis | null>(null);
+    const [coachDisplay, setCoachDisplay] = useState<import("../../types/replay").CoachDisplay | null>(null);
     const [coachSessionId, setCoachSessionId] = useState<string | null>(null);
     const [openaiResponseId, setOpenaiResponseId] = useState<string | null>(null);
     const [coachLoading, setCoachLoading] = useState(false);
@@ -212,6 +213,7 @@ export default function ReplayPage() {
         setDataReady(false);
         setStockFetchError(null);
         setCoachAnalysis(null);
+        setCoachDisplay(null);
         setCoachSessionId(null);
         setOpenaiResponseId(null);
         setCoachLoading(false);
@@ -233,6 +235,7 @@ export default function ReplayPage() {
             const response = await startReplayCoach(tradeDate, stock, controller.signal);
             if (!controller.signal.aborted && selectionRef.current.date === tradeDate && selectionRef.current.stock === stock && activeCoachKeyRef.current === key) {
                 setCoachAnalysis(response.analysis);
+                setCoachDisplay(response.coach_display);
                 setCoachSessionId(response.coach_session_id);
                 setOpenaiResponseId(response.openai_response_id);
                 completedCoachKeyRef.current = key;
@@ -655,6 +658,7 @@ export default function ReplayPage() {
 
             {replayData && <ReplayCoachPanel
                 analysis={coachAnalysis}
+                coachDisplay={coachDisplay}
                 loading={coachLoading}
                 error={coachError}
                 onRetry={() => {

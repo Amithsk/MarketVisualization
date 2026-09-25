@@ -48,17 +48,25 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
-    PROMPT_VERSION = "replay_coach_prompt_v4"
-    COACH_SCHEMA_VERSION = "replay_coach_schema_v4"
+    PROMPT_VERSION = "replay_coach_prompt_v7"
+    COACH_SCHEMA_VERSION = "replay_coach_schema_v5"
 
     @classmethod
     def requested_model(cls) -> str:
         return os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
-    SYSTEM_INSTRUCTIONS = """You are a rigorous intraday Trade Replay Coach. Analyze only supplied trade and candle evidence. Distinguish decision-time information from later outcomes. Important conclusions need timestamps and numeric evidence. Never invent indicators, VWAP, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons state their calculation. Alternatives are learning examples, not guarantees.
+    SYSTEM_INSTRUCTIONS = """You are an intraday trading coach helping a beginner understand a completed trade. Explain observations in simple language using exact supplied evidence. For each observation state the number, its supplied baseline, what the comparison means, whether it supports TAKE, WAIT, or NO TRADE, and the completed-candle time or price to inspect on the chart. Keep each explanation to one or two short sentences.
 
-For an EXECUTED trade_data.plan_status, trade_data is the original documented plan linked to executed_trade; executed_trade is the actual execution and result, not a duplicate of the plan. Use documented_plan as the deterministic calculation of that plan. If documented_plan.stop_present is true, the trade has a documented stop: never say the stop was missing or risk was undefined, and use documented_plan.risk and documented_plan.risk_reward_ratio. If documented_plan.target_price is non-null, use documented_plan.reward and documented_plan.risk_reward_ratio. LONG risk is planned entry minus planned stop and reward is planned target minus planned entry; SHORT risk is planned stop minus planned entry and reward is planned entry minus planned target. You may critique stop distance, stop placement, low R:R, or target placement, but never a missing stop when stop_present is true. Do not infer broker-order placement or a missing documented stop from order_id=null, no executed_trade.stop_price, or execution_source=TRADE_JOURNAL. Do not ask or attempt to recalculate the supplied documented_plan values.
+Do not calculate or provide ratings, component scores, overall scores, progress assessments, final classifications, or best-decision selection. The application owns all calculations, scoring, classifications, and final decisions. Legacy schema fields for risk, reward, and ratio are temporary compatibility fields: only echo supplied values and never treat them as your conclusion. Never invent evidence.
+
+Analyze only supplied trade and candle evidence. Distinguish decision-time information from later outcomes. Important conclusions need timestamps and numeric evidence. Never invent indicators, VWAP, support, or resistance. NIFTY VWAP is unavailable unless supplied. Volume comparisons state their calculation. Alternatives are learning examples, not guarantees.
+
+For an EXECUTED trade_data.plan_status, trade_data is the original documented plan linked to executed_trade; executed_trade is the actual execution and result, not a duplicate of the plan. decision_context contains deterministic no-lookahead facts: only its DECISION_TIME completed-candle facts may justify entry quality; post-entry evidence may describe outcome only. Use supplied documented_plan and decision_context values; do not calculate or invent financial, volume, VWAP, support, resistance, or scoring values. The minimum reward/risk ratio is 4.0 (reward divided by risk), so a TAKE is invalid below 4.0. If documented_plan.stop_present is true, the trade has a documented stop: never say the stop was missing or risk was undefined. You may critique stop distance, stop placement, low R:R, or target placement, but never a missing stop when stop_present is true. Do not infer broker-order placement or a missing documented stop from order_id=null, no executed_trade.stop_price, or execution_source=TRADE_JOURNAL.
 
 Each issue appears once, with its evidence beneath it. Each how_to_improve item must prescribe an action rather than repeat criticism; do not repeat a missing-stop statement across sections. Return exactly the keyed trade, wait, and no_trade objects required by the schema. The key is authoritative: do not emit plan_type. TRADE requires direction and prices; WAIT and NO_TRADE must not include them. Give each plan concise non-empty reason, trigger_condition, invalidation_condition, and a supplied candle evidence_time or null. Return only schema-conforming JSON."""
+
+    SYSTEM_INSTRUCTIONS += """
+
+The application supplies authoritative coaching_facts and deterministic market metrics. Interpret only supplied facts; never calculate scores, statuses, risk/reward, thresholds, levels, touch counts, or best decisions. Every observation must name the supplied number, its baseline, what it means for the planned direction, and what to inspect on the chart. Do not use generic phrases such as 'configured threshold', 'mandatory rules', 'conditions become measurable', 'price invalidates the setup', 'structural stop required', or 'wait for confirmation'. State an exact supplied value, or say 'Not established from the available pre-entry evidence.' Do not invent prices, levels, times, thresholds, or indicators. Do not use incomplete or after-entry candle values to justify the original entry. A profitable outcome does not prove the original decision was strong. Keep explanations to two short sentences and return no scores, ratings, or status badges."""
 
     @classmethod
     def request_kwargs(cls, model: str, input_text: str, max_output_tokens: int) -> Dict[str, Any]:
@@ -131,13 +139,26 @@ Each issue appears once, with its evidence beneath it. Each how_to_improve item 
             raise ReplayCoachResponseError()
 
         try:
+            if lifecycle is not None: lifecycle.active_operation = "PROVIDER_OUTPUT_EXTRACTION"
             decoded_output = json.loads(output_text)
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             cls._log_response_diagnostic("PROVIDER_JSON_INVALID", response_id=response_id, status=status)
             raise ReplayCoachResponseError() from error
         try:
+            if lifecycle is not None: lifecycle.active_operation = "PROVIDER_MODEL_VALIDATION"
             provider_analysis = ProviderReplayCoachTransport.model_validate(decoded_output)
+        except (ValidationError, ValueError) as error:
+            cls._log_validation_error(response_id, status, error, decoded_output)
+            raise ReplayCoachResponseError() from error
+        try:
+            if lifecycle is not None: lifecycle.active_operation = "PROVIDER_TO_APPLICATION_ADAPTER"
             analysis = to_application_analysis(provider_analysis, context)
+        except (ValidationError, ValueError) as error:
+            cls._log_validation_error(response_id, status, error, decoded_output)
+            raise ReplayCoachResponseError() from error
+        try:
+            if lifecycle is not None: lifecycle.active_operation = "CANONICAL_ANALYSIS_VALIDATION"
+            analysis = ReplayCoachAnalysis.model_validate(analysis)
         except (ValidationError, ValueError) as error:
             cls._log_validation_error(response_id, status, error, decoded_output)
             raise ReplayCoachResponseError() from error
@@ -227,11 +248,14 @@ Each issue appears once, with its evidence beneath it. Each how_to_improve item 
         logging.getLogger(__name__).warning("Replay Coach validation failure: reason=%s %s", reason, values)
 
     @classmethod
-    def _log_validation_error(cls, response_id: Any, status: str, error: ValidationError, output: Any) -> None:
-        sanitized_errors = [
-            {"path": ".".join(str(part) for part in item["loc"]), "type": item["type"], "message": item["msg"]}
-            for item in error.errors(include_url=False)
-        ]
+    def _log_validation_error(cls, response_id: Any, status: str, error: ValidationError | ValueError, output: Any) -> None:
+        if isinstance(error, ValidationError):
+            sanitized_errors = [
+                {"path": ".".join(str(part) for part in item["loc"]), "type": item["type"], "message": item["msg"]}
+                for item in error.errors(include_url=False)
+            ]
+        else:
+            sanitized_errors = [{"path": "adapter", "type": type(error).__name__, "message": str(error)}]
         cls._log_response_diagnostic(
             "COACH_SCHEMA_VALIDATION_FAILED",
             response_id=response_id,

@@ -92,3 +92,45 @@ class ReplayCoachAnalysis(CoachModel):
     alternative_trade_plans: List[AlternativeTradePlan]
     key_learning: KeyLearning
     limitations: List[str]
+
+class CoachDisplayRow(CoachModel):
+    component: str; value: str; rating: int; rating_max: int = 10
+    explanation: str; graph_times: List[str]; status: str
+class CoachDisplaySection(CoachModel):
+    title: str; decision: str; overall_rating: int; valid: bool; rows: List[CoachDisplayRow]
+class CoachPlanRow(CoachModel):
+    component: str; recommendation: str; explanation: str
+class CoachPlanDisplay(CoachModel):
+    title: str; decision: Literal["TAKE", "WAIT", "NO_TRADE"]; status_label: str; rows: List[CoachPlanRow]
+class CoachDecisionOption(CoachModel):
+    title: str; decision: Literal["TAKE", "WAIT", "NO_TRADE"]; status: str; rows: List[CoachPlanRow]
+class CoachChecklistRow(CoachModel):
+    check: str; current_value: str; required_value: str; status: str
+class ExecutedTradeVerdictRow(CoachModel):
+    component: str; value: str; meaning: str
+class ExecutedTradeVerdict(CoachModel):
+    title: str = "Executed Trade Verdict"; outcome_status: str; plan_standard_status: str
+    rows: List[ExecutedTradeVerdictRow]
+class DecisionQualityComponent(CoachModel):
+    component: str; label: str; score: int; maximum_score: int; status: str
+    observed_value: str; baseline: str; calculation: str; beginner_explanation: str
+    improvement_condition: str; graph_times: List[str]
+class DecisionQualityScore(CoachModel):
+    score_version: str; overall_score: int; maximum_score: int; summary: str
+    components: List[DecisionQualityComponent]
+class TradeResultDisplay(CoachModel):
+    status: str; pnl_amount: Optional[float] = None; summary: str
+class NextTradeFocus(CoachModel):
+    component: str; current_score: int; target_score: int; message: str
+class CoachDisplay(CoachModel):
+    presentation_version: str = "replay_coach_display_v2"
+    trade_result: TradeResultDisplay
+    decision_quality_score: DecisionQualityScore
+    executed_trade_verdict: ExecutedTradeVerdict
+    my_best_trade_plan: CoachPlanDisplay
+    decision_options: List[CoachDecisionOption]
+    recommended_decision_checklist: List[CoachChecklistRow]
+    next_trade_focus: NextTradeFocus
+    shared_graph_times: List[str] = []
+    execution_times: dict[str, str] = {}
+    detailed_evidence_available: bool = True

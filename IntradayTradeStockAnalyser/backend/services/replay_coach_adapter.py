@@ -1,6 +1,7 @@
 """Adapt provider-core Replay Coach output into the persisted application model."""
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+import logging
 from typing import Any, Dict
 
 from backend.models.replay_coach_model import (
@@ -31,15 +32,18 @@ def _allowed_evidence_times(context: Dict[str, Any]) -> set[str]:
 
 
 def _evidence_times(value: str | None, allowed_times: set[str]) -> list[str]:
+    """Provider evidence time is optional display metadata, never a validity gate."""
     if value is None:
         return []
     try:
         parsed = datetime.fromisoformat(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError("evidence_time must be an ISO-8601 candle timestamp.") from error
+    except (TypeError, ValueError):
+        logging.getLogger(__name__).info("Replay Coach optional evidence_time discarded: reason=INVALID_TIMESTAMP")
+        return []
     normalized = parsed.isoformat(timespec="seconds")
     if normalized not in allowed_times:
-        raise ValueError("evidence_time must match a supplied stock or market candle timestamp.")
+        logging.getLogger(__name__).info("Replay Coach optional evidence_time discarded: reason=UNSUPPORTED_TIMESTAMP")
+        return []
     return [normalized]
 
 
