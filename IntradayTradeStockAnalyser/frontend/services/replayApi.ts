@@ -122,3 +122,19 @@ export async function startReplayCoach(tradeDate: string, stock: string, signal?
     }
     return data as ReplayCoachStartResponse;
 }
+
+async function coachJson<T>(url: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`${BASE_URL}${url}`, { cache: "no-store", ...init });
+    const data = await response.json();
+    if (!response.ok || data.status !== "success") throw new Error(data.message || "Coach conversation is unavailable.");
+    return data as T;
+}
+export function getReplayCoachMessages(analysisId: number) {
+    return coachJson<import("../types/replay").ReplayCoachConversationResponse>(`/api/v1/replay/coach/analyses/${analysisId}/messages`);
+}
+export function askReplayCoachQuestion(analysisId: number, request: import("../types/replay").ReplayCoachQuestionRequest) {
+    return coachJson<import("../types/replay").ReplayCoachQuestionResponse>(`/api/v1/replay/coach/analyses/${analysisId}/messages`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(request) });
+}
+export function saveReplayCoachMessageFeedback(assistantMessageId: number, request: import("../types/replay").ReplayCoachFeedbackRequest) {
+    return coachJson<{status:"success";feedback:import("../types/replay").ReplayCoachFeedback}>(`/api/v1/replay/coach/messages/${assistantMessageId}/feedback`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(request) });
+}

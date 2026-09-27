@@ -194,6 +194,7 @@ export default function ReplayPage() {
     const [coachAnalysis, setCoachAnalysis] = useState<CoachAnalysis | null>(null);
     const [coachDisplay, setCoachDisplay] = useState<import("../../types/replay").CoachDisplay | null>(null);
     const [coachSessionId, setCoachSessionId] = useState<string | null>(null);
+    const [coachAnalysisId, setCoachAnalysisId] = useState<number | null>(null);
     const [openaiResponseId, setOpenaiResponseId] = useState<string | null>(null);
     const [coachLoading, setCoachLoading] = useState(false);
     const [coachError, setCoachError] = useState<string | null>(null);
@@ -215,6 +216,7 @@ export default function ReplayPage() {
         setCoachAnalysis(null);
         setCoachDisplay(null);
         setCoachSessionId(null);
+        setCoachAnalysisId(null);
         setOpenaiResponseId(null);
         setCoachLoading(false);
         setCoachError(null);
@@ -237,6 +239,7 @@ export default function ReplayPage() {
                 setCoachAnalysis(response.analysis);
                 setCoachDisplay(response.coach_display);
                 setCoachSessionId(response.coach_session_id);
+                setCoachAnalysisId(response.analysis_id);
                 setOpenaiResponseId(response.openai_response_id);
                 completedCoachKeyRef.current = key;
             }
@@ -659,8 +662,13 @@ export default function ReplayPage() {
             {replayData && <ReplayCoachPanel
                 analysis={coachAnalysis}
                 coachDisplay={coachDisplay}
+                analysisId={coachAnalysisId}
                 loading={coachLoading}
                 error={coachError}
+                onEvidenceTime={(time) => {
+                    const index = replayData.stock_candles.findIndex((candle) => String(candle.time) === time);
+                    if (index >= 0) setSelectedCandleIndex(index);
+                }}
                 onRetry={() => {
                     if (selectedDate && selectedStock && replayData.executed_trade?.trade_id !== undefined) {
                         completedCoachKeyRef.current = null;

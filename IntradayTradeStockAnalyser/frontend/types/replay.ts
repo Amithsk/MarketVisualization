@@ -426,7 +426,7 @@ export type KeyLearning = { lesson: string; numeric_rule: string; example_using_
 
 export type CoachAnalysis = {
     executed_trade_analysis: ExecutedTradeAnalysis;
-    alternative_trade_plans: AlternativeTradePlan[];
+    best_full_session_plan?: FullSessionPlan | null;
     key_learning: KeyLearning;
     limitations: string[];
 };
@@ -451,6 +451,19 @@ export type ReplayCoachStartResponse = {
     openai_response_id: string;
     trade_date: string;
     stock: string;
+    analysis_id: number;
     analysis: CoachAnalysis;
     coach_display: CoachDisplay;
 };
+
+export type ReplayCoachMessageRole = "USER" | "ASSISTANT";
+export type ReplayCoachMessageStatus = "PROCESSING" | "COMPLETED" | "FAILED";
+export type ReplayCoachFollowUpIntent = "EXECUTED_TRADE_EXPLANATION" | "FULL_SESSION_PLAN_EXPLANATION" | "PLAN_COMPARISON" | "CALCULATION_EXPLANATION" | "CHART_EVIDENCE" | "TRADING_CONCEPT" | "NEXT_TRADE_LESSON" | "CLARIFICATION_REQUIRED" | "GENERAL_FOLLOW_UP";
+export type ReplayCoachFeedbackRating = "HELPFUL" | "NEEDS_IMPROVEMENT";
+export type ReplayCoachFeedbackReason = "CLEAR_NUMERICAL_EXPLANATION" | "CLEAR_CHART_REFERENCE" | "GOOD_PLAN_COMPARISON" | "EASY_TO_UNDERSTAND" | "ACTIONABLE_LESSON" | "CORRECT_CALCULATION" | "DID_NOT_ANSWER" | "TOO_GENERIC" | "MISSING_PRICES_OR_CALCULATIONS" | "MISSING_CHART_TIMES" | "INCORRECT_FACT_OR_CALCULATION" | "CONFUSED_EXECUTED_AND_SUGGESTED_PLAN" | "USED_FUTURE_INFORMATION" | "DIFFICULT_TO_UNDERSTAND" | "TOO_MUCH_INFORMATION" | "OTHER";
+export type ReplayCoachFeedback = { id: number; assistant_message_id?: number; rating: ReplayCoachFeedbackRating; reason_code: ReplayCoachFeedbackReason | null; comment: string | null; created_at?: string; updated_at?: string };
+export type ReplayCoachMessage = { id:number; analysis_id:number; sequence_number:number; role:ReplayCoachMessageRole; content:string; status:ReplayCoachMessageStatus; reply_to_message_id:number|null; inferred_intent:ReplayCoachFollowUpIntent|null; evidence_times:string[]; safe_error_code:string|null; created_at:string; completed_at:string|null; feedback:ReplayCoachFeedback|null };
+export type ReplayCoachConversationResponse = { status:"success"; analysis_id:number; messages:ReplayCoachMessage[] };
+export type ReplayCoachQuestionRequest = { question:string; client_request_id:string };
+export type ReplayCoachQuestionResponse = { status:"success"; analysis_id:number; state:string; user_message:ReplayCoachMessage; assistant_message:ReplayCoachMessage|null; safe_error_code?:string };
+export type ReplayCoachFeedbackRequest = { rating:ReplayCoachFeedbackRating; reason_code:ReplayCoachFeedbackReason|null; comment:string|null };

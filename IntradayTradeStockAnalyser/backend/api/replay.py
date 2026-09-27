@@ -5,10 +5,7 @@ import logging
 import re
 from time import perf_counter
 from uuid import uuid4
-from fastapi import (
-    APIRouter,
-    Depends,
-)
+from fastapi import APIRouter, Depends
 
 from fastapi.responses import (
     JSONResponse
@@ -35,9 +32,41 @@ from backend.services.replay_coach_context_service import ReplayCoachContextServ
 from backend.services.replay_coach_openai_service import ReplayCoachError
 from backend.services.replay_coach_service import ReplayCoachService, ReplayCoachLifecycle
 from backend.models.replay_model import ReplayStockFetchRequest
+from backend.models.replay_coach_follow_up_model import FollowUpQuestionRequest, ReplayCoachFeedbackRequest
+from backend.repositories.replay_coach_message_repository import ReplayCoachMessageRepository
+from backend.repositories.replay_coach_feedback_repository import ReplayCoachFeedbackRepository
+from backend.services.replay_coach_follow_up_service import ReplayCoachFollowUpService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get("/api/v1/replay/coach/analyses/{analysis_id}/messages")
+async def get_replay_coach_messages(analysis_id: int, db: Session = Depends(get_db)):
+    if analysis_id <= 0: return JSONResponse(status_code=422, content={"status":"error","error_code":"INVALID_ANALYSIS_ID","message":"Invalid Coach analysis."})
+    if not ReplayCoachMessageRepository.load_completed_analysis_snapshot(db, analysis_id):
+        return JSONResponse(status_code=404, content={"status":"error","error_code":"COACH_ANALYSIS_NOT_FOUND","message":"Coach analysis is unavailable."})
+    return {"status":"success","analysis_id":analysis_id,"messages":[ReplayCoachFollowUpService.present(row) for row in ReplayCoachMessageRepository.list_messages_by_analysis_id(db,analysis_id)]}
+
+
+@router.post("/api/v1/replay/coach/analyses/{analysis_id}/messages")
+async def post_replay_coach_message(analysis_id: int, request: FollowUpQuestionRequest, db: Session = Depends(get_db)):
+    if analysis_id <= 0: return JSONResponse(status_code=422, content={"status":"error","error_code":"INVALID_ANALYSIS_ID","message":"Invalid Coach analysis."})
+    result=ReplayCoachFollowUpService.ask(db,analysis_id,request,uuid4().hex[:12])
+    if result["state"] == "ANALYSIS_UNAVAILABLE": return JSONResponse(status_code=404,content={"status":"error","error_code":"COACH_ANALYSIS_NOT_FOUND","message":"Coach analysis is unavailable."})
+    if result.get("state") == "FAILED" and result.get("new_attempt"):
+        return JSONResponse(status_code=502, content={"status":"error","analysis_id":analysis_id,**result})
+    return {"status":"success","analysis_id":analysis_id,**result}
+
+
+@router.put("/api/v1/replay/coach/messages/{assistant_message_id}/feedback")
+async def put_replay_coach_feedback(assistant_message_id: int, request: ReplayCoachFeedbackRequest, db: Session = Depends(get_db)):
+    if assistant_message_id <= 0: return JSONResponse(status_code=422,content={"status":"error","error_code":"INVALID_MESSAGE_ID","message":"Invalid Coach message."})
+    try:
+        row=ReplayCoachFeedbackRepository.upsert_for_assistant_message(db,assistant_message_id,request)
+    except ValueError:
+        return JSONResponse(status_code=422,content={"status":"error","error_code":"INVALID_FEEDBACK_TARGET","message":"Feedback requires a completed Coach answer."})
+    return {"status":"success","feedback":{"id":row["id"],"assistant_message_id":row["assistant_message_id"],"rating":row["rating"],"reason_code":row["reason_code"],"comment":row["comment"],"created_at":str(row["created_at"]),"updated_at":str(row["updated_at"])}}
 
 
 @router.post("/api/v1/replay/stock-candles/fetch")
