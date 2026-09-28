@@ -52,6 +52,8 @@ export default function useLivePolling(
 
     const [stock, setStock] =
         useState<Candle[]>([]);
+    const [niftyContext, setNiftyContext] = useState<any>(null);
+    const [stockContext, setStockContext] = useState<any>(null);
     const timerRef =
         useRef<number | null>(null);
 
@@ -102,6 +104,7 @@ export default function useLivePolling(
                             })
                         )
                     );
+                    setNiftyContext(nRes.market_context || null);
                 }
 
             } catch (e) {
@@ -144,6 +147,7 @@ export default function useLivePolling(
                                 })
                             )
                         );
+                        setStockContext(sRes.market_context || null);
                     }
 
                 } catch (e) {
@@ -243,5 +247,7 @@ export default function useLivePolling(
     return {
         nifty,
         stock,
+        niftyContext,
+        stockContext,
     };
 }

@@ -33,7 +33,7 @@ export default function LivePage() {
     const [tradePlans, setTradePlans] =
         useState<LiveTradePlan[]>([]);
 
-    const { nifty, stock } = useLivePolling(selectedStock);
+    const { nifty, stock, niftyContext, stockContext } = useLivePolling(selectedStock);
 
     // -----------------------------------
     // NIFTY candles
@@ -111,6 +111,8 @@ export default function LivePage() {
                 marketEvents={[]}
                 stockName={selectedStock}
                 mode="live"
+                niftyContext={niftyContext}
+                stockContext={stockContext}
                 tradePlans={tradePlans}
                 onStockCandleSelect={
                     setSelectedStockCandle

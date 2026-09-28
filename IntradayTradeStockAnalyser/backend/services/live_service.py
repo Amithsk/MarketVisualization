@@ -6,6 +6,7 @@ import httpx
 import socket
 from urllib.parse import urlparse
 import time
+from backend.services.market_context_engine import calculate_market_context
 
 BASE_URL = os.getenv("ZERODHA_MARKET_DATA_BASE_URL", "http://127.0.0.1:8001")
 
@@ -77,6 +78,7 @@ class LiveService:
                 "contract": payload.get("contract"),
                 "candles": candles,
                 "count": payload.get("count", len(candles)),
+                "market_context": calculate_market_context(candles, "NIFTY-FUT"),
             }
 
         except Exception as e:
@@ -142,6 +144,7 @@ class LiveService:
                 "interval": payload.get("interval"),
                 "candles": candles,
                 "count": payload.get("count", len(candles)),
+                "market_context": calculate_market_context(candles, payload.get("symbol") or symbol),
             }
 
         except Exception as e:

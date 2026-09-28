@@ -35,9 +35,29 @@ type Props = {
     // -----------------------------------
 
     mode?: "live" | "replay";
+    marketContext?: MarketContext | null;
+};
+
+type MarketContext = {
+    current_price?: number | null;
+    vwap?: { value?: number | null; distance?: number | null } | null;
+    orb?: { high?: number | null; low?: number | null } | null;
+    nearest_active_support?: { zone_high?: number | null } | null;
+    nearest_active_resistance?: { zone_low?: number | null } | null;
+};
+
+type MarketContextLevel = {
+    key: string;
+    label: string;
+    price: number;
+    color: string;
+    distance?: number | null;
+    anchorY: Coordinate;
+    labelY: number;
 };
 
 const EMPTY_MARKET_EVENTS: MarketEvent[] = [];
+const LIVE_CONTEXT_RAIL_WIDTH = 220;
 
 // -----------------------------------
 // LIVE CANDLE METADATA HELPERS
@@ -267,6 +287,18 @@ function LiveCandleMetadata({
         </div>
     );
 }
+
+function MarketContextLevelOverlay({ levels }: { levels: MarketContextLevel[] }) {
+    if (!levels.length) return null;
+
+    return <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+        {levels.map((level) => <div key={level.key} className="absolute right-0 border-t border-dashed" style={{ top: `${level.anchorY}px`, width: `${LIVE_CONTEXT_RAIL_WIDTH}px`, borderColor: level.color }}>
+            <div className="absolute right-2 rounded bg-white/95 px-1.5 py-0.5 text-[11px] font-bold leading-none shadow-sm" style={{ top: `${level.labelY - level.anchorY}px`, transform: "translateY(-50%)", color: level.color }}>
+                {level.label} {level.price.toFixed(1)}
+            </div>
+        </div>)}
+    </div>;
+}
 // -----------------------------------
 // IST SAFE TIMESTAMP
 // -----------------------------------
@@ -319,6 +351,7 @@ export default function CandlestickChart({
     tradePlans = [],
     executedTrade,
     mode = "replay",
+    marketContext,
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
     const marketEvents = providedMarketEvents ?? EMPTY_MARKET_EVENTS;
@@ -331,6 +364,7 @@ export default function CandlestickChart({
     const [liveMetadata, setLiveMetadata] = useState<LiveMetadataItem[]>([]);
     const [lifecycleSegments, setLifecycleSegments] =
         useState<LifecycleSegmentItem[]>([]);
+    const [marketContextLevels, setMarketContextLevels] = useState<MarketContextLevel[]>([]);
 
     // -----------------------------------
     // Hover State
@@ -426,13 +460,17 @@ export default function CandlestickChart({
             handleScale: {
                 mouseWheel: mode !== "live",
             },
-            rightPriceScale: { borderColor: "#CBD5E1" },
+            rightPriceScale: {
+                borderColor: "#CBD5E1",
+                visible: mode !== "live",
+            },
             timeScale: {
                 visible: showTimeline,
                 borderColor: "#CBD5E1",
                 timeVisible: true,
                 secondsVisible: false,
                 rightOffset: mode === "live" ? 2 : 0,
+            rightOffsetPixels: mode === "live" ? LIVE_CONTEXT_RAIL_WIDTH : undefined,
             },
         });
 
@@ -909,6 +947,37 @@ export default function CandlestickChart({
             setLiveMetadata(nextLiveMetadata);
         };
 
+        const updateMarketContextLevels = () => {
+            if (mode !== "live" || !marketContext) {
+                setMarketContextLevels([]);
+                return;
+            }
+
+            const availableLevels: MarketContextLevel[] = [
+                { key: "resistance", label: "Resistance", price: marketContext.nearest_active_resistance?.zone_low, color: "#DC2626" },
+                { key: "orb-high", label: "ORB High", price: marketContext.orb?.high, color: "#D97706" },
+                { key: "vwap", label: "VWAP", price: marketContext.vwap?.value, distance: marketContext.vwap?.distance, color: "#7C3AED" },
+                { key: "current", label: "CURRENT", price: marketContext.current_price, color: "#0891B2" },
+                { key: "orb-low", label: "ORB Low", price: marketContext.orb?.low, color: "#D97706" },
+                { key: "support", label: "Support", price: marketContext.nearest_active_support?.zone_high, color: "#16A34A" },
+            ].flatMap((level) => {
+                if (typeof level.price !== "number" || !Number.isFinite(level.price)) return [];
+                const anchorY = candleSeries.priceToCoordinate(level.price);
+                return anchorY === null ? [] : [{ ...level, price: level.price, anchorY, labelY: Number(anchorY) }];
+            }).sort((left, right) => left.anchorY - right.anchorY);
+
+            const minimumLabelGap = 22;
+            for (let index = 1; index < availableLevels.length; index += 1) {
+                availableLevels[index].labelY = Math.max(availableLevels[index].anchorY, availableLevels[index - 1].labelY + minimumLabelGap);
+            }
+            const maximumLabelY = (chartContainerRef.current?.clientHeight ?? 400) - 12;
+            const overflow = availableLevels.length
+                ? Math.max(0, availableLevels[availableLevels.length - 1].labelY - maximumLabelY)
+                : 0;
+            if (overflow) availableLevels.forEach((level) => { level.labelY -= overflow; });
+            setMarketContextLevels(availableLevels);
+        };
+
         const updateLifecycleSegments = () => {
             if (
                 mode !== "live" ||
@@ -1093,6 +1162,7 @@ export default function CandlestickChart({
         const updateLiveOverlays = () => {
             updateLiveMetadata();
             updateLifecycleSegments();
+            updateMarketContextLevels();
         };
 
         let metadataAnimationFrame =
@@ -1136,7 +1206,7 @@ export default function CandlestickChart({
 
             chart.remove();
         };
-    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans, executedTrade]);
+    }, [candles, marketEvents, mode, onCrosshairMove, synchronizedTimestamp, tradePlans, executedTrade, marketContext]);
 
     const summaryData = hoverData ?? candles[candles.length - 1];
 
@@ -1204,6 +1274,8 @@ export default function CandlestickChart({
                         showStockCandleDetails={isStockChart}
                     />
                 )}
+
+                {mode === "live" && <MarketContextLevelOverlay levels={marketContextLevels} />}
 
                 {mode === "live" && isStockChart && lifecycleSegments.length > 0 && (
                     <div

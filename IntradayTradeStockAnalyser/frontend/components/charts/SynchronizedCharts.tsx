@@ -57,6 +57,10 @@ type Props = {
     executedTrade?: ExecutedTrade;
 
     mode?: "live" | "replay";
+
+    niftyContext?: any;
+
+    stockContext?: any;
 };
 
 const LIVE_VIEWPORT_DURATION_MS = 2 * 60 * 60 * 1000;
@@ -210,6 +214,10 @@ export default function SynchronizedCharts({
     executedTrade,
 
     mode = "replay",
+
+    niftyContext,
+
+    stockContext,
 
 }: Props) {
 
@@ -480,6 +488,8 @@ export default function SynchronizedCharts({
 
                 mode={mode}
 
+                marketContext={niftyContext}
+
                 currentCandleIndex={
                     currentCandleIndex
                 }
@@ -518,6 +528,7 @@ export default function SynchronizedCharts({
                 }
                 executedTrade={executedTrade}
                 mode={mode}
+                marketContext={stockContext}
                 
                 title={
                     stockName
