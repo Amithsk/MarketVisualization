@@ -293,7 +293,7 @@ function MarketContextLevelOverlay({ levels }: { levels: MarketContextLevel[] })
 
     return <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
         {levels.map((level) => <div key={level.key} className="absolute right-0 border-t border-dashed" style={{ top: `${level.anchorY}px`, width: `${LIVE_CONTEXT_RAIL_WIDTH}px`, borderColor: level.color }}>
-            <div className="absolute right-2 rounded bg-white/95 px-1.5 py-0.5 text-[11px] font-bold leading-none shadow-sm" style={{ top: `${level.labelY - level.anchorY}px`, transform: "translateY(-50%)", color: level.color }}>
+            <div className="absolute right-2 rounded bg-white/95 px-1.5 py-0.5 text-[12px] font-sans font-bold leading-none shadow-sm" style={{ top: `${level.labelY - level.anchorY}px`, transform: "translateY(-50%)", color: level.color }}>
                 {level.label} {level.price.toFixed(1)}
             </div>
         </div>)}
