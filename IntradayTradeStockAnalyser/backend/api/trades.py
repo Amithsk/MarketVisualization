@@ -1,15 +1,48 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 from backend.services.trade_service import (
     TradeService
 )
 
 from  backend.utils.deps import get_db
+from backend.services.trade_plan_draft_service import TradePlanDraftError, TradePlanDraftService
 
 
 router = APIRouter()
+
+
+class DraftCandle(BaseModel):
+    time: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+class TradePlanDraftRequest(BaseModel):
+    direction: str
+    strategy: str
+    context_timestamp: str
+    stock_candles: list[DraftCandle] = Field(default_factory=list)
+    nifty_candles: list[DraftCandle] = Field(default_factory=list)
+    entry: str | None = None
+    stop_loss: str | None = None
+    target: str | None = None
+    invalidation: str | None = None
+    entry_confirmation: str | None = None
+
+
+@router.post("/api/v1/trades/plan-draft")
+async def create_trade_plan_draft(request: TradePlanDraftRequest):
+    """Build an editable, deterministic description from supplied completed evidence."""
+    try:
+        return {"status": "success", **TradePlanDraftService.build(request.model_dump())}
+    except TradePlanDraftError as error:
+        raise HTTPException(status_code=422, detail=str(error))
 
 
 @router.get("/api/v1/trades/dates")
