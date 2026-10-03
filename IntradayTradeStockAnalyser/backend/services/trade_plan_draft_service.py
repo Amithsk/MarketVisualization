@@ -44,7 +44,7 @@ class TradePlanDraftService:
             f"I'm considering a {'BUY' if direction == 'LONG' else 'SELL'} using {strategy or 'this setup'}: {setup}. "
             f"NIFTY is {nifty_observation}, while the stock is {stock_observation}{relative_observation}; "
             f"volume is {volume_observation}. "
-            f"I will enter only after {confirmation}, with a stop at {stop} and a target at {target} [target reason]; "
+            f"I will enter at {entry} only after {confirmation}, with a stop at {stop} and a target at {target} [target reason]; "
             f"the setup fails if {invalidation}."
         )
         return {"draft": description, "context_timestamp": decision_time.isoformat(timespec="seconds")}

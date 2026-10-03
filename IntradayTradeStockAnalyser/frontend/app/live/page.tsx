@@ -122,6 +122,8 @@ export default function LivePage() {
             <LiveTradePlanPanel
                 selectedCandle={selectedStockCandle}
                 stockName={selectedStock}
+                stockCandles={stockCandles}
+                niftyCandles={niftyCandles}
                 plans={tradePlans}
                 onPlansChange={setTradePlans}
             />
