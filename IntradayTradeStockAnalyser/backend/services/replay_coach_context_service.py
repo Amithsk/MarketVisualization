@@ -6,6 +6,7 @@ from math import isfinite
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 from backend.services.replay_coach_decision_context import ReplayCoachDecisionContext
+from backend.services.replay_coach_scoring_service import ReplayCoachScoringService
 
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -105,10 +106,21 @@ class ReplayCoachContextService:
         """Compact deterministic facts for provider interpretation; raw evidence remains available."""
         timing, stock, nifty = facts.get("decision_timing", {}), facts.get("stock_direction", {}), facts.get("nifty_direction", {})
         volume, economics, levels = facts.get("stock_relative_volume", {}), facts.get("risk_economics", {}), facts.get("support_resistance", [])
-        support = next((level for level in levels if level.get("level_type") == "SUPPORT"), None)
-        threshold = 1.2
+        side = plan.get("position_type")
+        level_type = "SUPPORT" if side == "LONG" else "RESISTANCE" if side == "SHORT" else None
+        structural_level = next((level for level in levels if level_type and level.get("level_type") == level_type and level.get("established_before_entry") and level.get("touch_count", 0) >= 2), None)
+        stop = economics.get("stop")
+        threshold = ReplayCoachScoringService.RELATIVE_VOLUME_STRONG
         median = volume.get("previous_5_candle_median")
-        return {"decision_time": timing.get("entry_time"), "last_completed_stock_candle_time": timing.get("last_completed_stock_candle_time"), "containing_candle_start": timing.get("containing_candle_start"), "containing_candle_end": timing.get("containing_candle_end"), "containing_candle_complete_at_entry": timing.get("containing_candle_complete_at_entry"), "planned_direction": plan.get("position_type"), "entry_price": economics.get("entry"), "stop_price": economics.get("stop"), "target_price": economics.get("target"), "quantity": trade.get("quantity"), "risk_per_share": economics.get("risk"), "reward_per_share": economics.get("reward"), "reward_risk_ratio": economics.get("reward_risk_ratio"), "required_reward_risk_ratio": economics.get("required_ratio"), "stock_close": stock.get("last_completed_close"), "stock_vwap": stock.get("vwap"), "distance_from_vwap_points": stock.get("distance_from_vwap_points"), "distance_from_vwap_pct": stock.get("distance_from_vwap_pct"), "stock_direction": stock.get("classification"), "nifty_direction": nifty.get("classification"), "stock_completed_volume": volume.get("last_completed_volume"), "stock_previous_five_candle_median_volume": median, "stock_relative_volume": volume.get("ratio_vs_5_candle_median"), "required_relative_volume": threshold, "required_volume_value": round(median * threshold, 4) if isinstance(median, (int, float)) else None, "support": support, "structural_stop": {"status": "ESTABLISHED" if economics.get("take_valid") and support else "NOT_ESTABLISHED", "price": economics.get("stop") if economics.get("take_valid") and support else None, "reason": "No pre-entry level supports the calculated stop." if not (economics.get("take_valid") and support) else "Pre-entry structure supports the stop."}}
+        if side not in ("LONG", "SHORT") or stop is None:
+            structural_stop = {"status": "NOT_ASSESSED", "price": stop, "level": None, "reason": "Cannot assess the stop because the documented direction or stop price is unavailable."}
+        elif structural_level is None:
+            structural_stop = {"status": "NOT_ESTABLISHED", "price": stop, "level": None, "reason": f"No {level_type.lower()} with at least two completed pre-entry touches was found; this does not prove the entered stop was unsuitable."}
+        else:
+            level_price = structural_level["level"]
+            beyond_level = stop <= level_price if side == "LONG" else stop >= level_price
+            structural_stop = {"status": "ESTABLISHED" if beyond_level else "NOT_ESTABLISHED", "price": stop, "level": level_price, "reason": f"The checked {level_type.lower()} was {level_price}; entered stop was {stop}. " + ("The stop is beyond that level." if beyond_level else "The stored evidence does not place the stop beyond that level; this is not proof that the stop was wrong.")}
+        return {"decision_time": timing.get("entry_time"), "last_completed_stock_candle_time": timing.get("last_completed_stock_candle_time"), "containing_candle_start": timing.get("containing_candle_start"), "containing_candle_end": timing.get("containing_candle_end"), "containing_candle_complete_at_entry": timing.get("containing_candle_complete_at_entry"), "planned_direction": plan.get("position_type"), "entry_price": economics.get("entry"), "stop_price": stop, "target_price": economics.get("target"), "quantity": trade.get("quantity"), "risk_per_share": economics.get("risk"), "reward_per_share": economics.get("reward"), "reward_risk_ratio": economics.get("reward_risk_ratio"), "required_reward_risk_ratio": economics.get("required_ratio"), "stock_close": stock.get("last_completed_close"), "stock_vwap": stock.get("vwap"), "distance_from_vwap_points": stock.get("distance_from_vwap_points"), "distance_from_vwap_pct": stock.get("distance_from_vwap_pct"), "stock_direction": stock.get("classification"), "nifty_direction": nifty.get("classification"), "stock_completed_volume": volume.get("last_completed_volume"), "stock_previous_five_candle_median_volume": median, "stock_relative_volume": volume.get("ratio_vs_5_candle_median"), "required_relative_volume": threshold, "required_volume_value": round(median * threshold, 4) if isinstance(median, (int, float)) else None, "relative_volume_requirement_source": "System scoring default", "support": structural_level, "structural_stop": structural_stop}
 
     @classmethod
     def _documented_trade_data(cls, value: Any) -> Dict[str, Any]:

@@ -83,8 +83,9 @@ class ReplayCoachScoringService:
         ratio = volume.get("ratio_vs_5_candle_median"); current = volume.get("last_completed_volume"); base = volume.get("previous_5_candle_median")
         score = 2 if isinstance(ratio, (int, float)) and ratio >= cls.RELATIVE_VOLUME_STRONG else 1 if isinstance(ratio, (int, float)) and ratio >= cls.RELATIVE_VOLUME_PARTIAL else 0
         calculation = "Baseline unavailable." if ratio is None or current is None or base is None else f"{current:,.0f} ÷ {base:,.0f} = {ratio:.2f}× ({(ratio - 1) * 100:+.0f}% versus normal)."
-        return cls._component("RELATIVE_VOLUME", "Stock relative-volume confirmation", score, f"Completed volume {current:,.0f}" if current is not None else "Volume unavailable", f"Previous five-candle median {base:,.0f}" if base is not None else "Baseline unavailable", calculation,
-            "Volume measures participation; it does not itself prove direction.", f"Look for at least {cls.RELATIVE_VOLUME_STRONG:.1f}× the stock's own five-candle median.", time)
+        assessment = "passed" if score == 2 else "was below the system scoring default" if ratio is not None else "could not be assessed"
+        return cls._component("RELATIVE_VOLUME", "Stock relative-volume confirmation", score, f"Completed volume {current:,.0f}" if current is not None else "Volume unavailable", f"System scoring default: {cls.RELATIVE_VOLUME_STRONG:.1f}× the previous five-candle median" if base is not None else "Baseline unavailable", calculation,
+            f"The observed volume {assessment}; volume measures participation and does not itself prove direction.", f"For the system's strongest score, use at least {cls.RELATIVE_VOLUME_STRONG:.1f}× the stock's own five-candle median.", time)
 
     @classmethod
     def _structure_component(cls, side, levels, economics, time):
@@ -93,10 +94,13 @@ class ReplayCoachScoringService:
         level = candidates[0] if candidates else None
         valid = bool(level and stop is not None and ((side == "LONG" and float(stop) <= float(level["level"])) or (side == "SHORT" and float(stop) >= float(level["level"]))))
         score = 2 if valid else 1 if level else 0
+        assessment = "passed" if valid else "could not be established from the available pre-entry evidence"
+        detail = (f"The checked {kind.lower()} was {cls._price(level.get('level'))}, with {level.get('touch_count')} completed touches; the entered stop was {cls._price(stop)}."
+                  if level else f"No {kind.lower()} with two completed pre-entry touches was available.")
         return cls._component("PRICE_STRUCTURE", "Price structure and structural stop", score,
             f"{kind.title()} {cls._price(level.get('level'))}" if level else "No established level", "At least two pre-entry touches and a structural stop",
-            f"Touch count: {level.get('touch_count')}" if level else "Not established from available pre-entry evidence.",
-            "The stop is tied to price structure." if valid else "A calculated stop alone is not evidence that the trade idea is wrong.",
+            detail,
+            f"The structural-stop check {assessment}. A calculated stop alone is not evidence that the trade idea is wrong.",
             "Identify a confirmed price level first, then place the stop beyond that level.", time)
 
     @classmethod

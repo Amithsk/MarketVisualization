@@ -18,7 +18,7 @@ ISO_TIMESTAMP = re.compile(
 
 
 class ReplayCoachResponsePresenter:
-    """Converts timestamps in response-only analysis content to IST HH:mm."""
+    """Converts timestamps in response-only analysis content to readable IST."""
 
     @classmethod
     def present(cls, analysis: ReplayCoachAnalysis) -> dict[str, Any]:
@@ -163,6 +163,7 @@ class ReplayCoachResponsePresenter:
     def _executed_trade_verdict(context: dict[str, Any], economics: dict[str, Any], required: float) -> ExecutedTradeVerdict:
         """Present factual execution economics separately from decision quality."""
         trade, plan = context.get("executed_trade", {}), context.get("documented_plan", {})
+        timing = context.get("decision_context", {}).get("decision_timing", {})
         position = (plan.get("position_type") or "").upper()
         side = "LONG" if position == "LONG" else "SHORT" if position == "SHORT" else ("LONG" if trade.get("side") == "BUY" else "SHORT")
         entry = economics.get("entry", trade.get("entry_price")); stop, target = economics.get("stop"), economics.get("target")
@@ -178,9 +179,16 @@ class ReplayCoachResponsePresenter:
         profitable = isinstance(pnl, (int, float)) and pnl >= 0
         plan_standard = "MEETS_REQUIRED_RR" if ratio is not None and ratio >= required else "BELOW_REQUIRED_RR"
         def money(value: Any) -> str: return "Unavailable" if value is None else f"₹{float(value):,.2f}"
+        entry_meaning = "Actual executed entry."
+        if timing.get("containing_candle_complete_at_entry") is False:
+            entry_meaning = (
+                f"Entry was during the still-forming candle from {timing.get('containing_candle_start')} "
+                f"to {timing.get('containing_candle_end')}. The stored strategy does not say whether this "
+                "candle had to confirm, so this is not an entry-rule failure."
+            )
         rows = [
             ExecutedTradeVerdictRow(component="Direction", value=f"{side} / {trade.get('side', 'Unknown')}", meaning="Expected the price to rise." if side == "LONG" else "Expected the price to fall."),
-            ExecutedTradeVerdictRow(component="Entry", value=f"{money(trade.get('entry_price'))} at {trade.get('entry_timestamp', 'Unavailable')}", meaning="Actual executed entry."),
+            ExecutedTradeVerdictRow(component="Entry", value=f"{money(trade.get('entry_price'))} at {trade.get('entry_timestamp', 'Unavailable')}", meaning=entry_meaning),
             ExecutedTradeVerdictRow(component="Stop", value=money(stop), meaning=f"{money(risk)} planned risk per share."),
             ExecutedTradeVerdictRow(component="Target", value=money(target), meaning=f"{money(reward)} planned reward per share."),
             ExecutedTradeVerdictRow(component="Planned risk", value=money(planned_risk), meaning="Planned risk per share × quantity."),
@@ -196,7 +204,8 @@ class ReplayCoachResponsePresenter:
         raw = match.group(0)
         try:
             parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
-            return parsed.astimezone(IST).strftime("%H:%M")
+            local = parsed.astimezone(IST)
+            return f"{local.day} {local.strftime('%b')}, {local.strftime('%I').lstrip('0')}:{local.strftime('%M %p')} IST"
         except ValueError:
             # A syntactically timestamp-like but invalid value is retained.
             return raw

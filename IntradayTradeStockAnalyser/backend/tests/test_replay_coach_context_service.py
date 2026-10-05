@@ -77,6 +77,21 @@ class ReplayCoachContextServiceTests(unittest.TestCase):
         self.assertTrue(context["data_quality"]["market_volume_available"])
         self.assertFalse(context["data_quality"]["market_vwap_available"])
 
+    def test_structural_stop_reports_missing_evidence_without_calling_stop_wrong(self):
+        facts = {
+            "decision_timing": {}, "stock_direction": {}, "nifty_direction": {},
+            "stock_relative_volume": {}, "risk_economics": {"entry": 100, "stop": 98},
+            "support_resistance": [],
+        }
+
+        result = ReplayCoachContextService._coaching_facts(
+            {}, {"position_type": "LONG"}, facts
+        )["structural_stop"]
+
+        self.assertEqual(result["status"], "NOT_ESTABLISHED")
+        self.assertEqual(result["price"], 98)
+        self.assertIn("does not prove", result["reason"])
+
     def test_missing_trade_is_rejected(self):
         with self.assertRaises(ReplayCoachContextValidationError):
             ReplayCoachContextService.build_context({"stock_candles": [], "nifty_candles": []}, "2026-09-11")
