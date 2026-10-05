@@ -17,7 +17,7 @@ type Direction = "LONG" | "SHORT";
 export type TradePlanStatus = "ACTIVE" | "CANCELLED" | "EXECUTED" | "EXITED";
 
 type TradePlanDraft = {
-    direction: Direction;
+    direction: Direction | "";
     strategy: string;
     entry: string;
     stopLoss: string;
@@ -83,8 +83,8 @@ function createDraftFromCandle(candle: Candle): TradePlanDraft {
     );
 
     return {
-        direction: "LONG",
-        strategy: STRATEGIES[0],
+        direction: "",
+        strategy: "",
         entry: formatPrice(entry),
         stopLoss: formatPrice(entry - defaultRisk),
         target1: formatPrice(entry + defaultRisk),
@@ -94,6 +94,16 @@ function createDraftFromCandle(candle: Candle): TradePlanDraft {
         invalidation: "",
         entryConfirmation: "",
     };
+}
+
+function isDirection(value: string): value is Direction {
+
+    return value === "LONG" || value === "SHORT";
+}
+
+function isStrategy(value: string): boolean {
+
+    return STRATEGIES.includes(value);
 }
 
 function parseNumber(value: string): number | null {
@@ -262,8 +272,8 @@ export default function LiveTradePlanPanel({
         if (
             draft &&
             nextDraft.why.trim().length === 0 &&
-            nextDraft.direction &&
-            nextDraft.strategy.trim() &&
+            isDirection(nextDraft.direction) &&
+            isStrategy(nextDraft.strategy) &&
             (field === "direction" || field === "strategy")
         ) {
             void requestDraft(nextDraft, false);
@@ -274,7 +284,12 @@ export default function LiveTradePlanPanel({
         plan: TradePlanDraft,
         replaceExisting: boolean
     ) => {
-        if (!selectedCandle || !draftRef.current) {
+        if (
+            !selectedCandle ||
+            !draftRef.current ||
+            !isDirection(plan.direction) ||
+            !isStrategy(plan.strategy)
+        ) {
             return;
         }
 
@@ -355,7 +370,6 @@ export default function LiveTradePlanPanel({
         draftRef.current = nextDraft;
         setDraft(nextDraft);
         setDraftError("");
-        void requestDraft(nextDraft, false);
         setIsDrawerOpen(true);
     };
 
@@ -373,6 +387,8 @@ export default function LiveTradePlanPanel({
         ];
 
         if (
+            !isDirection(draft.direction) ||
+            !isStrategy(draft.strategy) ||
             requiredNumbers.some(
                 (value) => parseNumber(value) === null
             )
@@ -684,11 +700,12 @@ export default function LiveTradePlanPanel({
                                 onChange={(event) =>
                                     updateDraft(
                                         "direction",
-                                        event.target.value as Direction
+                                        event.target.value
                                     )
                                 }
                                 className={inputClassName}
                             >
+                                <option value="" disabled>Select direction</option>
                                 <option value="LONG">LONG</option>
                                 <option value="SHORT">SHORT</option>
                             </select>
@@ -708,6 +725,7 @@ export default function LiveTradePlanPanel({
                                 }
                                 className={inputClassName}
                             >
+                                <option value="" disabled>Select strategy</option>
                                 {STRATEGIES.map((strategy) => (
                                     <option
                                         key={strategy}
@@ -775,7 +793,11 @@ export default function LiveTradePlanPanel({
                                 <button
                                     type="button"
                                     onClick={() => void requestDraft(visibleDraft, visibleDraft.why.trim().length > 0)}
-                                    disabled={draftLoading}
+                                    disabled={
+                                        draftLoading ||
+                                        !isDirection(visibleDraft.direction) ||
+                                        !isStrategy(visibleDraft.strategy)
+                                    }
                                     className="shrink-0 rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 disabled:opacity-40"
                                 >
                                     {draftLoading ? "Generating…" : visibleDraft.why.trim() ? "Regenerate draft" : "Generate draft"}
