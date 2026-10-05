@@ -157,6 +157,10 @@ export default function LiveTradePlanPanel({
     const [draftLoading, setDraftLoading] = useState(false);
     const [draftError, setDraftError] = useState("");
     const draftRequestRef = useRef(0);
+    const draftRef = useRef<TradePlanDraft | null>(null);
+    const draftPlanIdRef = useRef(0);
+    const pendingDraftRequestKeyRef = useRef<string | null>(null);
+    draftRef.current = draft;
 
     const activePlan =
         plans.find((plan) =>
@@ -221,10 +225,16 @@ export default function LiveTradePlanPanel({
         field: keyof TradePlanDraft,
         value: string
     ) => {
-        draftRequestRef.current += 1;
         if (!visibleDraft) {
             return;
         }
+
+        if (visibleDraft[field] === value) {
+            return;
+        }
+
+        draftRequestRef.current += 1;
+        pendingDraftRequestKeyRef.current = null;
 
         const nextDraft = {
             ...visibleDraft,
@@ -232,6 +242,7 @@ export default function LiveTradePlanPanel({
         };
 
         if (draft) {
+            draftRef.current = nextDraft;
             setDraft(nextDraft);
         }
 
@@ -251,6 +262,8 @@ export default function LiveTradePlanPanel({
         if (
             draft &&
             nextDraft.why.trim().length === 0 &&
+            nextDraft.direction &&
+            nextDraft.strategy.trim() &&
             (field === "direction" || field === "strategy")
         ) {
             void requestDraft(nextDraft, false);
@@ -261,7 +274,7 @@ export default function LiveTradePlanPanel({
         plan: TradePlanDraft,
         replaceExisting: boolean
     ) => {
-        if (!selectedCandle) {
+        if (!selectedCandle || !draftRef.current) {
             return;
         }
 
@@ -271,9 +284,16 @@ export default function LiveTradePlanPanel({
             return;
         }
 
+        const draftPlanId = draftPlanIdRef.current;
+        const contextTimestamp = selectedCandle.time;
+        const requestKey = `${draftPlanId}|${plan.direction}|${plan.strategy}|${contextTimestamp}`;
+        if (pendingDraftRequestKeyRef.current === requestKey) {
+            return;
+        }
+
         const requestId = draftRequestRef.current + 1;
         draftRequestRef.current = requestId;
-        const requestKey = `${stockName}|${plan.direction}|${plan.strategy}|${selectedCandle.time}`;
+        pendingDraftRequestKeyRef.current = requestKey;
         setDraftLoading(true);
         setDraftError("");
 
@@ -281,7 +301,7 @@ export default function LiveTradePlanPanel({
             const text = await generateTradePlanDraft({
                 direction: plan.direction,
                 strategy: plan.strategy,
-                contextTimestamp: selectedCandle.time,
+                contextTimestamp,
                 stockCandles,
                 niftyCandles,
                 entry: plan.entry,
@@ -291,22 +311,29 @@ export default function LiveTradePlanPanel({
                 entryConfirmation: plan.entryConfirmation,
             });
 
-            const currentKey = `${stockName}|${plan.direction}|${plan.strategy}|${selectedCandle.time}`;
-            if (draftRequestRef.current !== requestId || requestKey !== currentKey) {
+            const current = draftRef.current;
+            if (
+                draftRequestRef.current !== requestId ||
+                draftPlanIdRef.current !== draftPlanId ||
+                !current ||
+                current.direction !== plan.direction ||
+                current.strategy !== plan.strategy ||
+                (!replaceExisting && current.why.trim())
+            ) {
                 return;
             }
 
-            setDraft((current) => {
-                if (!current || (!replaceExisting && current.why.trim())) {
-                    return current;
-                }
-                return { ...current, why: text };
-            });
+            const nextDraft = { ...current, why: text };
+            draftRef.current = nextDraft;
+            setDraft(nextDraft);
         } catch (error) {
             if (draftRequestRef.current === requestId) {
                 setDraftError(error instanceof Error ? error.message : "Could not generate a draft.");
             }
         } finally {
+            if (pendingDraftRequestKeyRef.current === requestKey) {
+                pendingDraftRequestKeyRef.current = null;
+            }
             if (draftRequestRef.current === requestId) {
                 setDraftLoading(false);
             }
@@ -324,6 +351,8 @@ export default function LiveTradePlanPanel({
         setCancellationTime("");
         setCancellationError("");
         const nextDraft = createDraftFromCandle(selectedCandle);
+        draftPlanIdRef.current += 1;
+        draftRef.current = nextDraft;
         setDraft(nextDraft);
         setDraftError("");
         void requestDraft(nextDraft, false);
@@ -364,6 +393,8 @@ export default function LiveTradePlanPanel({
             ...plans,
         ]);
         setSelectedPlanId(nextPlan.id);
+        draftPlanIdRef.current += 1;
+        draftRef.current = null;
         setDraft(null);
         setCancellingPlanId(null);
         setCancellationReason("");
@@ -949,6 +980,8 @@ export default function LiveTradePlanPanel({
                                 key={plan.id}
                                 type="button"
                                 onClick={() => {
+                                    draftPlanIdRef.current += 1;
+                                    draftRef.current = null;
                                     setDraft(null);
                                     setSelectedPlanId(plan.id);
                                     setCancellingPlanId(null);

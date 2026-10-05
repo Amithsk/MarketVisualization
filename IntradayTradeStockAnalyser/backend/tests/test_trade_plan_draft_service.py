@@ -41,6 +41,12 @@ class TradePlanDraftServiceTests(unittest.TestCase):
         self.assertIn("not expanded", text)
         self.assertIn("underperforming NIFTY", text)
 
+    def test_short_vwap_rejection_describes_lower_continuation(self):
+        text = TradePlanDraftService.build(request("SHORT", "VWAP Rejection"))["draft"]
+
+        self.assertIn("price rejecting VWAP and continuing lower", text)
+        self.assertNotIn("opening-range high", text)
+
     def test_missing_context_uses_editable_placeholders_and_excludes_future_candle(self):
         stock = [candle("2026-09-22T09:45:00+05:30", 100, 100, 100), candle("2026-09-22T09:50:00+05:30", 100, 999, 10000)]
         text = TradePlanDraftService.build(request(stock=stock, nifty=[], invalidation="", entry_confirmation=""))["draft"]

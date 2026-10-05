@@ -141,7 +141,7 @@ class TradePlanDraftService:
             ("LONG", "VWAP Bounce"): "I'm looking for a bullish hold or reclaim of VWAP",
             ("SHORT", "VWAP Bounce"): "I'm looking for a failed VWAP bounce and renewed selling",
             ("LONG", "VWAP Rejection"): "I will treat VWAP rejection as conflicting evidence and wait for a bullish reclaim",
-            ("SHORT", "VWAP Rejection"): "I'm looking for sellers to reject price at VWAP",
+            ("SHORT", "VWAP Rejection"): "I'm looking for price rejecting VWAP and continuing lower",
             ("LONG", "Pullback"): "I'm looking for a controlled pullback followed by bullish continuation",
             ("SHORT", "Pullback"): "I'm looking for a controlled pullback followed by bearish continuation",
             ("LONG", "Support / Resistance"): "I'm considering a possible reversal or continuation from support",
