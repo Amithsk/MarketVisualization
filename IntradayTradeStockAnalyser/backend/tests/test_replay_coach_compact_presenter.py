@@ -11,7 +11,7 @@ class CompactCoachPresenterTests(unittest.TestCase):
 
         result = ReplayCoachResponsePresenter.present(analysis)
 
-        self.assertEqual(result["executed_trade_analysis"]["summary"], "Observed at 23 Sep, 10:12 AM IST.")
+        self.assertEqual(result["executed_trade_analysis"]["summary"], "Observed at 23 Sep, 10:12 AM.")
 
     def test_invalid_price_risk_returns_deterministic_decision_statuses(self):
         analysis = ReplayCoachAnalysis.model_validate({"executed_trade_analysis": {"summary": "x", "good": [], "bad": [], "how_to_improve": []}, "key_learning": {"lesson": "x", "numeric_rule": "x", "example_using_this_trade": "x"}, "limitations": []})
@@ -29,7 +29,7 @@ class CompactCoachPresenterTests(unittest.TestCase):
         self.assertNotIn("Break-even / recovery", [row["component"] for row in display["executed_trade_verdict"]["rows"]])
         entry = next(row for row in display["executed_trade_verdict"]["rows"] if row["component"] == "Entry")
         self.assertIn("still-forming candle", entry["meaning"])
-        self.assertIn("22 Sep, 10:05 AM IST", entry["meaning"])
+        self.assertIn("22 Sep, 10:05 AM", entry["meaning"])
 
     def test_short_planned_risk_and_reward_use_short_direction(self):
         analysis = ReplayCoachAnalysis.model_validate({"executed_trade_analysis": {"summary": "x", "good": [], "bad": [], "how_to_improve": []}, "key_learning": {"lesson": "x", "numeric_rule": "x", "example_using_this_trade": "x"}, "limitations": []})

@@ -56,6 +56,8 @@ export default function useLivePolling(
     const [stockContext, setStockContext] = useState<any>(null);
     const timerRef =
         useRef<number | null>(null);
+    const niftyRetryTimerRef =
+        useRef<number | null>(null);
 
     const requestIdRef =
         useRef(0);
@@ -105,6 +107,7 @@ export default function useLivePolling(
                         )
                     );
                     setNiftyContext(nRes.market_context || null);
+                    scheduleNiftyRefreshRetry(nRes);
                 }
 
             } catch (e) {
@@ -161,6 +164,84 @@ export default function useLivePolling(
                     }
                 }
             }
+        }
+
+        function latestCompletedCandleStart() {
+
+            const parts = new Intl.DateTimeFormat(
+                "en-US",
+                {
+                    timeZone: "Asia/Kolkata",
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "numeric",
+                    hourCycle: "h23",
+                }
+            ).formatToParts(new Date());
+
+            const part = (type: string) =>
+                Number(parts.find((item) => item.type === type)?.value);
+            const istNow = Date.UTC(
+                part("year"),
+                part("month") - 1,
+                part("day"),
+                part("hour"),
+                part("minute")
+            ) - 5.5 * 60 * 60 * 1000;
+
+            return Math.floor(
+                (istNow - 5 * 60 * 1000) / (5 * 60 * 1000)
+            ) * 5 * 60 * 1000;
+        }
+
+        function scheduleNiftyRefreshRetry(response: any) {
+
+            if (niftyRetryTimerRef.current !== null) {
+                window.clearTimeout(niftyRetryTimerRef.current);
+                niftyRetryTimerRef.current = null;
+            }
+
+            const latest = response?.latest_candle_timestamp ||
+                response?.candles?.[response.candles.length - 1]?.time;
+            const latestTimestamp = latest ? new Date(latest).getTime() : NaN;
+
+            if (!Number.isFinite(latestTimestamp) ||
+                latestTimestamp >= latestCompletedCandleStart()) {
+                return;
+            }
+
+            const nextRefreshTimestamp = response?.next_refresh_time
+                ? new Date(response.next_refresh_time).getTime()
+                : NaN;
+            const retryDelay = Number.isFinite(nextRefreshTimestamp)
+                ? Math.max(1000, nextRefreshTimestamp - Date.now() + 20000)
+                : 20000;
+
+            niftyRetryTimerRef.current = window.setTimeout(
+                async () => {
+                    if (cancelled || !isIndianMarketOpen()) {
+                        return;
+                    }
+
+                    try {
+                        const refreshed = await fetchNiftyCandles();
+                        if (!cancelled && refreshed?.candles) {
+                            setNifty(refreshed.candles.map((c: any) => ({
+                                ...c,
+                                time: c.time || c.Datetime,
+                            })));
+                            setNiftyContext(refreshed.market_context || null);
+                        }
+                    } catch (e) {
+                        if (!cancelled) {
+                            console.error("Nifty refresh retry error", e);
+                        }
+                    }
+                },
+                retryDelay
+            );
         }
 
 
@@ -238,6 +319,11 @@ export default function useLivePolling(
                 );
 
                 timerRef.current = null;
+            }
+
+            if (niftyRetryTimerRef.current !== null) {
+                window.clearTimeout(niftyRetryTimerRef.current);
+                niftyRetryTimerRef.current = null;
             }
         };
 

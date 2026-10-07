@@ -205,7 +205,7 @@ class ReplayCoachResponsePresenter:
         try:
             parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
             local = parsed.astimezone(IST)
-            return f"{local.day} {local.strftime('%b')}, {local.strftime('%I').lstrip('0')}:{local.strftime('%M %p')} IST"
+            return f"{local.day} {local.strftime('%b')}, {local.strftime('%I').lstrip('0')}:{local.strftime('%M %p')}"
         except ValueError:
             # A syntactically timestamp-like but invalid value is retained.
             return raw

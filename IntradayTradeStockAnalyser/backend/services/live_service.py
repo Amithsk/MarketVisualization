@@ -1,6 +1,8 @@
 #/IntradayTradeStockAnalyser/backend/services/live_service.py
 import os
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import socket
@@ -9,9 +11,53 @@ import time
 from backend.services.market_context_engine import calculate_market_context
 
 BASE_URL = os.getenv("ZERODHA_MARKET_DATA_BASE_URL", "http://127.0.0.1:8001")
+INDIAN_TIME_ZONE = ZoneInfo("Asia/Kolkata")
+CANDLE_INTERVAL = timedelta(minutes=5)
 
 
 class LiveService:
+
+    @staticmethod
+    def _now_ist() -> datetime:
+        return datetime.now(tz=INDIAN_TIME_ZONE)
+
+    @staticmethod
+    def _candle_start_ist(value: Any) -> datetime | None:
+        if value is None:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=INDIAN_TIME_ZONE)
+
+        return parsed.astimezone(INDIAN_TIME_ZONE)
+
+    @classmethod
+    def _completed_candles(
+        cls,
+        candles: List[Dict[str, Any]],
+        now_ist: datetime | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Return only candles whose full five-minute interval has elapsed."""
+        current = now_ist or cls._now_ist()
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=INDIAN_TIME_ZONE)
+        current = current.astimezone(INDIAN_TIME_ZONE)
+
+        return [
+            candle
+            for candle in candles
+            if (start := cls._candle_start_ist(candle.get("time"))) is not None
+            and start + CANDLE_INTERVAL <= current
+        ]
+
+    @staticmethod
+    def _latest_candle_timestamp(candles: List[Dict[str, Any]]) -> Any:
+        return candles[-1].get("time") if candles else None
 
     @staticmethod
     def _normalize_candle(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -66,10 +112,19 @@ class LiveService:
             # Normalize candles
             candles_raw = payload.get("candles", [])
 
-            candles = [
+            normalized_candles = [
                 LiveService._normalize_candle(c)
                 for c in candles_raw
             ]
+            now_ist = LiveService._now_ist()
+            candles = LiveService._completed_candles(
+                normalized_candles,
+                now_ist,
+            )
+            upstream_latest = LiveService._latest_candle_timestamp(
+                normalized_candles,
+            )
+            latest_completed = LiveService._latest_candle_timestamp(candles)
 
             return {
                 "status": "success",
@@ -77,7 +132,9 @@ class LiveService:
                 "interval": payload.get("interval"),
                 "contract": payload.get("contract"),
                 "candles": candles,
-                "count": payload.get("count", len(candles)),
+                "count": len(candles),
+                "upstream_latest_candle_timestamp": upstream_latest,
+                "latest_completed_candle_timestamp": latest_completed,
                 "market_context": calculate_market_context(candles, "NIFTY-FUT"),
             }
 
@@ -132,10 +189,28 @@ class LiveService:
 
             candles_raw = payload.get("candles", [])
 
-            candles = [
+            normalized_candles = [
                 LiveService._normalize_candle(c)
                 for c in candles_raw
             ]
+            now_ist = LiveService._now_ist()
+            candles = LiveService._completed_candles(
+                normalized_candles,
+                now_ist,
+            )
+            upstream_latest = LiveService._latest_candle_timestamp(
+                normalized_candles,
+            )
+            latest_completed = LiveService._latest_candle_timestamp(candles)
+
+            print(
+                "[STOCK_LIVE] "
+                f"instrument={payload.get('symbol') or symbol} "
+                f"now_ist={now_ist.isoformat()} "
+                f"upstream_latest={upstream_latest} "
+                f"latest_completed={latest_completed} "
+                f"returned_latest={latest_completed}"
+            )
 
             return {
                 "status": "success",
@@ -143,7 +218,9 @@ class LiveService:
                 "trade_date": payload.get("trade_date"),
                 "interval": payload.get("interval"),
                 "candles": candles,
-                "count": payload.get("count", len(candles)),
+                "count": len(candles),
+                "upstream_latest_candle_timestamp": upstream_latest,
+                "latest_completed_candle_timestamp": latest_completed,
                 "market_context": calculate_market_context(candles, payload.get("symbol") or symbol),
             }
 
