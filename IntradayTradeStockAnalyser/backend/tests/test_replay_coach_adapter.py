@@ -1,40 +1,45 @@
 import unittest
 
-from backend.services.replay_coach_adapter import _evidence_times
-from backend.services.replay_coach_adapter import _required_evidence_time
-from backend.services.replay_coach_adapter import _validated_evidence_times
-from backend.services.replay_coach_adapter import _optional_decision_time
+from backend.models.replay_coach_provider_model import ProviderReplayCoachTransport
+from backend.services.replay_coach_adapter import _required_evidence_time, to_application_analysis
+from backend.services.replay_coach_openai_service import ReplayCoachOpenAIService
 
 
 class ReplayCoachAdapterTests(unittest.TestCase):
-    def test_unsupported_optional_evidence_time_is_discarded(self):
-        self.assertEqual(_evidence_times("2026-09-23T10:08:00+05:30", {"2026-09-23T10:00:00+05:30"}), [])
+    canonical = "2026-10-09T09:45:00+05:30"
 
-    def test_invalid_optional_evidence_time_is_discarded(self):
-        self.assertEqual(_evidence_times("not-a-time", {"2026-09-23T10:00:00+05:30"}), [])
+    def test_prompt_requires_canonical_timestamps_for_structured_fields(self):
+        instruction = "For `decision_time`, `decision_evidence_times`, and `outcome_evidence_times`, return exact supplied candle `time` strings verbatim in canonical ISO format."
+        self.assertIn(instruction, ReplayCoachOpenAIService.SYSTEM_INSTRUCTIONS)
 
-    def test_supported_optional_evidence_time_is_retained(self):
-        value = "2026-09-23T10:00:00+05:30"
-        self.assertEqual(_evidence_times(value, {value}), [value])
+    def test_canonical_timestamp_matching_evidence_is_accepted(self):
+        self.assertEqual(_required_evidence_time(self.canonical, {self.canonical}, "decision_evidence_times"), self.canonical)
 
-    def test_unique_clock_evidence_time_resolves_to_the_supplied_timestamp(self):
-        value = "2026-09-23T10:00:00+05:30"
-        self.assertEqual(_required_evidence_time("10:00", {value}, "decision_evidence_times"), value)
+    def test_human_readable_timestamp_is_rejected_for_structured_evidence(self):
+        with self.assertRaisesRegex(ValueError, "decision_evidence_times contains an invalid timestamp"):
+            _required_evidence_time("9:45 AM", {self.canonical}, "decision_evidence_times")
 
-    def test_unknown_clock_evidence_time_is_rejected(self):
-        with self.assertRaises(ValueError):
-            _required_evidence_time("10:05", {"2026-09-23T10:00:00+05:30"}, "decision_evidence_times")
+    def test_timestamp_not_present_in_evidence_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "decision_evidence_times must match a supplied stock or market candle timestamp"):
+            _required_evidence_time("2026-10-09T09:50:00+05:30", {self.canonical}, "decision_evidence_times")
 
-    def test_equivalent_utc_timestamp_resolves_to_the_canonical_candle(self):
-        canonical = "2026-09-23T10:00:00+05:30"
-        self.assertEqual(_required_evidence_time("2026-09-23T04:30:00Z", {canonical}, "decision_evidence_times"), canonical)
-
-    def test_naive_provider_timestamp_resolves_only_to_matching_session_candle(self):
-        canonical = "2026-09-23T10:00:00+05:30"
-        self.assertEqual(_required_evidence_time("2026-09-23T10:00:00", {canonical}, "decision_evidence_times"), canonical)
-
-    def test_invalid_evidence_annotation_is_discarded(self):
-        self.assertEqual(_validated_evidence_times(["10:05"], {"2026-09-23T10:00:00+05:30"}, "decision_evidence_times"), [])
-
-    def test_invalid_decision_time_is_discarded_without_inventing_a_time(self):
-        self.assertIsNone(_optional_decision_time("10:05", {"2026-09-23T10:00:00+05:30"}))
+    def test_mocked_provider_response_with_canonical_timestamps_passes_adapter(self):
+        provider = ProviderReplayCoachTransport.model_validate({
+            "executed_trade_analysis": {"summary": "Evidence-only review.", "good": [], "bad": [], "how_to_improve": []},
+            "best_full_session_plan": {
+                "decision": "TAKE", "trade_name": "Breakout", "direction": "LONG", "opportunity_score": 8,
+                "score_explanation": "Supported by the supplied candle.", "market_story": "The market supported the move.",
+                "setup_explanation": "The stock broke above its range.", "decision_time": self.canonical,
+                "entry_trigger": "Enter above 100.", "entry_price": 100.0, "entry_price_upper": None,
+                "stop_price": 99.0, "target_price": 104.0, "invalidation_condition": "Close below 99.",
+                "volume_explanation": "Volume expanded.", "nifty_explanation": "NIFTY was supportive.",
+                "beginner_lesson": "Use completed candles.", "decision_evidence_times": [self.canonical],
+                "outcome_evidence_times": [self.canonical],
+            },
+            "key_learning": {"lesson": "Wait for confirmation.", "numeric_rule": "Use the supplied level.", "example_using_this_trade": "The candle confirmed the breakout."},
+            "limitations": [],
+        })
+        context = {"stock": {"candles": [{"time": self.canonical}]}, "market": {"candles": []}}
+        analysis = to_application_analysis(provider, context)
+        self.assertEqual(analysis.best_full_session_plan.decision_time, self.canonical)
+        self.assertEqual(analysis.best_full_session_plan.decision_evidence_times, [self.canonical])
