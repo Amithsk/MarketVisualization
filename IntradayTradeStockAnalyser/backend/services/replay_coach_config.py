@@ -13,7 +13,7 @@ ENV_FILE = PROJECT_DIR / ".env"
 
 def load_replay_coach_environment(env_file: Path = ENV_FILE) -> None:
     """Load local Coach settings without replacing explicit process values."""
-    load_dotenv(env_file, override=False)
+    load_dotenv(env_file, override=True)
 
 
 DEFAULT_MAX_OUTPUT_TOKENS = 16000
