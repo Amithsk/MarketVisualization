@@ -9,6 +9,7 @@ from backend.services.trade_service import (
 
 from  backend.utils.deps import get_db
 from backend.services.trade_plan_draft_service import TradePlanDraftError, TradePlanDraftService
+from backend.services.live_trade_plan_service import LiveTradePlanService
 
 
 router = APIRouter()
@@ -36,6 +37,28 @@ class TradePlanDraftRequest(BaseModel):
     entry_confirmation: str | None = None
 
 
+class LiveTradePlanPayload(BaseModel):
+    symbol: str
+    planDate: str
+    decisionTime: str
+    direction: str
+    strategy: str
+    entry: str
+    stopLoss: str
+    target1: str
+    target2: str
+    positionSize: str
+    why: str = ""
+    invalidation: str = ""
+    entryConfirmation: str = ""
+
+
+class LiveTradePlanTransition(BaseModel):
+    status: str
+    actionTime: str
+    cancellationReason: str | None = None
+
+
 @router.post("/api/v1/trades/plan-draft")
 async def create_trade_plan_draft(request: TradePlanDraftRequest):
     """Build an editable, deterministic description from supplied completed evidence."""
@@ -43,6 +66,40 @@ async def create_trade_plan_draft(request: TradePlanDraftRequest):
         return {"status": "success", **TradePlanDraftService.build(request.model_dump())}
     except TradePlanDraftError as error:
         raise HTTPException(status_code=422, detail=str(error))
+
+
+@router.get("/api/v1/live-trade-plans")
+async def list_live_trade_plans(symbol: str, db: Session = Depends(get_db)):
+    return {"plans": LiveTradePlanService.list(db, symbol)}
+
+
+@router.post("/api/v1/live-trade-plans", status_code=201)
+async def create_live_trade_plan(payload: LiveTradePlanPayload, db: Session = Depends(get_db)):
+    try:
+        return {"plan": LiveTradePlanService.create(db, payload.model_dump())}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+
+@router.put("/api/v1/live-trade-plans/{plan_id}")
+async def update_live_trade_plan(plan_id: str, payload: LiveTradePlanPayload, db: Session = Depends(get_db)):
+    try:
+        LiveTradePlanService.update(db, plan_id, payload.model_dump())
+        return {"status": "success"}
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+
+
+@router.post("/api/v1/live-trade-plans/{plan_id}/transition")
+async def transition_live_trade_plan(plan_id: str, payload: LiveTradePlanTransition, db: Session = Depends(get_db)):
+    expected = {"CANCELLED": "ACTIVE", "EXECUTED": "ACTIVE", "EXITED": "EXECUTED"}.get(payload.status)
+    if not expected:
+        raise HTTPException(status_code=422, detail="Invalid trade-plan status")
+    try:
+        LiveTradePlanService.transition(db, plan_id, expected, payload.status, payload.actionTime, payload.cancellationReason)
+        return {"status": "success"}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
 
 
 @router.get("/api/v1/trades/dates")

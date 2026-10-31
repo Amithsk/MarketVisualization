@@ -21,7 +21,7 @@ class ReplayCoachContextValidationError(ValueError):
 class ReplayCoachContextService:
     """Transforms an assembled Replay response without fetching or mutating it."""
 
-    CONTEXT_VERSION = "replay_coach_v3"
+    CONTEXT_VERSION = "replay_coach_v4"
     INTERVAL_MINUTES = 5
 
     @classmethod
@@ -128,7 +128,7 @@ class ReplayCoachContextService:
         value = value if isinstance(value, dict) else {}
         return {
             key: cls._json_value(value.get(key))
-            for key in ("planned_entry_price", "planned_stop_price", "planned_target_price", "position_type", "plan_status")
+            for key in ("strategy", "setup_description", "planned_entry_price", "planned_stop_price", "planned_target_price", "position_type", "plan_status")
         }
 
     @classmethod
@@ -149,7 +149,8 @@ class ReplayCoachContextService:
             ratio = round(reward / risk, 4)
         return {
             "entry_price": entry, "stop_price": stop, "target_price": target,
-            "position_type": position_type, "risk": risk, "reward": reward,
+            "position_type": position_type, "strategy": trade_data.get("strategy"),
+            "setup_description": trade_data.get("setup_description"), "risk": risk, "reward": reward,
             "risk_reward_ratio": ratio, "stop_present": stop is not None,
         }
 

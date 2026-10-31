@@ -1,7 +1,7 @@
 /*IntradayTradeStockAnalyser/frontend/app/live/page.tsx*/
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import StockSelector from "../../components/selectors/StockSelector";
 import SynchronizedCharts from "../../components/charts/SynchronizedCharts";
@@ -11,6 +11,7 @@ import type {
 } from "../../components/live/LiveTradePlanPanel";
 import useLivePolling from "../../hooks/useLivePolling";
 import { Candle } from "../../types/candle";
+import { fetchLiveTradePlans } from "../../services/liveTradePlanApi";
 
 const DEFAULT_STOCKS = [
     "NSE:SBIN",
@@ -34,6 +35,14 @@ export default function LivePage() {
         useState<LiveTradePlan[]>([]);
 
     const { nifty, stock, niftyContext, stockContext } = useLivePolling(selectedStock);
+
+    useEffect(() => {
+        let cancelled = false;
+        void fetchLiveTradePlans(selectedStock)
+            .then(({ plans }) => { if (!cancelled) setTradePlans(plans); })
+            .catch(() => { if (!cancelled) setTradePlans([]); });
+        return () => { cancelled = true; };
+    }, [selectedStock]);
 
     // -----------------------------------
     // NIFTY candles
@@ -60,6 +69,25 @@ export default function LivePage() {
         close: Number(c.close || c.Close),
         volume: Number(c.volume || c.Volume || 0),
     }));
+
+    // A draft belongs to a particular selected candle.  Retaining just that
+    // identifier lets the panel hydrate the matching local draft after reload.
+    useEffect(() => {
+        try {
+            const time = window.localStorage.getItem(`intraday.live-selected-candle.v1:${selectedStock}`);
+            const candle = stockCandles.find((item) => item.time === time);
+            if (candle) setSelectedStockCandle((current) => current?.time === candle.time ? current : candle);
+        } catch { /* selection restoration is optional */ }
+    }, [selectedStock, stockCandles]);
+
+    const selectStockCandle = (candle: Candle | null) => {
+        setSelectedStockCandle(candle);
+        try {
+            const key = `intraday.live-selected-candle.v1:${selectedStock}`;
+            if (candle) window.localStorage.setItem(key, candle.time);
+            else window.localStorage.removeItem(key);
+        } catch { /* storage is optional */ }
+    };
 
     return (
         <div className="p-6">
@@ -115,7 +143,7 @@ export default function LivePage() {
                 stockContext={stockContext}
                 tradePlans={tradePlans}
                 onStockCandleSelect={
-                    setSelectedStockCandle
+                    selectStockCandle
                 }
             />
 

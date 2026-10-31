@@ -5,7 +5,7 @@ import { askReplayCoachQuestion, getReplayCoachMessages } from "../../services/r
 import type { ReplayCoachMessage } from "../../types/replay";
 import ReplayCoachFeedback from "./ReplayCoachFeedback";
 
-const starters = ["Why was my entry timing weak?", "How was the suggested plan better than my executed trade?", "Which candle confirmed the suggested plan?", "Explain the reward-to-risk calculation.", "What is the main lesson for my next trade?"];
+const starters = ["What does the evidence show about my entry timing?", "How was the suggested plan better than my executed trade?", "Which candle confirmed the suggested plan?", "Explain the reward-to-risk calculation.", "What is the main lesson for my next trade?"];
 
 export default function ReplayCoachConversation({ analysisId, onEvidenceTime }: { analysisId: number; onEvidenceTime: (time: string) => void }) {
     const [messages, setMessages] = useState<ReplayCoachMessage[]>([]);

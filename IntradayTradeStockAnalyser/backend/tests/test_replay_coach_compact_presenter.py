@@ -13,23 +13,21 @@ class CompactCoachPresenterTests(unittest.TestCase):
 
         self.assertEqual(result["executed_trade_analysis"]["summary"], "Observed at 23 Sep, 10:12 AM.")
 
-    def test_invalid_price_risk_returns_deterministic_decision_statuses(self):
+    def test_forming_candle_does_not_create_a_verdict_warning_or_improvement(self):
         analysis = ReplayCoachAnalysis.model_validate({"executed_trade_analysis": {"summary": "x", "good": [], "bad": [], "how_to_improve": []}, "key_learning": {"lesson": "x", "numeric_rule": "x", "example_using_this_trade": "x"}, "limitations": []})
         context = {"executed_trade": {"side": "BUY", "entry_price": 1832.6, "entry_timestamp": "2026-09-22T10:08:00+05:30", "pnl_amount": 72, "quantity": 1}, "documented_plan": {"position_type": "LONG"}, "decision_context": {"decision_timing": {"last_completed_stock_candle_time": "2026-09-22T10:00:00+05:30", "containing_candle_start": "2026-09-22T10:05:00+05:30", "containing_candle_end": "2026-09-22T10:10:00+05:30", "containing_candle_complete_at_entry": False}, "stock_direction": {"classification": "BULLISH", "last_completed_close": 1832.6, "vwap": 1830.71}, "nifty_direction": {"classification": "NEUTRAL"}, "stock_relative_volume": {"last_completed_volume": 21701, "ratio_vs_5_candle_median": .5573}, "support_resistance": [], "risk_economics": {"entry": 1832.6, "stop": 1825, "target": 1835, "risk": 7.6, "reward": 2.4, "reward_risk_ratio": .3158, "required_ratio": 4.0, "break_even_win_rate": .76, "equal_wins_to_recover_one_loss": 3.1667, "take_valid": False}}}
         display = ReplayCoachResponsePresenter.coach_display(analysis, context)
-        self.assertEqual(display["my_best_trade_plan"]["decision"], "WAIT")
-        self.assertEqual(len(display["decision_options"]), 3)
-        statuses = {option["decision"]: option["status"] for option in display["decision_options"]}
-        self.assertEqual(statuses, {"TAKE": "NOT READY", "WAIT": "RECOMMENDED", "NO_TRADE": "VALID ALTERNATIVE"})
-        self.assertTrue(all("valid" not in option for option in display["decision_options"]))
-        self.assertEqual(display["decision_quality_score"]["overall_score"], 4)
+        self.assertEqual(display["decision_quality_score"]["overall_score"], 2)
         self.assertEqual(display["executed_trade_verdict"]["outcome_status"], "PROFITABLE")
         self.assertEqual(display["executed_trade_verdict"]["plan_standard_status"], "BELOW_REQUIRED_RR")
         self.assertNotIn("overall_rating", display["executed_trade_verdict"])
         self.assertNotIn("Break-even / recovery", [row["component"] for row in display["executed_trade_verdict"]["rows"]])
         entry = next(row for row in display["executed_trade_verdict"]["rows"] if row["component"] == "Entry")
-        self.assertIn("still-forming candle", entry["meaning"])
-        self.assertIn("22 Sep, 10:05 AM", entry["meaning"])
+        self.assertEqual(entry["meaning"], "Actual executed entry.")
+        rendered = str(display)
+        self.assertNotIn("still-forming candle", rendered)
+        self.assertNotIn("confirmation required", rendered.lower())
+        self.assertNotIn("stored strategy does not say", rendered.lower())
 
     def test_short_planned_risk_and_reward_use_short_direction(self):
         analysis = ReplayCoachAnalysis.model_validate({"executed_trade_analysis": {"summary": "x", "good": [], "bad": [], "how_to_improve": []}, "key_learning": {"lesson": "x", "numeric_rule": "x", "example_using_this_trade": "x"}, "limitations": []})

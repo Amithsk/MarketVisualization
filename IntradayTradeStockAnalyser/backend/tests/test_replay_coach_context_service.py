@@ -35,6 +35,17 @@ class ReplayCoachContextServiceTests(unittest.TestCase):
         self.assertEqual(context["executed_trade"]["entry_candle_time"], "2026-09-11T09:15:00+05:30")
         self.assertEqual(context["executed_trade"]["exit_candle_time"], "2026-09-11T09:25:00+05:30")
 
+    def test_maps_0956_to_0955_containing_candle_and_preserves_strategy_evidence(self):
+        payload = replay(entry_timestamp="2026-09-11T09:56:00", exit_timestamp=None)
+        payload["stock_candles"] = [candle("09:45"), candle("09:50"), candle("09:55")]
+        payload["nifty_candles"] = [candle("09:45"), candle("09:50"), candle("09:55")]
+        payload["trade_data"] = {"strategy": "VWAP", "setup_description": "Enter only after a completed candle closes above 100.", "planned_entry_price": 101, "planned_stop_price": 99, "planned_target_price": 109, "position_type": "LONG", "plan_status": "EXECUTED"}
+        context = ReplayCoachContextService.build_context(payload, "2026-09-11")
+        self.assertEqual(context["context_version"], "replay_coach_v4")
+        self.assertEqual(context["executed_trade"]["entry_candle_time"], "2026-09-11T09:55:00+05:30")
+        self.assertEqual(context["documented_plan"]["strategy"], "VWAP")
+        self.assertIn("completed candle closes", context["documented_plan"]["setup_description"])
+
     def test_detects_gaps_and_unsynchronized_data(self):
         context = ReplayCoachContextService.build_context(replay(stock=[candle("09:15"), candle("09:25")]), "2026-09-11")
         self.assertEqual(context["data_quality"]["stock_missing_timestamps"], ["2026-09-11T09:20:00+05:30"])

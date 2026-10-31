@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 
 from backend.services.replay_coach_scoring_service import ReplayCoachScoringService
 
@@ -31,3 +32,11 @@ class ReplayCoachScoringServiceTests(unittest.TestCase):
         structure = next(item for item in score["components"] if item["component"] == "PRICE_STRUCTURE")
         self.assertEqual(structure["score"], 0)
         self.assertEqual(score["next_trade_focus"]["component"], "PRICE_STRUCTURE")
+
+    def test_forming_candle_status_and_unknown_strategy_rules_do_not_change_score(self):
+        complete = context()
+        complete["documented_plan"].update({"strategy": "VWAP", "setup_description": None})
+        complete["decision_context"]["decision_timing"]["containing_candle_complete_at_entry"] = True
+        forming = deepcopy(complete)
+        forming["decision_context"]["decision_timing"]["containing_candle_complete_at_entry"] = False
+        self.assertEqual(ReplayCoachScoringService.score(complete), ReplayCoachScoringService.score(forming))

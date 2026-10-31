@@ -179,13 +179,10 @@ class ReplayCoachResponsePresenter:
         profitable = isinstance(pnl, (int, float)) and pnl >= 0
         plan_standard = "MEETS_REQUIRED_RR" if ratio is not None and ratio >= required else "BELOW_REQUIRED_RR"
         def money(value: Any) -> str: return "Unavailable" if value is None else f"₹{float(value):,.2f}"
+        # The recorded entry timestamp is execution/fill-like data, not proof of
+        # the trader's decision time or a candle-close requirement. Do not turn
+        # the expected containing-candle status into verdict commentary.
         entry_meaning = "Actual executed entry."
-        if timing.get("containing_candle_complete_at_entry") is False:
-            entry_meaning = (
-                f"Entry was during the still-forming candle from {timing.get('containing_candle_start')} "
-                f"to {timing.get('containing_candle_end')}. The stored strategy does not say whether this "
-                "candle had to confirm, so this is not an entry-rule failure."
-            )
         rows = [
             ExecutedTradeVerdictRow(component="Direction", value=f"{side} / {trade.get('side', 'Unknown')}", meaning="Expected the price to rise." if side == "LONG" else "Expected the price to fall."),
             ExecutedTradeVerdictRow(component="Entry", value=f"{money(trade.get('entry_price'))} at {trade.get('entry_timestamp', 'Unavailable')}", meaning=entry_meaning),

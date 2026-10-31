@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -12,6 +13,11 @@ import type {
 
 import { Candle } from "../../types/candle";
 import { generateTradePlanDraft } from "../../services/tradePlanDraftApi";
+import {
+    createLiveTradePlan,
+    transitionLiveTradePlan,
+    updateLiveTradePlan,
+} from "../../services/liveTradePlanApi";
 
 type Direction = "LONG" | "SHORT";
 export type TradePlanStatus = "ACTIVE" | "CANCELLED" | "EXECUTED" | "EXITED";
@@ -39,6 +45,29 @@ export type LiveTradePlan = TradePlanDraft & {
     executedAt?: string;
     exitedAt?: string;
 };
+
+type StoredDraft = { version: 1; draft: TradePlanDraft };
+const DRAFT_PREFIX = "intraday.live-trade-plan-draft.v1";
+
+function draftStorageKey(symbol: string, decisionTime: string): string {
+    return `${DRAFT_PREFIX}:anonymous:live:${symbol}:${decisionTime.slice(0, 10)}:${decisionTime}`;
+}
+
+function readDraft(key: string): TradePlanDraft | null {
+    try {
+        const value = window.localStorage.getItem(key);
+        const parsed = value ? JSON.parse(value) as StoredDraft : null;
+        return parsed?.version === 1 && parsed.draft ? parsed.draft : null;
+    } catch { return null; }
+}
+
+function writeDraft(key: string, draft: TradePlanDraft): void {
+    try { window.localStorage.setItem(key, JSON.stringify({ version: 1, draft } satisfies StoredDraft)); } catch { /* storage is optional */ }
+}
+
+function removeDraft(key: string): void {
+    try { window.localStorage.removeItem(key); } catch { /* storage is optional */ }
+}
 
 type Props = {
     selectedCandle: Candle | null;
@@ -166,11 +195,38 @@ export default function LiveTradePlanPanel({
 
     const [draftLoading, setDraftLoading] = useState(false);
     const [draftError, setDraftError] = useState("");
+    const [saveError, setSaveError] = useState("");
     const draftRequestRef = useRef(0);
     const draftRef = useRef<TradePlanDraft | null>(null);
     const draftPlanIdRef = useRef(0);
     const pendingDraftRequestKeyRef = useRef<string | null>(null);
     draftRef.current = draft;
+
+    const currentDraftKey = selectedCandle
+        ? draftStorageKey(stockName, selectedCandle.time)
+        : null;
+
+    // Hydrate before any field-change/generation logic can run.  The draft is
+    // tied to the precise selected candle so it cannot leak to another date.
+    useEffect(() => {
+        if (!currentDraftKey || draft || selectedPlanId) return;
+        const restored = readDraft(currentDraftKey);
+        if (!restored) return;
+        draftPlanIdRef.current += 1;
+        draftRef.current = restored;
+        setDraft(restored);
+        setIsDrawerOpen(true);
+    }, [currentDraftKey, draft, selectedPlanId]);
+
+    useEffect(() => {
+        if (!draft || !currentDraftKey) return;
+        const timer = window.setTimeout(() => writeDraft(currentDraftKey, draft), 250);
+        const flush = () => {
+            if (draftRef.current) writeDraft(currentDraftKey, draftRef.current);
+        };
+        window.addEventListener("beforeunload", flush);
+        return () => { window.clearTimeout(timer); window.removeEventListener("beforeunload", flush); flush(); };
+    }, [draft, currentDraftKey]);
 
     const activePlan =
         plans.find((plan) =>
@@ -257,16 +313,19 @@ export default function LiveTradePlanPanel({
         }
 
         if (selectedPlan) {
-            onPlansChange(
-                plans.map((plan) =>
+            const nextPlans = plans.map((plan) =>
                     plan.id === selectedPlan.id
                         ? {
                             ...plan,
                             ...nextDraft,
                         }
                         : plan
-                )
-            );
+                );
+            onPlansChange(nextPlans);
+            void updateLiveTradePlan({
+                ...nextPlans.find((plan) => plan.id === selectedPlan.id)!,
+                planDate: selectedPlan.decisionTime.slice(0, 10),
+            }).catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save changes."));
         }
 
         if (
@@ -370,10 +429,11 @@ export default function LiveTradePlanPanel({
         draftRef.current = nextDraft;
         setDraft(nextDraft);
         setDraftError("");
+        setSaveError("");
         setIsDrawerOpen(true);
     };
 
-    const handleSavePlan = () => {
+    const handleSavePlan = async () => {
         if (!selectedCandle || !draft || activePlan) {
             return;
         }
@@ -396,29 +456,31 @@ export default function LiveTradePlanPanel({
             return;
         }
 
-        const nextPlan: LiveTradePlan = {
+        setSaveError("");
+        try {
+            const { plan: nextPlan } = await createLiveTradePlan({
             ...draft,
-            id: `${Date.now()}`,
             symbol: stockName,
             decisionTime: selectedCandle.time,
-            status: "ACTIVE",
-        };
+            planDate: selectedCandle.time.slice(0, 10),
+            });
 
-        onPlansChange([
-            nextPlan,
-            ...plans,
-        ]);
-        setSelectedPlanId(nextPlan.id);
-        draftPlanIdRef.current += 1;
-        draftRef.current = null;
-        setDraft(null);
-        setCancellingPlanId(null);
-        setCancellationReason("");
-        setCancellationTime("");
-        setCancellationError("");
+            onPlansChange([nextPlan, ...plans]);
+            setSelectedPlanId(nextPlan.id);
+            if (currentDraftKey) removeDraft(currentDraftKey);
+            draftPlanIdRef.current += 1;
+            draftRef.current = null;
+            setDraft(null);
+            setCancellingPlanId(null);
+            setCancellationReason("");
+            setCancellationTime("");
+            setCancellationError("");
+        } catch (error) {
+            setSaveError(error instanceof Error ? error.message : "Could not save plan. Your draft is retained.");
+        }
     };
 
-    const updateStatus = (
+    const updateStatus = async (
         nextStatus: TradePlanStatus
     ) => {
         if (!selectedPlan) {
@@ -429,8 +491,9 @@ export default function LiveTradePlanPanel({
             selectedCandle?.time ||
             new Date().toISOString();
 
-        onPlansChange(
-            plans.map((plan) => {
+        try {
+            await transitionLiveTradePlan(selectedPlan.id, nextStatus, actionTime);
+            onPlansChange(plans.map((plan) => {
                 if (plan.id !== selectedPlan.id) {
                     return plan;
                 }
@@ -472,8 +535,11 @@ export default function LiveTradePlanPanel({
                             ? actionTime
                             : plan.exitedAt,
                 };
-            })
-        );
+            }));
+        } catch (error) {
+            setSaveError(error instanceof Error ? error.message : "Could not update plan status.");
+            return;
+        }
 
         if (nextStatus !== "CANCELLED") {
             setCancellingPlanId(null);
@@ -503,7 +569,7 @@ export default function LiveTradePlanPanel({
         setCancellationError("");
     };
 
-    const handleConfirmCancellation = () => {
+    const handleConfirmCancellation = async () => {
         if (
             !selectedPlan ||
             selectedPlan.status !== "ACTIVE" ||
@@ -527,8 +593,9 @@ export default function LiveTradePlanPanel({
             selectedCandle?.time ||
             new Date().toISOString();
 
-        onPlansChange(
-            plans.map((plan) =>
+        try {
+            await transitionLiveTradePlan(selectedPlan.id, "CANCELLED", actionTime, trimmedReason);
+            onPlansChange(plans.map((plan) =>
                 plan.id === selectedPlan.id
                     ? {
                         ...plan,
@@ -537,8 +604,11 @@ export default function LiveTradePlanPanel({
                         cancellationReason: trimmedReason,
                     }
                     : plan
-            )
-        );
+            ));
+        } catch (error) {
+            setCancellationError(error instanceof Error ? error.message : "Could not cancel the plan.");
+            return;
+        }
         setCancellingPlanId(null);
         setCancellationReason("");
         setCancellationTime("");
@@ -550,6 +620,17 @@ export default function LiveTradePlanPanel({
         setCancellationReason("");
         setCancellationTime("");
         setCancellationError("");
+    };
+
+    const handleDiscardDraft = () => {
+        if (currentDraftKey) removeDraft(currentDraftKey);
+        draftRequestRef.current += 1;
+        draftPlanIdRef.current += 1;
+        draftRef.current = null;
+        setDraft(null);
+        setIsDrawerOpen(false);
+        setDraftError("");
+        setSaveError("");
     };
 
     return (
@@ -855,21 +936,25 @@ export default function LiveTradePlanPanel({
                         </div>
 
                         {draft && (
-                            <button
-                                type="button"
-                                onClick={handleSavePlan}
-                                className="
-                                    rounded
-                                    bg-green-500
-                                    px-4
-                                    py-2
-                                    font-semibold
-                                    text-gray-950
-                                "
-                            >
-                                Save Plan
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => void handleSavePlan()}
+                                    className="rounded bg-green-500 px-4 py-2 font-semibold text-gray-950"
+                                >
+                                    Save Plan
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDiscardDraft}
+                                    className="rounded border border-gray-700 px-4 py-2 text-xs text-gray-200"
+                                >
+                                    Discard Draft
+                                </button>
+                            </div>
                         )}
+
+                        {saveError && <div className="text-xs text-red-300">{saveError}</div>}
 
                         {selectedPlan && (
                             <div className="space-y-3">
@@ -935,7 +1020,7 @@ export default function LiveTradePlanPanel({
                                         <div className="mt-3 flex flex-wrap gap-2">
                                             <StatusButton
                                                 disabled={false}
-                                                onClick={handleConfirmCancellation}
+                                            onClick={() => void handleConfirmCancellation()}
                                             >
                                                 Confirm Cancel
                                             </StatusButton>
@@ -964,13 +1049,13 @@ export default function LiveTradePlanPanel({
                                             selectedPlan.status !== "ACTIVE" ||
                                             cancellingPlanId === selectedPlan.id
                                         }
-                                        onClick={() => updateStatus("EXECUTED")}
+                                        onClick={() => void updateStatus("EXECUTED")}
                                     >
                                         Execute Trade
                                     </StatusButton>
                                     <StatusButton
                                         disabled={selectedPlan.status !== "EXECUTED"}
-                                        onClick={() => updateStatus("EXITED")}
+                                        onClick={() => void updateStatus("EXITED")}
                                     >
                                         Exit Trade
                                     </StatusButton>
