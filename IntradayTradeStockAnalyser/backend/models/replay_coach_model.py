@@ -5,7 +5,7 @@ Keeping this model independent allows completed historical analyses to remain
 readable while the provider contract evolves safely.
 """
 from decimal import Decimal
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
 
 class CoachModel(BaseModel): model_config = ConfigDict(extra="forbid")
@@ -99,6 +99,7 @@ class ReplayCoachAnalysis(CoachModel):
     best_full_session_plan: Optional[FullSessionPlan] = None
     key_learning: KeyLearning
     limitations: List[str]
+    active_trade_candle_review: Optional[Dict[str, Any]] = None
 
 class CoachDisplayRow(CoachModel):
     component: str; value: str; rating: int; rating_max: int = 10
@@ -130,4 +131,5 @@ class CoachDisplay(CoachModel):
     next_trade_focus: NextTradeFocus
     shared_graph_times: List[str] = []
     execution_times: dict[str, str] = {}
+    decision_time_market_context: dict = {}
     detailed_evidence_available: bool = True

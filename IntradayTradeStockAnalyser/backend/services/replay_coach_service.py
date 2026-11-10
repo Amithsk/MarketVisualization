@@ -136,6 +136,7 @@ class ReplayCoachService:
     @classmethod
     def _generate(cls, context: Dict[str, Any], request_id: str = "none", analysis_id=None, lifecycle=None) -> Dict[str, Any]:
         analysis, response_id, _usage = ReplayCoachOpenAIService.analyze(context, request_id=request_id, analysis_id=analysis_id, lifecycle=lifecycle)
+        analysis = analysis.model_copy(update={"active_trade_candle_review": context.get("active_trade_candle_review")})
         return cls._result(context, analysis, response_id, _usage, "generated", lifecycle=lifecycle) | {
             "_usage": _usage,
             "_persisted_analysis": analysis.model_dump(mode="json", exclude_computed_fields=True),

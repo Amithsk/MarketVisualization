@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 from backend.services.replay_coach_decision_context import ReplayCoachDecisionContext
 from backend.services.replay_coach_scoring_service import ReplayCoachScoringService
+from backend.services.active_trade_candle_review_service import ActiveTradeCandleReviewService
 
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -21,7 +22,7 @@ class ReplayCoachContextValidationError(ValueError):
 class ReplayCoachContextService:
     """Transforms an assembled Replay response without fetching or mutating it."""
 
-    CONTEXT_VERSION = "replay_coach_v4"
+    CONTEXT_VERSION = "replay_coach_v5"
     INTERVAL_MINUTES = 5
 
     @classmethod
@@ -86,6 +87,7 @@ class ReplayCoachContextService:
             # Coach-only summary.  The public Replay response is untouched.
             "trade_data": trade_data,
             "documented_plan": documented_plan,
+            "active_trade_candle_review": ActiveTradeCandleReviewService.build(stock, market, executed_trade, documented_plan),
             "decision_context": decision_context,
             "coaching_facts": cls._coaching_facts(executed_trade, documented_plan, decision_context),
             "stock": {"symbol": str(trade["symbol"]).upper().removeprefix("NSE:"), "candle_count": len(stock), "candles": stock},

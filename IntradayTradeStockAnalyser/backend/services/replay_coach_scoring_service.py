@@ -25,8 +25,8 @@ class ReplayCoachScoringService:
         graph_time = cls._clock(timing.get("last_completed_stock_candle_time"))
         structure = cls._structure_component(side, facts.get("support_resistance", []), economics, graph_time)
         components = [
-            cls._stock_component(side, stock, graph_time),
-            cls._nifty_component(side, nifty, graph_time),
+            cls._stock_component(side, facts, graph_time),
+            cls._nifty_component(side, facts, graph_time),
             cls._volume_component(volume, graph_time),
             structure,
             cls._rr_component(economics, structure["score"] == 2, graph_time),
@@ -55,7 +55,23 @@ class ReplayCoachScoringService:
                 "graph_times": [graph_time] if graph_time else []}
 
     @classmethod
-    def _stock_component(cls, side, stock, time):
+    def _stock_component(cls, side, facts, time):
+        stock = facts.get("stock_direction", {})
+        structure = facts.get("stock_session_structure", {}).get("classification") or stock.get("session_structure") or stock.get("classification", "INSUFFICIENT_DATA")
+        momentum = facts.get("stock_recent_momentum", {}).get("classification") or stock.get("classification", "NEUTRAL")
+        vwap_facts = facts.get("stock_vwap_location", {})
+        location = vwap_facts.get("location") or "UNAVAILABLE"
+        close, vwap = vwap_facts.get("last_completed_close", stock.get("last_completed_close")), vwap_facts.get("vwap", stock.get("vwap"))
+        structural = (side == "LONG" and structure == "BULLISH") or (side == "SHORT" and structure == "BEARISH")
+        momentum_ok = (side == "LONG" and momentum == "BULLISH") or (side == "SHORT" and momentum == "BEARISH")
+        vwap_ok = (side == "LONG" and location == "ABOVE") or (side == "SHORT" and location == "BELOW")
+        score = 2 if structural and (momentum_ok or vwap_ok) else 1 if structural else 0
+        return cls._component("STOCK_DIRECTION", "Stock direction and VWAP", score,
+            f"Session structure {structure}; recent momentum {momentum}; completed close {cls._price(close)}",
+            f"VWAP {cls._price(vwap)} ({location})", "Broader structure, recent momentum, and VWAP location are separate decision-time facts.",
+            f"Broader structure was {structure.lower()} while recent momentum was {momentum.lower()}.", "Check broader structure, recent momentum, and VWAP location together.", time)
+
+    def _legacy_stock_component(cls, side, stock, time):
         direction = stock.get("classification", "UNAVAILABLE")
         close, vwap = stock.get("last_completed_close"), stock.get("vwap")
         distance, pct = stock.get("distance_from_vwap_points"), stock.get("distance_from_vwap_pct")
@@ -71,8 +87,9 @@ class ReplayCoachScoringService:
             f"For stronger {side or 'trade'} confirmation, wait for a completed candle to align with VWAP.", time)
 
     @classmethod
-    def _nifty_component(cls, side, nifty, time):
-        direction = nifty.get("classification", "UNAVAILABLE")
+    def _nifty_component(cls, side, facts, time):
+        nifty = facts.get("nifty_direction", {})
+        direction = facts.get("nifty_session_structure", {}).get("classification") or nifty.get("session_structure") or nifty.get("classification", "UNAVAILABLE")
         score = 2 if (side == "LONG" and direction == "BULLISH") or (side == "SHORT" and direction == "BEARISH") else 1 if direction == "NEUTRAL" else 0
         return cls._component("NIFTY_ALIGNMENT", "NIFTY direction alignment", score, f"NIFTY was {direction.lower()}", "Completed NIFTY candles", "Direction uses completed candles before entry.",
             f"NIFTY {('supported' if score == 2 else 'was neutral for' if score == 1 else 'did not support')} this {side or 'trade'} idea.",

@@ -40,3 +40,14 @@ class ReplayCoachScoringServiceTests(unittest.TestCase):
         forming = deepcopy(complete)
         forming["decision_context"]["decision_timing"]["containing_candle_complete_at_entry"] = False
         self.assertEqual(ReplayCoachScoringService.score(complete), ReplayCoachScoringService.score(forming))
+
+    def test_multi_horizon_stock_scoring_distinguishes_continuation_pullback_and_opposition(self):
+        def component(structure, momentum, location, side="LONG"):
+            facts = {"stock_session_structure": {"classification": structure}, "stock_recent_momentum": {"classification": momentum}, "stock_vwap_location": {"location": location, "last_completed_close": 100, "vwap": 100}, "stock_direction": {}}
+            return ReplayCoachScoringService._stock_component(side, facts, "10:00")["score"]
+        self.assertEqual(component("BULLISH", "BULLISH", "ABOVE"), 2)
+        self.assertEqual(component("BULLISH", "BEARISH", "NEAR"), 1)
+        self.assertEqual(component("BEARISH", "BEARISH", "BELOW"), 0)
+        self.assertEqual(component("BEARISH", "BEARISH", "BELOW", "SHORT"), 2)
+        self.assertEqual(component("BEARISH", "BULLISH", "NEAR", "SHORT"), 1)
+        self.assertEqual(component("BULLISH", "BULLISH", "ABOVE", "SHORT"), 0)

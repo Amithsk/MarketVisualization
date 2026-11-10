@@ -88,6 +88,13 @@ class ReplayCoachResponsePresenter:
             next_trade_focus=decision_quality["next_trade_focus"],
             shared_graph_times=shared_times,
             execution_times={key: value for key, value in {"entry": trade.get("entry_timestamp"), "exit": trade.get("exit_timestamp")}.items() if value},
+            decision_time_market_context={
+                "stock_session_structure": facts.get("stock_session_structure", {}),
+                "stock_recent_momentum": facts.get("stock_recent_momentum", {}),
+                "stock_vwap_location": facts.get("stock_vwap_location", {}),
+                "stock_nifty_relationship": facts.get("stock_nifty_relationship", {}),
+                "composite": facts.get("decision_time_market_context", {}),
+            },
             executed_trade_verdict=executed,
             best_full_session_plan=analysis.best_full_session_plan,
         ).model_dump(mode="json"))

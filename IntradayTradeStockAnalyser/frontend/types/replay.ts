@@ -429,7 +429,9 @@ export type CoachAnalysis = {
     best_full_session_plan?: FullSessionPlan | null;
     key_learning: KeyLearning;
     limitations: string[];
+    active_trade_candle_review?: ActiveTradeCandleReview | null;
 };
+export type ActiveTradeCandleReview = { version: string; trade_side: "LONG" | "SHORT"; formula_key: string; items: { completion_time: string | null; candle_effectiveness?: { calculation_lines: { label: string; formula: string; result: string }[] }; candle_behaviour: { message: string }; nifty_relationship: { message: string; calculation_lines: { label: string; formula: string; result: string }[] }; trade_effect: { message: string; calculation_lines: { label: string; formula: string; result: string }[] }; decision: { classification: "HOLD" | "WATCH" | "EXIT" | "NO_COMPLETED_CANDLE" } }[] };
 export type CoachDisplayRow = { component: string; value: string; rating: number; rating_max: number; explanation: string; graph_times: string[]; status: string };
 export type CoachDisplaySection = { title: string; decision: string; overall_rating: number; valid: boolean; rows: CoachDisplayRow[] };
 export type FullSessionPlan = { decision: "TAKE" | "WAIT" | "NO_TRADE"; trade_name: string; direction: "LONG" | "SHORT" | "NEUTRAL"; opportunity_score: number; score_explanation: string; market_story: string; setup_explanation: string; decision_time: string | null; entry_trigger: string; entry_price: number | null; entry_price_upper: number | null; stop_price: number | null; target_price: number | null; risk: number | null; reward: number | null; reward_to_risk: number | null; required_reward_to_risk: number; ratio_status: string; invalidation_condition: string; volume_explanation: string; nifty_explanation: string; beginner_lesson: string; decision_evidence_times: string[]; outcome_evidence_times: string[] };
@@ -442,6 +444,7 @@ export type CoachDisplay = {
     next_trade_focus: { component: string; current_score: number; target_score: number; message: string };
     shared_graph_times: string[];
     execution_times: { entry?: string; exit?: string };
+    decision_time_market_context: { stock_session_structure?: { classification?: string }; stock_recent_momentum?: { classification?: string }; stock_vwap_location?: { location?: string }; stock_nifty_relationship?: { classification?: string; meaning?: string }; composite?: { classification?: string } };
     executed_trade_verdict: ExecutedTradeVerdict; best_full_session_plan?: FullSessionPlan | null; detailed_evidence_available: boolean;
 };
 

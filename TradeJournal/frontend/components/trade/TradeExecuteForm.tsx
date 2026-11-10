@@ -6,9 +6,14 @@ import { useState } from "react"
 
 type Props = {
   tradeDate: string
+  plannedQuantity?: number
+  plannedPrice?: number
 
   onSubmit: (payload: {
     entry_timestamp?: string
+    quantity?: number
+    price?: number
+    client_request_id?: string
   }) => Promise<void>
 
   onCancel?: () => void
@@ -18,17 +23,21 @@ export default function TradeExecuteForm({
   tradeDate,
   onSubmit,
   onCancel,
+  plannedQuantity,
+  plannedPrice,
 }: Props) {
   const [useCurrentTime, setUseCurrentTime] = useState(true)
   const [entryTime, setEntryTime] = useState("")
   const [loading, setLoading] = useState(false)
+  const [quantity, setQuantity] = useState(String(plannedQuantity ?? ""))
+  const [price, setPrice] = useState(String(plannedPrice ?? ""))
 
   const submit = async () => {
     try {
       setLoading(true)
 
       if (useCurrentTime) {
-        await onSubmit({})
+        await onSubmit({ quantity: Number(quantity), price: Number(price), client_request_id: crypto.randomUUID() })
         return
       }
 
@@ -41,6 +50,7 @@ export default function TradeExecuteForm({
 
       await onSubmit({
         entry_timestamp: entryTimestamp,
+        quantity: Number(quantity), price: Number(price), client_request_id: crypto.randomUUID(),
       })
     } finally {
       setLoading(false)
@@ -70,6 +80,8 @@ export default function TradeExecuteForm({
           Specify Entry Time
         </label>
       </div>
+      <input type="number" min="1" className="w-full rounded border px-3 py-2" placeholder="Actual quantity" value={quantity} onChange={e => setQuantity(e.target.value)} />
+      <input type="number" min="0.000001" step="0.01" className="w-full rounded border px-3 py-2" placeholder="Actual fill price" value={price} onChange={e => setPrice(e.target.value)} />
 
       {!useCurrentTime && (
         <div className="space-y-2">

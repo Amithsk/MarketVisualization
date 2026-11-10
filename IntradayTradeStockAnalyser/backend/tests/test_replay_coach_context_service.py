@@ -41,7 +41,7 @@ class ReplayCoachContextServiceTests(unittest.TestCase):
         payload["nifty_candles"] = [candle("09:45"), candle("09:50"), candle("09:55")]
         payload["trade_data"] = {"strategy": "VWAP", "setup_description": "Enter only after a completed candle closes above 100.", "planned_entry_price": 101, "planned_stop_price": 99, "planned_target_price": 109, "position_type": "LONG", "plan_status": "EXECUTED"}
         context = ReplayCoachContextService.build_context(payload, "2026-09-11")
-        self.assertEqual(context["context_version"], "replay_coach_v4")
+        self.assertEqual(context["context_version"], "replay_coach_v5")
         self.assertEqual(context["executed_trade"]["entry_candle_time"], "2026-09-11T09:55:00+05:30")
         self.assertEqual(context["documented_plan"]["strategy"], "VWAP")
         self.assertIn("completed candle closes", context["documented_plan"]["setup_description"])

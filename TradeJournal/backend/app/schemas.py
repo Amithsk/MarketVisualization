@@ -1,5 +1,5 @@
 # TradeJournal/backend/app/schemas.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, date
 from typing import Optional
 
@@ -29,12 +29,25 @@ class NotTakenPayload(BaseModel):
 
 class ExecuteTradePayload(BaseModel):
     entry_timestamp: Optional[datetime] = None
+    quantity: Optional[int] = Field(default=None, gt=0)
+    price: Optional[float] = Field(default=None, gt=0)
+    client_request_id: Optional[str] = None
+
+
+class AddTradePayload(BaseModel):
+    quantity: int = Field(gt=0)
+    price: float = Field(gt=0)
+    execution_timestamp: datetime
+    note: str = Field(min_length=1, max_length=2000)
+    client_request_id: Optional[str] = None
 
 
 class ExitTradePayload(BaseModel):
-    exit_price: float
+    exit_price: float = Field(gt=0)
     exit_reason: str
     exit_timestamp: datetime
+    quantity: Optional[int] = Field(default=None, gt=0)
+    client_request_id: Optional[str] = None
 
 
 # -------- Review --------
