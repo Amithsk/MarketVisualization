@@ -4,8 +4,9 @@ import logging
 from sqlalchemy.orm import Session
 
 from backend.repositories.replay_repository import (
-    ReplayRepository,
+    ReplayRepository, ExecutionHistoryReadError,
 )
+from decimal import Decimal
 
 from backend.services.nifty_service import (
     NiftyService
@@ -39,6 +40,33 @@ from backend.services.replay_stock_fetch_service import ReplayStockFetchError
 
 
 class ReplayService:
+
+    @staticmethod
+    def _positioned_executions(executions, trade):
+        """Attach Journal-compatible weighted-average snapshots to each event."""
+        open_quantity, average, realized = 0, Decimal("0"), Decimal("0")
+        opening_side = trade.get("side")
+        result = []
+        for event in executions:
+            quantity, price = event["quantity"], Decimal(str(event["price"]))
+            before_quantity, before_average = open_quantity, average
+            realized_this = Decimal("0")
+            is_entry = event["event_type"] in ("ENTRY", "ADD")
+            if is_entry:
+                average = ((average * open_quantity) + (price * quantity)) / (open_quantity + quantity)
+                open_quantity += quantity
+            else:
+                realized_this = ((price - average) if opening_side == "BUY" else (average - price)) * quantity
+                realized += realized_this
+                open_quantity -= quantity
+            result.append({**event,
+                "open_quantity_before": before_quantity, "open_quantity_after": open_quantity,
+                "weighted_average_before": float(before_average) if before_quantity else None,
+                "weighted_average_after": float(average) if open_quantity else None,
+                "realized_gross_pnl": float(realized_this),
+                "cumulative_realized_gross_pnl": float(realized),
+            })
+        return result
 
     @staticmethod
     def get_replay_data(
@@ -83,6 +111,13 @@ class ReplayService:
                     stock,
                 )
             )
+            execution_history_error = None
+            try:
+                raw_execution_history = ReplayRepository.get_execution_history(db, executed_trade["trade_id"])
+                execution_history = ReplayService._positioned_executions(raw_execution_history, executed_trade)
+            except ExecutionHistoryReadError as error:
+                # Do not turn a readable historical single-entry trade into a Replay failure.
+                execution_history, execution_history_error = [], str(error)
 
             nifty_candles = (
                 NiftyService
@@ -282,6 +317,8 @@ class ReplayService:
                 "trade_data": trade_data,
 
                 "executed_trade": executed_trade,
+                "execution_history": execution_history,
+                "execution_history_error": execution_history_error,
 
                 "stock_candles": stock_candles,
 

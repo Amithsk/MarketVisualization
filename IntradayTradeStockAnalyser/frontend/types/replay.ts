@@ -39,6 +39,13 @@ export type ExecutedTrade = {
     order_id: string | null;
     execution_source: "TRADE_JOURNAL";
 };
+export type ExecutionEvent = {
+    sequence: number; event_type: "ENTRY" | "ADD" | "EXIT"; side: "BUY" | "SELL";
+    quantity: number; price: number; execution_timestamp: string; reason: string | null; note: string | null;
+    open_quantity_before: number; open_quantity_after: number;
+    weighted_average_before: number | null; weighted_average_after: number | null;
+    realized_gross_pnl: number; cumulative_realized_gross_pnl: number;
+};
 
 export type MarketContext = {
 
@@ -329,6 +336,8 @@ export type ReplayData = {
     trade_data: ReplayTradeData;
 
     executed_trade: ExecutedTrade;
+    execution_history?: ExecutionEvent[];
+    execution_history_error?: string | null;
 
     stock_candles: Candle[];
 

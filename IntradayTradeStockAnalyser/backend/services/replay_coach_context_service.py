@@ -76,6 +76,14 @@ class ReplayCoachContextService:
             "entry_timestamp": cls._iso(entry_time), "entry_candle_time": cls._iso(entry_candle),
             "exit_timestamp": cls._iso(exit_time), "exit_candle_time": cls._iso(exit_candle),
         })
+        execution_history = [
+            {key: cls._json_value(event.get(key)) for key in (
+                "sequence", "event_type", "side", "quantity", "price", "reason", "note",
+                "open_quantity_before", "open_quantity_after", "weighted_average_before",
+                "weighted_average_after", "realized_gross_pnl", "cumulative_realized_gross_pnl",
+            )} | {"execution_timestamp": cls._iso(cls._parse_timestamp(event.get("execution_timestamp"), "execution timestamp", errors))}
+            for event in (data.get("execution_history") or []) if isinstance(event, dict)
+        ]
         trade_data = cls._documented_trade_data(data.get("trade_data"))
         documented_plan = cls._documented_plan(trade_data)
         decision_context = ReplayCoachDecisionContext.build(stock, market, cls._iso(entry_time), documented_plan)
@@ -83,11 +91,13 @@ class ReplayCoachContextService:
             "context_version": cls.CONTEXT_VERSION, "trade_date": selected_date.isoformat(),
             "timezone": "Asia/Kolkata", "candle_interval_minutes": cls.INTERVAL_MINUTES,
             "executed_trade": executed_trade,
+            "execution_history": execution_history,
+            "execution_history_error": data.get("execution_history_error"),
             # Keep the original documented plan alongside its deterministic,
             # Coach-only summary.  The public Replay response is untouched.
             "trade_data": trade_data,
             "documented_plan": documented_plan,
-            "active_trade_candle_review": ActiveTradeCandleReviewService.build(stock, market, executed_trade, documented_plan),
+            "active_trade_candle_review": ActiveTradeCandleReviewService.build(stock, market, executed_trade, documented_plan, execution_history),
             "decision_context": decision_context,
             "coaching_facts": cls._coaching_facts(executed_trade, documented_plan, decision_context),
             "stock": {"symbol": str(trade["symbol"]).upper().removeprefix("NSE:"), "candle_count": len(stock), "candles": stock},

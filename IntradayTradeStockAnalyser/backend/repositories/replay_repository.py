@@ -14,7 +14,38 @@ class MultipleExecutedTradesError(Exception):
         super().__init__("Multiple executed TradeJournal trades found")
 
 
+class ExecutionHistoryReadError(Exception):
+    """Journal execution rows could not be read; legacy summary remains valid."""
+    pass
+
+
 class ReplayRepository:
+
+    @staticmethod
+    def get_execution_history(db: Session, trade_id: int):
+        """Read Phase-1 Journal events without changing the legacy trade selector."""
+        try:
+            rows = db.execute(text("""
+                SELECT sequence, event_type, side, quantity, price,
+                       execution_timestamp, reason, note
+                FROM trade_execution
+                WHERE trade_id = :trade_id
+                ORDER BY execution_timestamp ASC, sequence ASC
+            """), {"trade_id": trade_id}).mappings().all()
+        except Exception as error:
+            raise ExecutionHistoryReadError(str(error)) from error
+
+        def value(row, key):
+            item = row[key]
+            return item.value if hasattr(item, "value") else item
+
+        return [{
+            "sequence": int(row["sequence"]), "event_type": value(row, "event_type"),
+            "side": value(row, "side"), "quantity": int(row["quantity"]),
+            "price": float(row["price"]),
+            "execution_timestamp": row["execution_timestamp"].isoformat(),
+            "reason": row["reason"], "note": row["note"],
+        } for row in rows]
 
     @staticmethod
     def get_executed_trade(

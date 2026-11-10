@@ -29,6 +29,7 @@ type Props = {
     showTimeline?: boolean;
     tradePlans?: LiveTradePlan[];
     executedTrade?: ExecutedTrade;
+    executionHistory?: import("../../types/replay").ExecutionEvent[];
 
     // -----------------------------------
     // Chart Mode
@@ -350,6 +351,7 @@ export default function CandlestickChart({
     showTimeline = true,
     tradePlans = [],
     executedTrade,
+    executionHistory = [],
     mode = "replay",
     marketContext,
 }: Props) {
@@ -726,7 +728,14 @@ export default function CandlestickChart({
                 ? markerTimeFor(executedTrade.exit_timestamp)
                 : undefined;
 
-            const executionMarkers = [
+            const executionMarkers = executionHistory.length ? executionHistory.map((event) => {
+                const time = markerTimeFor(event.execution_timestamp);
+                const isExit = event.event_type === "EXIT";
+                return time && { time, position: isExit ? "aboveBar" as const : "belowBar" as const,
+                    color: isExit ? "#EF4444" : event.event_type === "ADD" ? "#F59E0B" : "#22C55E",
+                    shape: isExit ? "arrowDown" as const : "arrowUp" as const,
+                    text: `#${event.sequence} ${event.event_type} ${event.quantity} @ ${event.price} · ${event.execution_timestamp.slice(11,19)} · open ${event.open_quantity_before}→${event.open_quantity_after}` };
+            }).filter(Boolean) : [
                 entryTime && {
                     time: entryTime,
                     position: "belowBar" as const,
