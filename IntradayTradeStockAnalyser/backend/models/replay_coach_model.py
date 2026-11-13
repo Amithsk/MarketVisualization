@@ -11,11 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_seriali
 class CoachModel(BaseModel): model_config = ConfigDict(extra="forbid")
 class Evidence(CoachModel):
     time: str; stock_values: str; market_values: str; calculation: Optional[str] = None
-class ReviewPoint(CoachModel): point: str; evidence: List[Evidence]
+class ReviewPoint(CoachModel): point: str; evidence: List[Evidence] = Field(max_length=3)
 class NegativeReviewPoint(ReviewPoint): why_it_matters: str
 class Improvement(CoachModel): action: str; rule: str; example_using_this_trade: str
 class ExecutedTradeAnalysis(CoachModel):
-    summary: str; good: List[ReviewPoint]; bad: List[NegativeReviewPoint]; how_to_improve: List[Improvement]
+    summary: str = Field(max_length=800); good: List[ReviewPoint] = Field(max_length=3); bad: List[NegativeReviewPoint] = Field(max_length=3); how_to_improve: List[Improvement] = Field(max_length=3)
 class AlternativePlanBase(CoachModel):
     name: str; entry_condition: str; rating: int = Field(ge=1, le=10); why_good: List[str]; risks: List[str]; evidence_times: List[str]
 

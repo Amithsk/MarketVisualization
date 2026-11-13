@@ -12,6 +12,7 @@ from backend.models.replay_coach_model import ReplayCoachAnalysis
 from backend.models.replay_coach_provider_model import ProviderReplayCoachTransport
 from backend.services.replay_coach_adapter import to_application_analysis
 from backend.services.replay_coach_config import load_replay_coach_environment, replay_coach_max_output_tokens
+from backend.services.replay_coach_provider_context import ReplayCoachProviderContext
 
 
 class ReplayCoachError(Exception):
@@ -48,13 +49,13 @@ class ReplayCoachOpenAIService:
     DEFAULT_MODEL = "gpt-5-mini"
     DEFAULT_TIMEOUT_SECONDS = 120.0
     SCHEMA_NAME = "replay_coach_analysis"
-    PROMPT_VERSION = "replay_coach_prompt_v13"
+    PROMPT_VERSION = "replay_coach_prompt_v14"
     COACH_SCHEMA_VERSION = "replay_coach_schema_v7"
 
     @classmethod
     def requested_model(cls) -> str:
         return os.getenv("OPENAI_REPLAY_COACH_MODEL", cls.DEFAULT_MODEL)
-    SYSTEM_INSTRUCTIONS = """You are an intraday trading coach helping a beginner understand a completed trade. Explain observations in simple language using exact supplied evidence. For each observation state the number, its supplied baseline, what the comparison means, whether it supports TAKE, WAIT, or NO TRADE, and the completed-candle time or price to inspect on the chart. Keep each explanation to one or two short sentences.
+    SYSTEM_INSTRUCTIONS = """You are an intraday trading coach helping a beginner understand a completed trade. Explain observations in simple language using exact supplied evidence. For each observation state the number, its supplied baseline, what the comparison means, whether it supports TAKE, WAIT, or NO TRADE, and the completed-candle time or price to inspect on the chart. Keep each explanation to one or two short sentences. State the primary lesson first; do not restate the input, describe every candle, repeat deterministic calculations, or produce Markdown.
 
 Do not calculate or provide ratings, component scores, overall scores, progress assessments, final classifications, or best-decision selection. The application owns all calculations, scoring, classifications, and final decisions. Legacy schema fields for risk, reward, and ratio are temporary compatibility fields: only echo supplied values and never treat them as your conclusion. Never invent evidence.
 
@@ -71,6 +72,8 @@ Each issue appears once, with its evidence beneath it. Each how_to_improve item 
 The application supplies authoritative coaching_facts and deterministic market metrics. Interpret only supplied facts; never calculate scores, statuses, risk/reward, thresholds, levels, touch counts, or best decisions. Every observation must name the supplied number, its baseline, what it means for the planned direction, and what to inspect on the chart. Do not use generic phrases such as 'configured threshold', 'mandatory rules', 'conditions become measurable', 'price invalidates the setup', 'structural stop required', or 'wait for confirmation'. State an exact supplied value, or say 'Not established from the available pre-entry evidence.' Do not invent prices, levels, times, thresholds, or indicators. Do not use incomplete or after-entry candle values to justify the original entry. A profitable outcome does not prove the original decision was strong. Keep explanations to two short sentences and return no scores, ratings, or status badges."""
 
     SYSTEM_INSTRUCTIONS += """ For best_full_session_plan, independently review the complete supplied stock and NIFTY sessions from their first to final candle. Do not evaluate or reuse the executed trade, documented plan, P&L, entry, stop, target, direction, or decision score when selecting this opportunity. Search VWAP rejection/reclaim, breakout/retest, support/resistance, opening-range, pullback and volume-supported momentum categories, and return exactly one strongest concrete historical TAKE plan: LONG or SHORT only, with a non-null decision time, entry, structural stop, target, invalidation and decision evidence. Do not return NEUTRAL, WAIT, NO_TRADE or Not applicable. Decision evidence must be completed at or before decision_time; later candles are outcome evidence only. Use exact supplied candle timestamps and evidence values. For `decision_time`, `decision_evidence_times`, and `outcome_evidence_times`, return exact supplied candle `time` strings verbatim in canonical ISO format. These structured reference fields are not displayed text and are exempt from the human-readable time-formatting rule. The 4:1 ratio evaluates the selected real plan; never alter prices to manufacture it."""
+
+    SYSTEM_INSTRUCTIONS += """ PROVIDER CONTEXT FORMAT: `stock` and `market` contain lossless candles as `columns` plus `rows`; each row maps positionally to those columns and timestamps are candle-open times. Use raw candles only to verify a claim; use supplied deterministic decision_context facts for arithmetic, score-related classifications, VWAP, momentum, structure, and stop calculations. Return at most three good points, three bad points, three improvement actions, three limitations, and no more than three evidence timestamps per item. Do not regenerate frontend-only active-trade review, decision-quality score, verdict, or deterministic arithmetic."""
 
     @classmethod
     def request_kwargs(cls, model: str, input_text: str, max_output_tokens: int) -> Dict[str, Any]:
@@ -89,8 +92,9 @@ The application supplies authoritative coaching_facts and deterministic market m
             raise ReplayCoachConfigurationError()
         started_at = perf_counter()
         logger = logging.getLogger(__name__)
-        input_text = json.dumps(context, default=str)
-        logger.info("Replay Coach provider request configured: request_id=%s analysis_id=%s model=%s method=responses.create schema_name=%s max_output_tokens_source=%s requested_max_output_tokens=%s reasoning_effort=unset input_character_count=%s input_byte_count=%s timeout_seconds=%s stream=False structured_output=True", request_id, analysis_id if analysis_id is not None else "none", openai_model, cls.SCHEMA_NAME, max_output_source, max_output_tokens, len(input_text), len(input_text.encode("utf-8")), timeout_seconds)
+        provider_context = ReplayCoachProviderContext.build(context)
+        input_text = json.dumps(provider_context, separators=(",", ":"), default=str)
+        logger.info("Replay Coach provider request configured: request_id=%s analysis_id=%s model=%s method=responses.create schema_name=%s max_output_tokens_source=%s requested_max_output_tokens=%s reasoning_effort=unset input_character_count=%s input_byte_count=%s canonical_evidence_bytes=%s timeout_seconds=%s stream=False structured_output=True", request_id, analysis_id if analysis_id is not None else "none", openai_model, cls.SCHEMA_NAME, max_output_source, max_output_tokens, len(input_text), len(input_text.encode("utf-8")), len(json.dumps(context, separators=(",", ":"), default=str).encode("utf-8")), timeout_seconds)
         try:
             client = cls._client(openai_api_key, timeout_seconds)
             if lifecycle is not None: lifecycle.provider_call_attempted = True; lifecycle.active_operation = "PROVIDER_CALL"
