@@ -23,13 +23,14 @@ class ReplayCoachScoringService:
         volume, economics = facts.get("stock_relative_volume", {}), facts.get("risk_economics", {})
         timing = facts.get("decision_timing", {})
         graph_time = cls._clock(timing.get("last_completed_stock_candle_time"))
-        structure = cls._structure_component(side, facts.get("support_resistance", []), economics, graph_time)
+        support_validity, structural_stop = cls._structure_components(side, facts.get("support_resistance", []), economics, graph_time)
         components = [
             cls._stock_component(side, facts, graph_time),
             cls._nifty_component(side, facts, graph_time),
             cls._volume_component(volume, graph_time),
-            structure,
-            cls._rr_component(economics, structure["score"] == 2, graph_time),
+            support_validity,
+            structural_stop,
+            cls._rr_component(economics, structural_stop["score"] == 1, graph_time),
         ]
         overall = sum(item["score"] for item in components)
         focus = cls._next_focus(components)
@@ -47,29 +48,42 @@ class ReplayCoachScoringService:
         return str(value)[11:16] if isinstance(value, str) and len(value) >= 16 else None
 
     @staticmethod
-    def _component(component, label, score, observed, baseline, calculation, explanation, improvement, graph_time):
-        return {"component": component, "label": label, "score": score, "maximum_score": 2,
-                "status": "CONFIRMED" if score == 2 else "PARTIAL" if score == 1 else "NOT_ESTABLISHED",
+    def _component(component, label, score, observed, baseline, calculation, explanation, improvement, graph_time, maximum_score=2, status=None, **evidence):
+        return {"component": component, "label": label, "score": score, "maximum_score": maximum_score,
+                "status": status or ("CONFIRMED" if score == maximum_score else "PARTIAL" if score else "NOT_ESTABLISHED"),
                 "observed_value": observed, "baseline": baseline, "calculation": calculation,
                 "beginner_explanation": explanation, "improvement_condition": improvement,
-                "graph_times": [graph_time] if graph_time else []}
+                "graph_times": evidence.pop("graph_times", [graph_time] if graph_time else []), **evidence}
 
     @classmethod
     def _stock_component(cls, side, facts, time):
         stock = facts.get("stock_direction", {})
-        structure = facts.get("stock_session_structure", {}).get("classification") or stock.get("session_structure") or stock.get("classification", "INSUFFICIENT_DATA")
-        momentum = facts.get("stock_recent_momentum", {}).get("classification") or stock.get("classification", "NEUTRAL")
+        broader = facts.get("stock_session_structure", {})
+        structure = broader.get("classification") or stock.get("session_structure") or stock.get("classification", "NOT_ASSESSABLE")
+        recent = facts.get("stock_recent_momentum", {})
+        momentum = recent.get("classification") or stock.get("classification", "NEUTRAL")
+        latest = facts.get("stock_latest_completed_candle", {})
         vwap_facts = facts.get("stock_vwap_location", {})
-        location = vwap_facts.get("location") or "UNAVAILABLE"
+        location = vwap_facts.get("location") or ("ABOVE" if isinstance(stock.get("distance_from_vwap_points"), (int, float)) and stock["distance_from_vwap_points"] > 0 else "BELOW" if isinstance(stock.get("distance_from_vwap_points"), (int, float)) and stock["distance_from_vwap_points"] < 0 else "UNAVAILABLE")
         close, vwap = vwap_facts.get("last_completed_close", stock.get("last_completed_close")), vwap_facts.get("vwap", stock.get("vwap"))
+        supportive_latest = latest.get("classification") in (("BULLISH_PROGRESS", "RECOVERY") if side == "LONG" else ("BEARISH_PROGRESS", "PULLBACK"))
         structural = (side == "LONG" and structure == "BULLISH") or (side == "SHORT" and structure == "BEARISH")
         momentum_ok = (side == "LONG" and momentum == "BULLISH") or (side == "SHORT" and momentum == "BEARISH")
         vwap_ok = (side == "LONG" and location == "ABOVE") or (side == "SHORT" and location == "BELOW")
-        score = 2 if structural and (momentum_ok or vwap_ok) else 1 if structural else 0
+        conflicts = [(structure == "BEARISH" if side == "LONG" else structure == "BULLISH"), (momentum == "BEARISH" if side == "LONG" else momentum == "BULLISH"), (latest.get("classification") == ("BEARISH_PROGRESS" if side == "LONG" else "BULLISH_PROGRESS")), (location == ("BELOW" if side == "LONG" else "ABOVE"))]
+        supports = [structural, momentum_ok, supportive_latest, vwap_ok]
+        score = 2 if structural and (momentum_ok or supportive_latest) and vwap_ok and not any(conflicts) else 1 if any(supports) else 0
+        alignment = "FULL_ALIGNMENT" if score == 2 else "PARTIAL_ALIGNMENT" if score == 1 else "NOT_ASSESSABLE" if structure == "NOT_ASSESSABLE" and not any(supports) else "NO_ALIGNMENT"
+        timing = facts.get("decision_timing", {})
+        graph_times = [cls._clock(item.get("time")) for item in broader.get("confirmed_swing_highs", []) + broader.get("confirmed_swing_lows", [])]
+        for window in (recent.get("three_candle"), recent.get("five_candle")):
+            if window: graph_times.extend([cls._clock(window["start_time"]), cls._clock(window["end_time"])])
+        graph_times.extend([cls._clock(latest.get("previous_interval_start")), cls._clock(latest.get("interval_start"))])
+        evidence = {"decision_boundary":{"entry_time":timing.get("entry_time"),"last_completed_candle_start":timing.get("last_completed_stock_candle_time"),"excluded_forming_candle_start":timing.get("containing_candle_start"),"excluded_forming_candle_end":timing.get("containing_candle_end"),"timestamp_semantics":"CANDLE_OPEN"},"broader_structure":broader,"recent_momentum":recent,"latest_completed_candle":latest,"vwap_location":vwap_facts,"alignment":{"classification":alignment,"supporting_factors":[name for name,ok in (("broader structure",structural),("recent momentum",momentum_ok),("latest completed candle",supportive_latest),("VWAP location",vwap_ok)) if ok],"conflicting_factors":[name for name,conflict in (("broader structure",conflicts[0]),("recent momentum",conflicts[1]),("latest completed candle",conflicts[2]),("VWAP location",conflicts[3])) if conflict],"neutral_factors":["broader structure" if structure=="UNCONFIRMED" else ""]}}
         return cls._component("STOCK_DIRECTION", "Stock direction and VWAP", score,
-            f"Session structure {structure}; recent momentum {momentum}; completed close {cls._price(close)}",
-            f"VWAP {cls._price(vwap)} ({location})", "Broader structure, recent momentum, and VWAP location are separate decision-time facts.",
-            f"Broader structure was {structure.lower()} while recent momentum was {momentum.lower()}.", "Check broader structure, recent momentum, and VWAP location together.", time)
+            f"Structure {structure.lower()}; recent momentum {momentum.lower()}; latest candle {latest.get('classification', 'not assessable').lower()}; close {cls._price(close)}",
+            f"VWAP {cls._price(vwap)} ({location})", "Broader structure, momentum, latest-candle behaviour, and VWAP are separate decision-time facts.",
+            f"Evidence was {'fully' if score == 2 else 'partially' if score == 1 else 'not'} aligned with the {side or 'planned'} trade. Structure was {structure.lower()} and momentum was {momentum.lower()}.", "Check confirmed swings, momentum, the latest completed candle, and VWAP together.", time, status=alignment, stock_direction_evidence=evidence, calculation_lines=[{"label":"Decision boundary","formula":"Last completed candle", "result":str(timing.get("last_completed_stock_candle_time") or "unavailable")},{"label":"Broader structure","formula":f"Swing highs {len(broader.get('confirmed_swing_highs', []))}/{broader.get('required_swing_highs', 2)}; swing lows {len(broader.get('confirmed_swing_lows', []))}/{broader.get('required_swing_lows', 2)}", "result":structure},{"label":"Latest completed candle","formula":str(latest.get("interval_start") or "unavailable"), "result":str(latest.get("classification") or "NOT_ASSESSABLE")},{"label":"VWAP distance","formula":f"{cls._price(close)} − {cls._price(vwap)}", "result":f"{vwap_facts.get('distance_from_vwap_points', stock.get('distance_from_vwap_points', 'unavailable'))} points ({location})"}], graph_times=list(dict.fromkeys(x for x in graph_times if x)))
 
     def _legacy_stock_component(cls, side, stock, time):
         direction = stock.get("classification", "UNAVAILABLE")
@@ -105,20 +119,54 @@ class ReplayCoachScoringService:
             f"The observed volume {assessment}; volume measures participation and does not itself prove direction.", f"For the system's strongest score, use at least {cls.RELATIVE_VOLUME_STRONG:.1f}× the stock's own five-candle median.", time)
 
     @classmethod
-    def _structure_component(cls, side, levels, economics, time):
-        stop = economics.get("stop"); kind = "SUPPORT" if side == "LONG" else "RESISTANCE"
-        candidates = [level for level in levels if level.get("level_type") == kind and level.get("established_before_entry") and level.get("touch_count", 0) >= 2]
+    def _structure_components(cls, side, levels, economics, time):
+        kind = "SUPPORT" if side == "LONG" else "RESISTANCE" if side == "SHORT" else None
+        candidates = [level for level in levels if kind and level.get("level_type") == kind and level.get("established_before_entry") and level.get("touch_count", 0) >= level.get("required_reactions", 2)]
         level = candidates[0] if candidates else None
-        valid = bool(level and stop is not None and ((side == "LONG" and float(stop) <= float(level["level"])) or (side == "SHORT" and float(stop) >= float(level["level"]))))
-        score = 2 if valid else 1 if level else 0
-        assessment = "passed" if valid else "could not be established from the available pre-entry evidence"
-        detail = (f"The checked {kind.lower()} was {cls._price(level.get('level'))}, with {level.get('touch_count')} completed touches; the entered stop was {cls._price(stop)}."
-                  if level else f"No {kind.lower()} with two completed pre-entry touches was available.")
-        return cls._component("PRICE_STRUCTURE", "Price structure and structural stop", score,
-            f"{kind.title()} {cls._price(level.get('level'))}" if level else "No established level", "At least two pre-entry touches and a structural stop",
-            detail,
-            f"The structural-stop check {assessment}. A calculated stop alone is not evidence that the trade idea is wrong.",
-            "Identify a confirmed price level first, then place the stop beyond that level.", time)
+        sources = level.get("source_candles", []) if level else []
+        assessable = bool(level and sources)
+        active = bool(assessable and not level.get("invalidated", False))
+        status = "CONFIRMED" if active else "NOT_ASSESSABLE" if level and not sources else "NOT_CONFIRMED"
+        source_times = [cls._clock(item.get("time")) for item in sources]
+        penetration_times = [cls._clock(item.get("time")) for item in (level.get("penetrations", []) if level else [])]
+        graph_times = list(dict.fromkeys([item for item in source_times + penetration_times if item]))
+        calculation_lines = cls._level_calculations(level, kind) if level else []
+        validity = cls._component("SUPPORT_VALIDITY" if kind == "SUPPORT" else "RESISTANCE_VALIDITY", f"{kind.title()} validity" if kind else "Structure validity", 1 if active else 0,
+            f"{kind.title()} centre {cls._price(level.get('level'))}" if level else "No established level", f"{level.get('touch_count', 0) if level else 0}/{level.get('required_reactions', 2) if level else 2} completed pre-entry reactions",
+            calculation_lines[0]["formula"] + " = " + calculation_lines[0]["result"] if calculation_lines else "No reconstructable completed-candle calculation.",
+            (f"{level.get('touch_count')} pre-entry reactions formed the {kind.lower()} and it remained active at entry." if active else "The available completed-candle evidence was insufficient to assess structure safely." if status == "NOT_ASSESSABLE" else f"The pre-entry structural level was not sufficiently established or had already been invalidated."),
+            "First confirm that the level was active at entry. Then place the stop beyond the complete structural boundary.", time, maximum_score=1, status=status, level=cls._level_evidence(level), source_candles=sources, penetrations=level.get("penetrations", []) if level else [], calculation_lines=calculation_lines, graph_times=graph_times)
+        stop = economics.get("stop"); extreme = level.get("structural_extreme") if level else None
+        placement = "UNAVAILABLE"
+        if active and stop is not None and extreme:
+            stop = float(stop); centre, lower, upper, value = float(level["level"]), float(level["zone_lower"]), float(level["zone_upper"]), float(extreme["value"])
+            beyond_extreme = stop < value if kind == "SUPPORT" else stop > value
+            beyond_zone = stop < lower if kind == "SUPPORT" else stop > upper
+            beyond_centre = stop < centre if kind == "SUPPORT" else stop > centre
+            placement = "BEYOND_COMPLETE_STRUCTURE" if beyond_extreme else "BEYOND_ZONE_NOT_STRUCTURAL_EXTREME" if beyond_zone else "BEYOND_CENTRE_ONLY" if beyond_centre else "INSIDE_DETECTED_ZONE"
+        stop_score = 1 if placement == "BEYOND_COMPLETE_STRUCTURE" else 0
+        stop_status = "CONFIRMED" if stop_score else "NOT_ASSESSABLE" if not assessable or stop is None or not extreme else "NOT_CONFIRMED"
+        stop_lines = cls._stop_calculations(kind, level, stop, extreme) if level and stop is not None and extreme else []
+        stop_component = cls._component("STRUCTURAL_STOP", "Structural stop placement", stop_score, f"Stop {cls._price(stop)}" if stop is not None else "Stop unavailable", placement.replace("_", " ").title(),
+            "; ".join(line["formula"] + " = " + line["result"] for line in stop_lines) or "Stop placement cannot be reconstructed safely.",
+            "The stop was beyond the complete structural boundary." if stop_score else "The stop was below/above the calculated centre but remained inside the complete structural range." if placement == "BEYOND_CENTRE_ONLY" else "The stop could not be verified beyond the complete pre-entry structure.",
+            "If a stop beyond the full structure creates excessive risk or reward:risk, skip the trade rather than forcing a wider stop.", time, maximum_score=1, status=stop_status, stop_price=stop, level_centre=level.get("level") if level else None, zone_boundary=(level.get("zone_lower") if kind == "SUPPORT" and level else level.get("zone_upper") if level else None), structural_extreme=extreme, placement=placement, calculation_lines=stop_lines, graph_times=graph_times)
+        return validity, stop_component
+
+    @classmethod
+    def _level_evidence(cls, level):
+        if not level: return None
+        return {key: level.get(key) for key in ("level_type", "method", "level", "zone_lower", "zone_upper", "required_reactions", "touch_count", "invalidation_required_closes", "invalidation_consecutive_closes", "invalidated")}
+    @classmethod
+    def _level_calculations(cls, level, kind):
+        if not level: return []
+        values = [item["value"] for item in level.get("source_candles", [])]
+        formula = " + ".join(cls._price(value) for value in values) + f" ÷ {len(values)}" if values else "Unavailable"
+        return [{"label": f"{kind.title()} centre", "formula": formula, "result": cls._price(level.get("level"))}]
+    @classmethod
+    def _stop_calculations(cls, kind, level, stop, extreme):
+        if kind == "SUPPORT": return [{"label": "Below support centre", "formula": f"{cls._price(level['level'])} − {cls._price(stop)}", "result": cls._price(float(level['level']) - stop)}, {"label": "Position relative to structural low", "formula": f"{cls._price(stop)} − {cls._price(extreme['value'])}", "result": f"{cls._price(abs(stop - float(extreme['value'])))} {'below' if stop < float(extreme['value']) else 'above'} the structural low"}]
+        return [{"label": "Above resistance centre", "formula": f"{cls._price(stop)} − {cls._price(level['level'])}", "result": cls._price(stop - float(level['level']))}, {"label": "Position relative to structural high", "formula": f"{cls._price(extreme['value'])} − {cls._price(stop)}", "result": f"{cls._price(abs(float(extreme['value']) - stop))} {'above' if stop > float(extreme['value']) else 'below'} the structural high"}]
 
     @classmethod
     def _rr_component(cls, economics, structurally_valid, time):
@@ -133,13 +181,19 @@ class ReplayCoachScoringService:
 
     @classmethod
     def _summary(cls, components):
-        good = [item["label"] for item in components if item["score"] == 2]
-        weak = [item["label"] for item in components if item["score"] < 2]
-        return f"{', '.join(good) or 'No component'} supported the entry; improve {', '.join(weak) or 'the documented process'}."
+        validity = next((item for item in components if item["component"] in ("SUPPORT_VALIDITY", "RESISTANCE_VALIDITY")), None)
+        stop = next((item for item in components if item["component"] == "STRUCTURAL_STOP"), None)
+        if validity and validity["score"] == validity["maximum_score"] and stop and stop["score"] == stop["maximum_score"]:
+            structural = "Pre-entry structure was valid and the stop was beyond the required structural boundary."
+        elif validity and validity["score"] == validity["maximum_score"]:
+            structural = f"Pre-entry {validity['label'].replace(' validity', '').lower()} was identifiable, but the stop remained inside the complete structural range."
+        elif validity and validity["status"] == "NOT_ASSESSABLE":
+            structural = "The available completed-candle evidence was insufficient to assess structure safely."
+        else: structural = "The pre-entry structural level was not sufficiently established or had already been invalidated."
+        return structural
 
     @classmethod
     def _next_focus(cls, components):
-        priority = ["PRICE_STRUCTURE", "REWARD_RISK", "STOCK_DIRECTION", "NIFTY_ALIGNMENT", "RELATIVE_VOLUME"]
-        lowest = min(item["score"] for item in components)
-        selected = next(item for key in priority for item in components if item["component"] == key and item["score"] == lowest)
-        return {"component": selected["component"], "current_score": selected["score"], "target_score": 2, "message": selected["improvement_condition"]}
+        priority = ["SUPPORT_VALIDITY", "RESISTANCE_VALIDITY", "STRUCTURAL_STOP", "REWARD_RISK", "STOCK_DIRECTION", "NIFTY_ALIGNMENT", "RELATIVE_VOLUME"]
+        selected = next((item for key in priority for item in components if item["component"] == key and item["score"] < item["maximum_score"]), components[0])
+        return {"component": selected["component"], "current_score": selected["score"], "target_score": selected["maximum_score"], "message": selected["improvement_condition"]}

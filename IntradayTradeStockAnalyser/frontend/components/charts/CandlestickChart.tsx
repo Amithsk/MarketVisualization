@@ -728,27 +728,32 @@ export default function CandlestickChart({
                 ? markerTimeFor(executedTrade.exit_timestamp)
                 : undefined;
 
-            const executionMarkers = executionHistory.length ? executionHistory.map((event) => {
+            // Same-candle fills stay separate markers in their Journal sequence.
+            const executionMarkers = executionHistory.length ? [...executionHistory]
+                .sort((left, right) => left.execution_timestamp.localeCompare(right.execution_timestamp) || left.sequence - right.sequence)
+                .map((event) => {
                 const time = markerTimeFor(event.execution_timestamp);
                 const isExit = event.event_type === "EXIT";
                 return time && { time, position: isExit ? "aboveBar" as const : "belowBar" as const,
                     color: isExit ? "#EF4444" : event.event_type === "ADD" ? "#F59E0B" : "#22C55E",
                     shape: isExit ? "arrowDown" as const : "arrowUp" as const,
-                    text: `#${event.sequence} ${event.event_type} ${event.quantity} @ ${event.price} · ${event.execution_timestamp.slice(11,19)} · open ${event.open_quantity_before}→${event.open_quantity_after}` };
+                    // The Journal sequence is the shared pointer to the detailed Position executions row.
+                    // Keep the event semantics in the marker itself; only its permanent label is compact.
+                    text: `#${event.sequence}` };
             }).filter(Boolean) : [
                 entryTime && {
                     time: entryTime,
                     position: "belowBar" as const,
                     color: "#22C55E",
                     shape: "arrowUp" as const,
-                    text: `Entry ${executedTrade.entry_price}`,
+                    text: "#1",
                 },
                 exitTime && executedTrade.exit_price !== null && {
                     time: exitTime,
                     position: "aboveBar" as const,
                     color: "#EF4444",
                     shape: "arrowDown" as const,
-                    text: `Exit ${executedTrade.exit_price}`,
+                    text: "#2",
                 },
             ].filter(Boolean);
 

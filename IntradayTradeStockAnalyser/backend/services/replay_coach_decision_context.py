@@ -8,6 +8,7 @@ MINIMUM_REWARD_RISK_RATIO = 4.0
 class ReplayCoachDecisionContext:
     VWAP_NEAR_RANGE_FRACTION = .15
     VWAP_NEAR_MIN_PCT = .10
+    STRUCTURE_INVALIDATION_CLOSES = 2
 
     @classmethod
     def build(cls, stock, market, entry_time, documented_plan):
@@ -20,7 +21,7 @@ class ReplayCoachDecisionContext:
         composite = cls._composite(ss["classification"], sm["classification"])
         return {
             "decision_timing": {"entry_time": entry_time, "containing_candle_start": cls._start(entry).isoformat(timespec="seconds"), "containing_candle_end": (cls._start(entry)+timedelta(minutes=5)).isoformat(timespec="seconds"), "containing_candle_complete_at_entry": False, "last_completed_stock_candle_time": s[-1]["time"] if s else None, "last_completed_market_candle_time": n[-1]["time"] if n else None},
-            "stock_session_structure": ss, "stock_recent_momentum": sm, "stock_vwap_location": sv, "stock_volume_context": cls._volume_context(svol),
+            "stock_session_structure": ss, "stock_recent_momentum": sm, "stock_latest_completed_candle": cls._latest_candle(s), "stock_vwap_location": sv, "stock_volume_context": cls._volume_context(svol),
             "nifty_session_structure": ns, "nifty_recent_momentum": nm, "nifty_vwap_location": nv, "nifty_volume_context": cls._volume_context(nvol),
             "stock_nifty_relationship": cls._relationship(ss["classification"], sm["classification"], ns["classification"], nm["classification"]),
             "decision_time_market_context": {"classification": composite, "stock_completed_candle_count": len(s), "nifty_completed_candle_count": len(n)},
@@ -41,21 +42,34 @@ class ReplayCoachDecisionContext:
         return "UP" if values[-1]["price"] > values[-2]["price"] else "DOWN" if values[-1]["price"] < values[-2]["price"] else "FLAT"
     @classmethod
     def _structure(cls, values):
-        if len(values) < 5: return {"classification":"INSUFFICIENT_DATA","completed_candle_count":len(values),"confirmed_swing_highs":[],"confirmed_swing_lows":[]}
+        required = 2
+        if len(values) < 3: return {"classification":"NOT_ASSESSABLE" if not values else "UNCONFIRMED","completed_candle_count":len(values),"required_swing_highs":required,"required_swing_lows":required,"confirmed_swing_highs":[],"confirmed_swing_lows":[],"swing_high_trend":"UNKNOWN","swing_low_trend":"UNKNOWN","explanation":"There are not enough completed candles to confirm swing points."}
         highs=[]; lows=[]
         for i in range(1,len(values)-1):
             a,b,c=values[i-1],values[i],values[i+1]
             if float(b["high"])>float(a["high"]) and float(b["high"])>float(c["high"]): highs.append({"time":b["time"],"price":float(b["high"])})
             if float(b["low"])<float(a["low"]) and float(b["low"])<float(c["low"]): lows.append({"time":b["time"],"price":float(b["low"])})
         ht,lt=cls._trend(highs),cls._trend(lows)
-        direction="BULLISH" if ht==lt=="UP" else "BEARISH" if ht==lt=="DOWN" else "RANGE" if ht==lt=="FLAT" else "MIXED"
-        return {"classification":direction,"completed_candle_count":len(values),"confirmed_swing_highs":highs,"confirmed_swing_lows":lows,"swing_high_trend":ht,"swing_low_trend":lt}
+        enough=len(highs)>=required and len(lows)>=required
+        direction="UNCONFIRMED" if not enough else "BULLISH" if ht==lt=="UP" else "BEARISH" if ht==lt=="DOWN" else "RANGE" if ht==lt=="FLAT" else "MIXED"
+        return {"classification":direction,"completed_candle_count":len(values),"required_swing_highs":required,"required_swing_lows":required,"confirmed_swing_highs":highs,"confirmed_swing_lows":lows,"swing_high_trend":ht,"swing_low_trend":lt,"explanation":f"Only {len(highs)} swing highs and {len(lows)} swing lows are confirmed; {required} of each are required." if not enough else f"Confirmed swing-high trend is {ht.lower()} and swing-low trend is {lt.lower()}."}
     @staticmethod
     def _momentum(values):
-        if not values:return {"classification":"NEUTRAL","three_candle_return_pct":None,"five_candle_return_pct":None}
-        close=float(values[-1]["close"]); ret=lambda x:round((close-float(values[-x]["close"]))/float(values[-x]["close"])*100,4) if len(values)>=x else None
-        a,b=ret(3),ret(5); signs=[x>0 for x in (a,b) if x is not None]
-        return {"classification":"BULLISH" if signs and all(signs) else "BEARISH" if signs and not any(signs) else "MIXED" if len(signs)==2 else "NEUTRAL","three_candle_return_pct":a,"five_candle_return_pct":b,"last_completed_close":close}
+        if not values:return {"classification":"NOT_ASSESSABLE","three_candle_return_pct":None,"five_candle_return_pct":None}
+        close=float(values[-1]["close"])
+        def window(count):
+            if len(values)<count:return None
+            start,end=values[-count],values[-1]; pct=round((close-float(start["close"]))/float(start["close"])*100,4)
+            return {"start_time":start["time"],"start_close":float(start["close"]),"end_time":end["time"],"end_close":close,"return_pct":pct,"formula":f"({close:.2f} - {float(start['close']):.2f}) / {float(start['close']):.2f} × 100"}
+        three,five=window(3),window(5); values_=[x["return_pct"] for x in (three,five) if x]; signs=[x>0 for x in values_]
+        return {"classification":"BULLISH" if signs and all(signs) else "BEARISH" if signs and not any(signs) else "MIXED" if len(signs)==2 else "NEUTRAL","three_candle_return_pct":three["return_pct"] if three else None,"five_candle_return_pct":five["return_pct"] if five else None,"three_candle":three,"five_candle":five,"last_completed_close":close}
+
+    @staticmethod
+    def _latest_candle(values):
+        if len(values)<2:return {"classification":"NOT_ASSESSABLE","explanation":"A previous completed candle is required for comparison."}
+        c,p=values[-1],values[-2]; o,h,l,close=(float(c[k]) for k in ("open","high","low","close")); body=round(close-o,4)
+        classification="INSIDE_RANGE" if h<=float(p["high"]) and l>=float(p["low"]) else "RECOVERY" if body>0 and l>=float(p["low"]) and h<float(p["high"]) else "BULLISH_PROGRESS" if body>0 and h>float(p["high"]) else "BEARISH_PROGRESS" if body<0 and l<float(p["low"]) else "PULLBACK" if body<0 else "PAUSE" if body==0 else "MIXED"
+        return {"interval_start":c["time"],"previous_interval_start":p["time"],"open":o,"high":h,"low":l,"close":close,"body_change":body,"body_pct":round(body/o*100,4) if o else None,"previous_high":float(p["high"]),"previous_low":float(p["low"]),"classification":classification,"explanation":f"The candle {'closed above' if body>0 else 'closed below' if body<0 else 'matched'} its open and {'did not reclaim' if h<float(p['high']) else 'exceeded'} the previous high."}
     @classmethod
     def _vwap(cls, values):
         if not values:return {"location":"UNAVAILABLE","last_completed_close":None,"vwap":None,"distance_from_vwap_points":None,"distance_from_vwap_pct":None,"near_tolerance_points":None}
@@ -111,7 +125,22 @@ class ReplayCoachDecisionContext:
             for candle in values:
                 price = float(candle[key]); touches = [item for item in values if abs(float(item[key]) - price) <= tolerance]
                 if len(touches) >= 2:
-                    levels.append({"level": round(sum(float(item[key]) for item in touches) / len(touches), 4), "level_type": kind, "touch_count": len(touches), "touch_timestamps": [item["time"] for item in touches], "clustering_tolerance": tolerance, "distance_from_proposed_entry": round(float(entry) - price, 4), "established_before_entry": True})
+                    centre = round(sum(float(item[key]) for item in touches) / len(touches), 4)
+                    zone_lower, zone_upper = round(min(float(item[key]) for item in touches), 4), round(max(float(item[key]) for item in touches), 4)
+                    sources = [{"time": item["time"], "time_semantics": "CANDLE_OPEN", "field": key.upper(), "value": round(float(item[key]), 4), "close": round(float(item["close"]), 4), "qualified": True, "reason": f"{key.title()} is within the detected {kind.lower()} zone."} for item in touches]
+                    penetrations, consecutive = [], 0
+                    for item in values:
+                        extreme, close = float(item[key]), float(item["close"])
+                        penetrated = extreme < zone_lower if kind == "SUPPORT" else extreme > zone_upper
+                        closed_beyond = close < zone_lower if kind == "SUPPORT" else close > zone_upper
+                        consecutive = consecutive + 1 if closed_beyond else 0
+                        if penetrated:
+                            recovered = not closed_beyond
+                            penetrations.append({"time": item["time"], "extreme": round(extreme, 4), "close": round(close, 4), "distance_beyond_centre": round(centre - extreme if kind == "SUPPORT" else extreme - centre, 4), "distance_beyond_zone": round(zone_lower - extreme if kind == "SUPPORT" else extreme - zone_upper, 4), "recovered_by_close": recovered, "closed_beyond_zone": closed_beyond, "invalidation_count_after": consecutive, "counts_toward_invalidation": closed_beyond, "explanation": f"Price penetrated {'below' if kind == 'SUPPORT' else 'above'} the {kind.lower()} zone" + (f" but recovered to close {'above' if kind == 'SUPPORT' else 'below'} it." if recovered else ".")})
+                    # A recovered penetration is a deterministic rejection of this zone; otherwise use its outer source candle.
+                    rejection = [item for item in penetrations if item["recovered_by_close"]]
+                    structural = min(rejection, key=lambda item: item["extreme"]) if kind == "SUPPORT" and rejection else max(rejection, key=lambda item: item["extreme"]) if rejection else (min(sources, key=lambda item: item["value"]) if kind == "SUPPORT" else max(sources, key=lambda item: item["value"]))
+                    levels.append({"level": centre, "level_type": kind, "method": f"MEAN_OF_QUALIFYING_{key.upper()}S", "zone_lower": zone_lower, "zone_upper": zone_upper, "touch_count": len(touches), "required_reactions": 2, "touch_timestamps": [item["time"] for item in touches], "source_candles": sources, "penetrations": penetrations, "invalidation_required_closes": ReplayCoachDecisionContext.STRUCTURE_INVALIDATION_CLOSES, "invalidation_consecutive_closes": max((item["invalidation_count_after"] for item in penetrations), default=0), "invalidated": any(item["invalidation_count_after"] >= ReplayCoachDecisionContext.STRUCTURE_INVALIDATION_CLOSES for item in penetrations), "structural_extreme": {"time": structural["time"], "field": key.upper(), "value": structural.get("extreme", structural.get("value")), "reason": f"Pre-entry {'rejection' if structural in rejection else 'qualifying'} {key} associated with the {kind.lower()} structure."}, "clustering_tolerance": tolerance, "distance_from_proposed_entry": round(float(entry) - price, 4), "established_before_entry": True})
                     break
         return levels
     @staticmethod

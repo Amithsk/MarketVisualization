@@ -73,6 +73,10 @@ class ReplayRepository:
                 trade_log.pnl_pct AS pnl_pct,
                 trade_log.trade_result AS trade_result,
                 trade_log.exit_reason AS exit_reason
+                ,trade_log.is_phase1_position AS is_phase1_position
+                ,trade_log.open_quantity AS journal_open_quantity
+                ,trade_log.remaining_avg_entry_price AS journal_remaining_avg_entry_price
+                ,trade_log.realized_gross_pnl AS journal_realized_gross_pnl
             FROM trade_plan
             INNER JOIN trade_log
                 ON trade_plan.trade_id = trade_log.id
@@ -120,6 +124,15 @@ class ReplayRepository:
             "exit_reason": row["exit_reason"],
             "order_id": row["order_id"],
             "execution_source": "TRADE_JOURNAL",
+            # Phase 1 only persists the current aggregate on trade_log, not a
+            # snapshot for every execution.  Replay exposes it explicitly so
+            # consumers never mistake a derived per-event value for Journal data.
+            "journal_position_snapshot": {
+                "available": bool(row.get("is_phase1_position")),
+                "open_quantity": int(row["journal_open_quantity"]) if row.get("journal_open_quantity") is not None else None,
+                "weighted_average": as_float(row.get("journal_remaining_avg_entry_price")),
+                "realized_gross_pnl": as_float(row.get("journal_realized_gross_pnl")),
+            },
         }
 
     @staticmethod

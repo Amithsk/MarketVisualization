@@ -10,8 +10,8 @@ def context(pnl=100):
         "stock_direction": {"classification": "BEARISH", "last_completed_close": 100, "vwap": 101, "distance_from_vwap_points": -1, "distance_from_vwap_pct": -1},
         "nifty_direction": {"classification": "BEARISH"},
         "stock_relative_volume": {"last_completed_volume": 150, "previous_5_candle_median": 100, "ratio_vs_5_candle_median": 1.5},
-        "support_resistance": [{"level_type": "RESISTANCE", "level": 101, "touch_count": 2, "established_before_entry": True}],
-        "risk_economics": {"stop": 101, "risk": 1, "reward": 4, "reward_risk_ratio": 4},
+        "support_resistance": [{"level_type": "RESISTANCE", "level": 101, "zone_lower": 100.8, "zone_upper": 101.2, "touch_count": 2, "required_reactions": 2, "established_before_entry": True, "invalidated": False, "source_candles": [{"time":"2026-09-22T09:50:00+05:30", "field":"HIGH", "value":101, "close":100.5, "qualified":True, "reason":"x"}, {"time":"2026-09-22T09:55:00+05:30", "field":"HIGH", "value":101, "close":100.5, "qualified":True, "reason":"x"}], "penetrations": [], "structural_extreme": {"time":"2026-09-22T09:55:00+05:30", "field":"HIGH", "value":101, "reason":"x"}}],
+        "risk_economics": {"stop": 102, "risk": 1, "reward": 4, "reward_risk_ratio": 4},
     }}
 
 
@@ -29,9 +29,24 @@ class ReplayCoachScoringServiceTests(unittest.TestCase):
     def test_missing_structural_stop_scores_zero_and_is_first_focus(self):
         values = context(); values["decision_context"]["support_resistance"] = []
         score = ReplayCoachScoringService.score(values)
-        structure = next(item for item in score["components"] if item["component"] == "PRICE_STRUCTURE")
+        structure = next(item for item in score["components"] if item["component"] == "RESISTANCE_VALIDITY")
         self.assertEqual(structure["score"], 0)
-        self.assertEqual(score["next_trade_focus"]["component"], "PRICE_STRUCTURE")
+        self.assertEqual(score["next_trade_focus"]["component"], "RESISTANCE_VALIDITY")
+
+    def test_support_level_discloses_sources_penetration_and_stop_inside_rejection(self):
+        values = context(); values["documented_plan"]["position_type"] = "LONG"
+        values["decision_context"]["risk_economics"]["stop"] = 98.5
+        values["decision_context"]["support_resistance"] = [{"level_type":"SUPPORT", "level":101.37, "zone_lower":100.3, "zone_upper":102, "touch_count":3, "required_reactions":2, "established_before_entry":True, "invalidated":False, "source_candles":[{"time":"2026-09-22T09:20:00+05:30","field":"LOW","value":101.8,"close":105.1,"qualified":True,"reason":"x"},{"time":"2026-09-22T09:25:00+05:30","field":"LOW","value":100.3,"close":100.6,"qualified":True,"reason":"x"},{"time":"2026-09-22T09:35:00+05:30","field":"LOW","value":102,"close":103.8,"qualified":True,"reason":"x"}], "penetrations":[{"time":"2026-09-22T09:30:00+05:30","extreme":96,"close":103.2,"recovered_by_close":True,"closed_beyond_zone":False,"invalidation_count_after":0,"explanation":"recovered"}], "structural_extreme":{"time":"2026-09-22T09:30:00+05:30","field":"LOW","value":96,"reason":"rejection"}}]
+        score = ReplayCoachScoringService.score(values)
+        support = next(x for x in score["components"] if x["component"] == "SUPPORT_VALIDITY")
+        stop = next(x for x in score["components"] if x["component"] == "STRUCTURAL_STOP")
+        self.assertEqual(support["score"], 1); self.assertEqual([x["time"][11:16] for x in support["source_candles"]], ["09:20", "09:25", "09:35"])
+        self.assertEqual(stop["score"], 0); self.assertEqual(stop["placement"], "BEYOND_ZONE_NOT_STRUCTURAL_EXTREME")
+
+    def test_two_completed_closes_invalidate_a_level(self):
+        values = context(); level = values["decision_context"]["support_resistance"][0]; level["invalidated"] = True
+        score = ReplayCoachScoringService.score(values)
+        self.assertEqual(next(x for x in score["components"] if x["component"] == "RESISTANCE_VALIDITY")["score"], 0)
 
     def test_forming_candle_status_and_unknown_strategy_rules_do_not_change_score(self):
         complete = context()

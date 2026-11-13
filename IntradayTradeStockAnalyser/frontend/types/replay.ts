@@ -38,6 +38,7 @@ export type ExecutedTrade = {
     exit_reason: string | null;
     order_id: string | null;
     execution_source: "TRADE_JOURNAL";
+    journal_position_snapshot?: { available: boolean; open_quantity: number | null; weighted_average: number | null; realized_gross_pnl: number | null };
 };
 export type ExecutionEvent = {
     sequence: number; event_type: "ENTRY" | "ADD" | "EXIT"; side: "BUY" | "SELL";
@@ -45,6 +46,7 @@ export type ExecutionEvent = {
     open_quantity_before: number; open_quantity_after: number;
     weighted_average_before: number | null; weighted_average_after: number | null;
     realized_gross_pnl: number; cumulative_realized_gross_pnl: number;
+    position_snapshot_source?: "DERIVED_FROM_JOURNAL_EXECUTIONS";
 };
 
 export type MarketContext = {
@@ -440,12 +442,12 @@ export type CoachAnalysis = {
     limitations: string[];
     active_trade_candle_review?: ActiveTradeCandleReview | null;
 };
-export type ActiveTradeCandleReview = { version: string; trade_side: "LONG" | "SHORT"; formula_key: string; items: { completion_time: string | null; candle_effectiveness?: { calculation_lines: { label: string; formula: string; result: string }[] }; candle_behaviour: { message: string }; nifty_relationship: { message: string; calculation_lines: { label: string; formula: string; result: string }[] }; trade_effect: { message: string; calculation_lines: { label: string; formula: string; result: string }[] }; decision: { classification: "HOLD" | "WATCH" | "EXIT" | "NO_COMPLETED_CANDLE" } }[] };
+export type ActiveTradeCandleReview = { version: string; trade_side: "LONG" | "SHORT"; formula_key: string; items: { completion_time: string | null; candle_effectiveness?: { calculation_lines: { label: string; formula: string; result: string }[] }; candle_behaviour: { message: string }; nifty_relationship: { message: string; calculation_lines: { label: string; formula: string; result: string }[] }; trade_effect: { message: string; trade_side: "LONG" | "SHORT" | null; basis_source: "ORIGINAL_EXECUTED_ENTRY" | "JOURNAL_WEIGHTED_AVERAGE" | "RECONSTRUCTED_EXECUTION_HISTORY" | "UNAVAILABLE"; basis_price: number | null; candle_close: number | null; movement_per_share_signed: number | null; movement_classification: "FAVOURABLE" | "ADVERSE" | "UNCHANGED" | "UNAVAILABLE"; open_quantity: number; gross_unrealized_pnl: number | null; costs_included: boolean; calculation_lines: { label: string; formula: string; result: string }[] }; decision: { classification: "HOLD" | "WATCH" | "EXIT" | "NO_COMPLETED_CANDLE" } }[] };
 export type CoachDisplayRow = { component: string; value: string; rating: number; rating_max: number; explanation: string; graph_times: string[]; status: string };
 export type CoachDisplaySection = { title: string; decision: string; overall_rating: number; valid: boolean; rows: CoachDisplayRow[] };
 export type FullSessionPlan = { decision: "TAKE" | "WAIT" | "NO_TRADE"; trade_name: string; direction: "LONG" | "SHORT" | "NEUTRAL"; opportunity_score: number; score_explanation: string; market_story: string; setup_explanation: string; decision_time: string | null; entry_trigger: string; entry_price: number | null; entry_price_upper: number | null; stop_price: number | null; target_price: number | null; risk: number | null; reward: number | null; reward_to_risk: number | null; required_reward_to_risk: number; ratio_status: string; invalidation_condition: string; volume_explanation: string; nifty_explanation: string; beginner_lesson: string; decision_evidence_times: string[]; outcome_evidence_times: string[] };
 export type ExecutedTradeVerdict = { title: string; outcome_status: string; plan_standard_status: string; rows: { component: string; value: string; meaning: string }[] };
-export type DecisionQualityComponent = { component: string; label: string; score: number; maximum_score: number; status: string; observed_value: string; baseline: string; calculation: string; beginner_explanation: string; improvement_condition: string; graph_times: string[] };
+export type DecisionQualityComponent = { component: string; label: string; score: number; maximum_score: number; status: string; observed_value: string; baseline: string; calculation: string; beginner_explanation: string; improvement_condition: string; graph_times: string[]; level?: { level_type?: string; method?: string; level?: number; zone_lower?: number; zone_upper?: number; required_reactions?: number; touch_count?: number; invalidation_required_closes?: number; invalidation_consecutive_closes?: number; invalidated?: boolean } | null; source_candles?: { time: string; time_semantics: string; field: string; value: number; close: number; qualified: boolean; reason: string }[]; penetrations?: { time: string; extreme: number; close: number; explanation: string; closed_beyond_zone?: boolean; invalidation_count_after?: number }[]; structural_extreme?: { time: string; field: string; value: number; reason: string } | null; placement?: string | null; calculation_lines?: { label: string; formula: string; result: string }[]; stock_direction_evidence?: Record<string, unknown> | null };
 export type CoachDisplay = {
     presentation_version: string;
     trade_result: { status: string; pnl_amount: number | null; summary: string };

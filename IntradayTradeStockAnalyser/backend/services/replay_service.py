@@ -52,10 +52,14 @@ class ReplayService:
             before_quantity, before_average = open_quantity, average
             realized_this = Decimal("0")
             is_entry = event["event_type"] in ("ENTRY", "ADD")
+            if quantity <= 0:
+                raise ExecutionHistoryReadError("Journal execution quantity must be positive")
             if is_entry:
                 average = ((average * open_quantity) + (price * quantity)) / (open_quantity + quantity)
                 open_quantity += quantity
             else:
+                if quantity > open_quantity:
+                    raise ExecutionHistoryReadError("Journal exit quantity exceeds the open position")
                 realized_this = ((price - average) if opening_side == "BUY" else (average - price)) * quantity
                 realized += realized_this
                 open_quantity -= quantity
@@ -65,7 +69,14 @@ class ReplayService:
                 "weighted_average_after": float(average) if open_quantity else None,
                 "realized_gross_pnl": float(realized_this),
                 "cumulative_realized_gross_pnl": float(realized),
+                "position_snapshot_source": "DERIVED_FROM_JOURNAL_EXECUTIONS",
             })
+        # Journal snapshots are authoritative when present.  Per-event values
+        # remain derived because Phase 1 stores no historical snapshots.
+        snapshot = trade.get("journal_position_snapshot") or {}
+        if result and snapshot.get("available"):
+            final = result[-1]
+            final["journal_position_snapshot"] = snapshot
         return result
 
     @staticmethod

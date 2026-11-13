@@ -115,6 +115,16 @@ class DecisionQualityComponent(CoachModel):
     component: str; label: str; score: int; maximum_score: int; status: str
     observed_value: str; baseline: str; calculation: str; beginner_explanation: str
     improvement_condition: str; graph_times: List[str]
+    level: Optional[Dict[str, Any]] = None
+    source_candles: List[Dict[str, Any]] = []
+    penetrations: List[Dict[str, Any]] = []
+    stop_price: Optional[float] = None
+    level_centre: Optional[float] = None
+    zone_boundary: Optional[float] = None
+    structural_extreme: Optional[Dict[str, Any]] = None
+    placement: Optional[str] = None
+    calculation_lines: List[Dict[str, str]] = []
+    stock_direction_evidence: Optional[Dict[str, Any]] = None
 class DecisionQualityScore(CoachModel):
     score_version: str; overall_score: int; maximum_score: int; summary: str
     components: List[DecisionQualityComponent]
