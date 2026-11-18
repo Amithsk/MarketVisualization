@@ -59,6 +59,9 @@ type MarketContextLevel = {
 
 const EMPTY_MARKET_EVENTS: MarketEvent[] = [];
 const LIVE_CONTEXT_RAIL_WIDTH = 220;
+const LIVE_METADATA_ROW_GAP = 22;
+const LIVE_METADATA_TIME_BOTTOM = 16;
+const LIVE_METADATA_BOTTOM_MARGIN = 0.29;
 
 // -----------------------------------
 // LIVE CANDLE METADATA HELPERS
@@ -133,8 +136,6 @@ type LiveMetadataItem = {
     volume: number;
 
     volumeChange: number | null;
-
-    timeLabel: string;
 
     highY: Coordinate;
 
@@ -232,9 +233,7 @@ function LiveCandleMetadata({
                             font-black
                         "
                         style={{
-                            top: showStockCandleDetails
-                                ? "calc(100% - 82px)"
-                                : "calc(100% - 76px)",
+                            bottom: `${LIVE_METADATA_TIME_BOTTOM + LIVE_METADATA_ROW_GAP * 3}px`,
                             left: "50%",
                             transform: "translateX(-50%)",
                         }}
@@ -254,9 +253,7 @@ function LiveCandleMetadata({
                                         : "text-gray-300"}
                             `}
                             style={{
-                                top: showStockCandleDetails
-                                    ? "calc(100% - 60px)"
-                                    : "calc(100% - 54px)",
+                                bottom: `${LIVE_METADATA_TIME_BOTTOM + LIVE_METADATA_ROW_GAP * 2}px`,
                                 left: "50%",
                                 transform: "translateX(-50%)",
                             }}
@@ -269,19 +266,17 @@ function LiveCandleMetadata({
                         </div>
                     )}
 
-                    {showStockCandleDetails && (
-                        <div
-                            className="absolute"
-                            style={{
-                                top: "calc(100% - 38px)",
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                                textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
-                            }}
-                        >
-                            C {Number(item.close).toFixed(1)}
-                        </div>
-                    )}
+                    <div
+                        className="absolute"
+                        style={{
+                            bottom: `${LIVE_METADATA_TIME_BOTTOM + LIVE_METADATA_ROW_GAP}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            textShadow: "0 1px 1px #FFFFFF, 0 -1px 1px #FFFFFF",
+                        }}
+                    >
+                        C {Number(item.close).toFixed(1)}
+                    </div>
 
                 </div>
             ))}
@@ -487,6 +482,17 @@ export default function CandlestickChart({
             wickUpColor: "#22C55E",
             wickDownColor: "#EF4444",
         });
+
+        // Keep the Live-only candle plot above the four metadata rows. This
+        // reserves fixed visual space without changing candle data or chart height.
+        if (mode === "live") {
+            candleSeries.priceScale().applyOptions({
+                scaleMargins: {
+                    top: 0.05,
+                    bottom: LIVE_METADATA_BOTTOM_MARGIN,
+                },
+            });
+        }
 
         // -----------------------------------
         // Volume series
@@ -951,7 +957,6 @@ export default function CandlestickChart({
                         bodyCenterY,
                         volume: Number(candle.volume),
                         volumeChange,
-                        timeLabel: candle.time.slice(11, 16),
                         highY,
                         lowY,
                     };
