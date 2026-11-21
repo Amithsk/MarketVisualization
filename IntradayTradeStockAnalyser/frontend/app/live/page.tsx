@@ -12,6 +12,11 @@ import type {
 import useLivePolling from "../../hooks/useLivePolling";
 import { Candle } from "../../types/candle";
 import { fetchLiveTradePlans } from "../../services/liveTradePlanApi";
+import {
+    belongsToLiveTradingSession,
+    getLiveTradingSession,
+    millisecondsUntilLiveTradingSessionBoundary,
+} from "../../lib/liveTradingSession";
 
 const DEFAULT_STOCKS = [
     "NSE:SBIN",
@@ -34,7 +39,26 @@ export default function LivePage() {
     const [tradePlans, setTradePlans] =
         useState<LiveTradePlan[]>([]);
 
+    const [tradingSession, setTradingSession] =
+        useState(() => getLiveTradingSession());
+
     const { nifty, stock, niftyContext, stockContext } = useLivePolling(selectedStock);
+
+    useEffect(() => {
+        const refreshTradingSession = () => {
+            setTradingSession(getLiveTradingSession());
+        };
+        const scheduleBoundaryRefresh = () => window.setTimeout(() => {
+            refreshTradingSession();
+            timer = scheduleBoundaryRefresh();
+        }, millisecondsUntilLiveTradingSessionBoundary() + 25);
+        let timer = scheduleBoundaryRefresh();
+        window.addEventListener("focus", refreshTradingSession);
+        return () => {
+            window.clearTimeout(timer);
+            window.removeEventListener("focus", refreshTradingSession);
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -42,7 +66,13 @@ export default function LivePage() {
             .then(({ plans }) => { if (!cancelled) setTradePlans(plans); })
             .catch(() => { if (!cancelled) setTradePlans([]); });
         return () => { cancelled = true; };
-    }, [selectedStock]);
+    }, [selectedStock, tradingSession.date]);
+
+    const currentSessionPlans = tradingSession.isOpen
+        ? tradePlans.filter((plan) =>
+            belongsToLiveTradingSession(plan, tradingSession.date)
+        )
+        : [];
 
     // -----------------------------------
     // NIFTY candles
@@ -141,7 +171,7 @@ export default function LivePage() {
                 mode="live"
                 niftyContext={niftyContext}
                 stockContext={stockContext}
-                tradePlans={tradePlans}
+                tradePlans={currentSessionPlans}
                 onStockCandleSelect={
                     selectStockCandle
                 }
@@ -152,8 +182,9 @@ export default function LivePage() {
                 stockName={selectedStock}
                 stockCandles={stockCandles}
                 niftyCandles={niftyCandles}
-                plans={tradePlans}
+                plans={currentSessionPlans}
                 onPlansChange={setTradePlans}
+                isSessionOpen={tradingSession.isOpen}
             />
 
         </div>

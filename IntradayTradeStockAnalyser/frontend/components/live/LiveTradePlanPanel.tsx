@@ -44,6 +44,7 @@ export type LiveTradePlan = TradePlanDraft & {
     cancellationReason?: string;
     executedAt?: string;
     exitedAt?: string;
+    planDate?: string;
 };
 
 type StoredDraft = { version: 1; draft: TradePlanDraft };
@@ -76,6 +77,7 @@ type Props = {
     niftyCandles: Candle[];
     plans: LiveTradePlan[];
     onPlansChange: (plans: LiveTradePlan[]) => void;
+    isSessionOpen: boolean;
 };
 
 const STRATEGIES = [
@@ -162,6 +164,7 @@ export default function LiveTradePlanPanel({
     niftyCandles,
     plans,
     onPlansChange,
+    isSessionOpen,
 }: Props) {
 
     const [draft, setDraft] =
@@ -228,6 +231,19 @@ export default function LiveTradePlanPanel({
         return () => { window.clearTimeout(timer); window.removeEventListener("beforeunload", flush); flush(); };
     }, [draft, currentDraftKey]);
 
+    useEffect(() => {
+        if (isSessionOpen) return;
+        if (draftRef.current && currentDraftKey) {
+            writeDraft(currentDraftKey, draftRef.current);
+        }
+        setSelectedPlanId(null);
+        setIsDrawerOpen(false);
+        setCancellingPlanId(null);
+        setCancellationReason("");
+        setCancellationTime("");
+        setCancellationError("");
+    }, [isSessionOpen, currentDraftKey]);
+
     const activePlan =
         plans.find((plan) =>
             plan.symbol === stockName &&
@@ -291,7 +307,7 @@ export default function LiveTradePlanPanel({
         field: keyof TradePlanDraft,
         value: string
     ) => {
-        if (!visibleDraft) {
+        if (!isSessionOpen || !visibleDraft) {
             return;
         }
 
@@ -344,6 +360,7 @@ export default function LiveTradePlanPanel({
         replaceExisting: boolean
     ) => {
         if (
+            !isSessionOpen ||
             !selectedCandle ||
             !draftRef.current ||
             !isDirection(plan.direction) ||
@@ -415,7 +432,7 @@ export default function LiveTradePlanPanel({
     };
 
     const handleCreatePlan = () => {
-        if (!selectedCandle || activePlan) {
+        if (!isSessionOpen || !selectedCandle || activePlan) {
             return;
         }
 
@@ -434,7 +451,7 @@ export default function LiveTradePlanPanel({
     };
 
     const handleSavePlan = async () => {
-        if (!selectedCandle || !draft || activePlan) {
+        if (!isSessionOpen || !selectedCandle || !draft || activePlan) {
             return;
         }
 
@@ -483,7 +500,7 @@ export default function LiveTradePlanPanel({
     const updateStatus = async (
         nextStatus: TradePlanStatus
     ) => {
-        if (!selectedPlan) {
+        if (!isSessionOpen || !selectedPlan) {
             return;
         }
 
@@ -551,6 +568,7 @@ export default function LiveTradePlanPanel({
 
     const handleStartCancellation = () => {
         if (
+            !isSessionOpen ||
             !selectedPlan ||
             selectedPlan.status !== "ACTIVE"
         ) {
@@ -571,6 +589,7 @@ export default function LiveTradePlanPanel({
 
     const handleConfirmCancellation = async () => {
         if (
+            !isSessionOpen ||
             !selectedPlan ||
             selectedPlan.status !== "ACTIVE" ||
             cancellingPlanId !== selectedPlan.id
@@ -674,7 +693,7 @@ export default function LiveTradePlanPanel({
                 <button
                     type="button"
                     onClick={handleCreatePlan}
-                    disabled={!selectedCandle || Boolean(activePlan)}
+                    disabled={!isSessionOpen || !selectedCandle || Boolean(activePlan)}
                     className="
                         rounded
                         bg-cyan-500
@@ -693,6 +712,12 @@ export default function LiveTradePlanPanel({
             {!selectedCandle && (
                 <div className="mb-4 text-xs" style={tradePlanHelperStyle}>
                     Select a Stock candle to enable Trade Plan creation.
+                </div>
+            )}
+
+            {!isSessionOpen && (
+                <div className="mb-4 text-xs text-amber-300">
+                    Live Trade Plans are unavailable outside the 09:15–15:30 IST trading session.
                 </div>
             )}
 
@@ -764,7 +789,7 @@ export default function LiveTradePlanPanel({
                         </button>
                     </div>
 
-                    <div className="grid gap-4">
+                    <fieldset disabled={!isSessionOpen} className="grid gap-4">
                     <div className="space-y-3">
                         <Field label="Decision Time">
                             <div className="text-white">
@@ -1063,7 +1088,7 @@ export default function LiveTradePlanPanel({
                             </div>
                         )}
                     </div>
-                    </div>
+                    </fieldset>
                 </div>
             )}
 
