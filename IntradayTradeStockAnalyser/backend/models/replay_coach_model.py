@@ -5,17 +5,17 @@ Keeping this model independent allows completed historical analyses to remain
 readable while the provider contract evolves safely.
 """
 from decimal import Decimal
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, model_validator
 
 class CoachModel(BaseModel): model_config = ConfigDict(extra="forbid")
 class Evidence(CoachModel):
     time: str; stock_values: str; market_values: str; calculation: Optional[str] = None
-class ReviewPoint(CoachModel): point: str; evidence: List[Evidence]
+class ReviewPoint(CoachModel): point: str; evidence: List[Evidence] = Field(max_length=3)
 class NegativeReviewPoint(ReviewPoint): why_it_matters: str
 class Improvement(CoachModel): action: str; rule: str; example_using_this_trade: str
 class ExecutedTradeAnalysis(CoachModel):
-    summary: str; good: List[ReviewPoint]; bad: List[NegativeReviewPoint]; how_to_improve: List[Improvement]
+    summary: str = Field(max_length=800); good: List[ReviewPoint] = Field(max_length=3); bad: List[NegativeReviewPoint] = Field(max_length=3); how_to_improve: List[Improvement] = Field(max_length=3)
 class AlternativePlanBase(CoachModel):
     name: str; entry_condition: str; rating: int = Field(ge=1, le=10); why_good: List[str]; risks: List[str]; evidence_times: List[str]
 
@@ -99,6 +99,7 @@ class ReplayCoachAnalysis(CoachModel):
     best_full_session_plan: Optional[FullSessionPlan] = None
     key_learning: KeyLearning
     limitations: List[str]
+    active_trade_candle_review: Optional[Dict[str, Any]] = None
 
 class CoachDisplayRow(CoachModel):
     component: str; value: str; rating: int; rating_max: int = 10
@@ -114,6 +115,16 @@ class DecisionQualityComponent(CoachModel):
     component: str; label: str; score: int; maximum_score: int; status: str
     observed_value: str; baseline: str; calculation: str; beginner_explanation: str
     improvement_condition: str; graph_times: List[str]
+    level: Optional[Dict[str, Any]] = None
+    source_candles: List[Dict[str, Any]] = []
+    penetrations: List[Dict[str, Any]] = []
+    stop_price: Optional[float] = None
+    level_centre: Optional[float] = None
+    zone_boundary: Optional[float] = None
+    structural_extreme: Optional[Dict[str, Any]] = None
+    placement: Optional[str] = None
+    calculation_lines: List[Dict[str, str]] = []
+    stock_direction_evidence: Optional[Dict[str, Any]] = None
 class DecisionQualityScore(CoachModel):
     score_version: str; overall_score: int; maximum_score: int; summary: str
     components: List[DecisionQualityComponent]
@@ -130,4 +141,5 @@ class CoachDisplay(CoachModel):
     next_trade_focus: NextTradeFocus
     shared_graph_times: List[str] = []
     execution_times: dict[str, str] = {}
+    decision_time_market_context: dict = {}
     detailed_evidence_available: bool = True

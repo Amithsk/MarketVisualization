@@ -12,6 +12,7 @@ MARKET_OPEN = time(9, 15)
 MARKET_CLOSE = time(15, 15)
 MARKET_OPEN_MINUTES = 9 * 60 + 15
 MARKET_CLOSE_MINUTES = 15 * 60 + 15
+NIFTY_UPSTREAM_SETTLING_SECONDS = 30
 
 
 class LiveNiftyPoller:
@@ -28,6 +29,7 @@ class LiveNiftyPoller:
         "latest_candle_timestamp": None,
         "interval": None,
         "contract": None,
+        "next_refresh_time": None,
         "last_error": None,
     }
 
@@ -84,7 +86,10 @@ class LiveNiftyPoller:
                 "last_error": state.get("last_error"),
             }
 
-        return state["payload"]
+        return {
+            **state["payload"],
+            "next_refresh_time": state.get("next_refresh_time"),
+        }
 
     @classmethod
     def is_market_time(cls, moment: Optional[datetime] = None) -> bool:
@@ -137,14 +142,38 @@ class LiveNiftyPoller:
             current.day,
             current.hour,
             0,
-            5,
+            0,
             tzinfo=INDIAN_TIME_ZONE,
-        ) + timedelta(minutes=next_minute)
+        ) + timedelta(
+            minutes=next_minute,
+            seconds=NIFTY_UPSTREAM_SETTLING_SECONDS,
+        )
 
         if boundary <= current:
             boundary += timedelta(minutes=5)
 
         return max(1.0, (boundary - current).total_seconds())
+
+    @classmethod
+    def seconds_until_current_boundary_settles(
+        cls,
+        moment: Optional[datetime] = None,
+    ) -> float:
+        """Delay a startup refresh occurring exactly at a candle boundary."""
+        current = cls._to_indian_time(moment)
+
+        if current.minute % 5 != 0:
+            return 0.0
+
+        boundary = current.replace(
+            second=NIFTY_UPSTREAM_SETTLING_SECONDS,
+            microsecond=0,
+        )
+
+        if current >= boundary:
+            return 0.0
+
+        return (boundary - current).total_seconds()
 
     @classmethod
     async def _run(cls):
@@ -160,6 +189,12 @@ class LiveNiftyPoller:
                 await cls._wait(wait_seconds)
                 continue
 
+            startup_settling_wait = cls.seconds_until_current_boundary_settles()
+            if startup_settling_wait:
+                await cls._set_next_refresh_time(startup_settling_wait)
+                await cls._wait(startup_settling_wait)
+                continue
+
             try:
                 await cls._refresh()
             except Exception as error:
@@ -171,6 +206,7 @@ class LiveNiftyPoller:
 
             if cls._stop_event and not cls._stop_event.is_set():
                 wait_seconds = cls.seconds_until_next_five_minute_boundary()
+                await cls._set_next_refresh_time(wait_seconds)
                 await cls._wait(wait_seconds)
 
     @classmethod
@@ -233,6 +269,7 @@ class LiveNiftyPoller:
 
             if cls._state_lock:
                 async with cls._state_lock:
+                    cache_before = cls._state["latest_candle_timestamp"]
                     cls._state = {
                         "initialized": True,
                         "payload": payload,
@@ -241,14 +278,33 @@ class LiveNiftyPoller:
                         "latest_candle_timestamp": latest_candle_timestamp,
                         "interval": payload.get("interval"),
                         "contract": payload.get("contract"),
+                        "next_refresh_time": cls._state.get("next_refresh_time"),
                         "last_error": None,
                     }
+            else:
+                cache_before = cls._state["latest_candle_timestamp"]
 
             print(
-                "LIVE_NIFTY_POLLER refresh succeeded "
-                f"trade_date={trade_date} "
-                f"latest_candle={latest_candle_timestamp}"
+                "[NIFTY_REFRESH] "
+                f"now_ist={refresh_time} "
+                f"upstream_latest={result.get('upstream_latest_candle_timestamp')} "
+                f"latest_completed={result.get('latest_completed_candle_timestamp')} "
+                f"cache_before={cache_before} "
+                f"cache_after={latest_candle_timestamp}"
             )
+
+    @classmethod
+    async def _set_next_refresh_time(cls, wait_seconds: float):
+
+        next_refresh_time = (
+            cls._to_indian_time() + timedelta(seconds=wait_seconds)
+        ).isoformat()
+
+        if cls._state_lock:
+            async with cls._state_lock:
+                cls._state["next_refresh_time"] = next_refresh_time
+        else:
+            cls._state["next_refresh_time"] = next_refresh_time
 
     @classmethod
     async def _record_error(cls, message: str):
@@ -278,6 +334,7 @@ class LiveNiftyPoller:
                         "latest_candle_timestamp": None,
                         "interval": None,
                         "contract": None,
+                        "next_refresh_time": None,
                         "last_error": None,
                     }
 

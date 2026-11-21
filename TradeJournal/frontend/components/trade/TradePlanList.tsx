@@ -11,7 +11,7 @@ type Props = {
   plans: TradePlan[]
   loading: boolean
   onExecute: (planId: number) => void
-  onExit: (tradeId: number, payload: any) => void
+  onExit: (tradeId: number, payload: any) => Promise<void>
   onReview: (tradeId: number, payload: any) => void
 }
 

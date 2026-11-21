@@ -7,6 +7,7 @@ import {
   fetchTradePlansByDate,
   createTradePlan,
   executeTradePlan,
+  addToPosition,
   exitTrade,
   submitTradeReview,
 } from "@/services/tradeApi"
@@ -93,10 +94,27 @@ await loadPlans()
     console.log("payload JSON:", JSON.stringify(payload))
     console.groupEnd()
 
-    await exitTrade(tradeId, payload)
+    try {
+      setError(null)
+      await exitTrade(tradeId, payload)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to exit trade")
+      throw err
+    }
 
     console.log("✅ exitTrade API call completed")
 
+    await loadPlans()
+  }
+
+  const addPosition = async (tradeId: number, payload: any) => {
+    try {
+      setError(null)
+      await addToPosition(tradeId, payload)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add to position")
+      throw err
+    }
     await loadPlans()
   }
 
@@ -142,6 +160,7 @@ await loadPlans()
     loadPlans,
     createPlan,
     executePlan,
+    addPosition,
     exitTrade: exitTradeAction,
     submitTradeReview: submitReview,
   }

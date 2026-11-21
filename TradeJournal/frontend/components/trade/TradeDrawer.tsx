@@ -8,6 +8,7 @@ import TradePlanCard from "./TradePlanCard"
 import TradeExitForm from "./TradeExitForm"
 import TradeReviewForm from "./TradeReviewForm"
 import TradeExecuteForm from "./TradeExecuteForm"
+import TradeAddForm from "./TradeAddForm"
 
 
 import { useTradeActions } from "@/hooks/useTradeActions"
@@ -33,6 +34,7 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
 
     createPlan,
     executePlan,
+    addPosition,
     exitTrade,
     submitTradeReview,
   } = useTradeActions(tradeDate)
@@ -75,6 +77,8 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
 
                   <TradeExecuteForm
                     tradeDate={tradeDate}
+                    plannedQuantity={plan.planned_position_size}
+                    plannedPrice={plan.planned_entry_price}
                     onSubmit={(payload) =>
                       executePlan(plan.id, payload)
                     }
@@ -82,18 +86,22 @@ export default function TradeDrawer({ tradeDate, onClose }: Props) {
 
                 )}
 
-              {/* EXIT */}
+              {/* ADD and EXIT remain available until the position is flat. */}
               {plan.trade_state?.is_executed &&
                 !plan.trade_state?.is_exited &&
                 plan.trade_id && (
                   <div className="mt-4">
+                    {plan.position?.is_phase1_position && <TradeAddForm onSubmit={(payload) => addPosition(plan.trade_id!, payload)} />}
                     <TradeExitForm
+                      openQuantity={plan.position?.is_phase1_position ? plan.position.open_quantity : undefined}
+                      latestExecutionTimestamp={plan.executions?.at(-1)?.execution_timestamp}
                       onSubmit={(payload) =>
                         exitTrade(plan.trade_id!, payload)
                       }
                     />
                   </div>
                 )}
+              {plan.position?.is_phase1_position && plan.executions && <div className="mt-4 rounded border p-3 text-xs"><div className="mb-2 font-semibold">Position: open {plan.position.open_quantity} · avg ₹{plan.position.remaining_avg_entry_price?.toFixed(2)} · realized ₹{plan.position.realized_gross_pnl?.toFixed(2)}</div>{plan.executions.map(item => <div key={item.id} className="border-t py-1">{item.sequence}. {item.event_type} {item.quantity} @ ₹{item.price.toFixed(2)} · {new Date(item.execution_timestamp).toLocaleString("en-IN")} {item.note ? `— ${item.note}` : ""}</div>)}</div>}
 
               {/* REVIEW */}
               {plan.trade_state?.is_exited &&

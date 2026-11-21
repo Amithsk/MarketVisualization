@@ -53,12 +53,12 @@ class ProviderBestFullSessionPlan(CoachModel):
     volume_explanation: str = Field(min_length=1, max_length=800)
     nifty_explanation: str = Field(min_length=1, max_length=800)
     beginner_lesson: str = Field(min_length=1, max_length=800)
-    decision_evidence_times: list[str] = Field(default_factory=list, max_length=12)
-    outcome_evidence_times: list[str] = Field(default_factory=list, max_length=12)
+    decision_evidence_times: list[str] = Field(default_factory=list, max_length=3)
+    outcome_evidence_times: list[str] = Field(default_factory=list, max_length=3)
 
 
 class ProviderReplayCoachTransport(CoachModel):
     executed_trade_analysis: ExecutedTradeAnalysis
     best_full_session_plan: ProviderBestFullSessionPlan
     key_learning: KeyLearning
-    limitations: list[str]
+    limitations: list[str] = Field(max_length=3)

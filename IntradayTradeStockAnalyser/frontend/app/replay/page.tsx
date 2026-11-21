@@ -641,6 +641,7 @@ export default function ReplayPage() {
                             executedTrade={
                                 replayData.executed_trade
                             }
+                            executionHistory={replayData.execution_history}
 
                             stockName={
                                 selectedStock

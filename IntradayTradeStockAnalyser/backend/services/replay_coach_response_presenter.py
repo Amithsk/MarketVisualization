@@ -18,7 +18,7 @@ ISO_TIMESTAMP = re.compile(
 
 
 class ReplayCoachResponsePresenter:
-    """Converts timestamps in response-only analysis content to IST HH:mm."""
+    """Converts timestamps in response-only analysis content to readable IST."""
 
     @classmethod
     def present(cls, analysis: ReplayCoachAnalysis) -> dict[str, Any]:
@@ -88,6 +88,13 @@ class ReplayCoachResponsePresenter:
             next_trade_focus=decision_quality["next_trade_focus"],
             shared_graph_times=shared_times,
             execution_times={key: value for key, value in {"entry": trade.get("entry_timestamp"), "exit": trade.get("exit_timestamp")}.items() if value},
+            decision_time_market_context={
+                "stock_session_structure": facts.get("stock_session_structure", {}),
+                "stock_recent_momentum": facts.get("stock_recent_momentum", {}),
+                "stock_vwap_location": facts.get("stock_vwap_location", {}),
+                "stock_nifty_relationship": facts.get("stock_nifty_relationship", {}),
+                "composite": facts.get("decision_time_market_context", {}),
+            },
             executed_trade_verdict=executed,
             best_full_session_plan=analysis.best_full_session_plan,
         ).model_dump(mode="json"))
@@ -163,6 +170,7 @@ class ReplayCoachResponsePresenter:
     def _executed_trade_verdict(context: dict[str, Any], economics: dict[str, Any], required: float) -> ExecutedTradeVerdict:
         """Present factual execution economics separately from decision quality."""
         trade, plan = context.get("executed_trade", {}), context.get("documented_plan", {})
+        timing = context.get("decision_context", {}).get("decision_timing", {})
         position = (plan.get("position_type") or "").upper()
         side = "LONG" if position == "LONG" else "SHORT" if position == "SHORT" else ("LONG" if trade.get("side") == "BUY" else "SHORT")
         entry = economics.get("entry", trade.get("entry_price")); stop, target = economics.get("stop"), economics.get("target")
@@ -178,9 +186,13 @@ class ReplayCoachResponsePresenter:
         profitable = isinstance(pnl, (int, float)) and pnl >= 0
         plan_standard = "MEETS_REQUIRED_RR" if ratio is not None and ratio >= required else "BELOW_REQUIRED_RR"
         def money(value: Any) -> str: return "Unavailable" if value is None else f"₹{float(value):,.2f}"
+        # The recorded entry timestamp is execution/fill-like data, not proof of
+        # the trader's decision time or a candle-close requirement. Do not turn
+        # the expected containing-candle status into verdict commentary.
+        entry_meaning = "Actual executed entry."
         rows = [
             ExecutedTradeVerdictRow(component="Direction", value=f"{side} / {trade.get('side', 'Unknown')}", meaning="Expected the price to rise." if side == "LONG" else "Expected the price to fall."),
-            ExecutedTradeVerdictRow(component="Entry", value=f"{money(trade.get('entry_price'))} at {trade.get('entry_timestamp', 'Unavailable')}", meaning="Actual executed entry."),
+            ExecutedTradeVerdictRow(component="Entry", value=f"{money(trade.get('entry_price'))} at {trade.get('entry_timestamp', 'Unavailable')}", meaning=entry_meaning),
             ExecutedTradeVerdictRow(component="Stop", value=money(stop), meaning=f"{money(risk)} planned risk per share."),
             ExecutedTradeVerdictRow(component="Target", value=money(target), meaning=f"{money(reward)} planned reward per share."),
             ExecutedTradeVerdictRow(component="Planned risk", value=money(planned_risk), meaning="Planned risk per share × quantity."),
@@ -196,7 +208,8 @@ class ReplayCoachResponsePresenter:
         raw = match.group(0)
         try:
             parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
-            return parsed.astimezone(IST).strftime("%H:%M")
+            local = parsed.astimezone(IST)
+            return f"{local.day} {local.strftime('%b')}, {local.strftime('%I').lstrip('0')}:{local.strftime('%M %p')}"
         except ValueError:
             # A syntactically timestamp-like but invalid value is retained.
             return raw

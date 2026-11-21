@@ -24,6 +24,8 @@ export type TradeState = {
   is_exited: boolean
   is_reviewed: boolean
 }
+export type TradeExecution = { id: number; sequence: number; event_type: "ENTRY" | "ADD" | "EXIT"; side: TradeSide; quantity: number; price: number; execution_timestamp: string; reason?: string | null; note?: string | null }
+export type PositionState = { open_quantity: number | null; total_entered_quantity: number | null; remaining_avg_entry_price: number | null; realized_gross_pnl: number | null; realized_gross_pnl_pct?: number | null; is_phase1_position: boolean }
 
 // ==============================
 // CORE DOMAIN MODELS
@@ -61,6 +63,8 @@ export type TradePlan = {
   trade_id?: number | null
   // backend-controlled workflow state
   trade_state?: TradeState
+  position?: PositionState | null
+  executions?: TradeExecution[]
 }
 
 /**

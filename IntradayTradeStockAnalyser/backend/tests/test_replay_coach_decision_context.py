@@ -8,10 +8,16 @@ def candles(values):
 
 class ReplayCoachDecisionContextTests(unittest.TestCase):
     def test_entry_inside_candle_excludes_containing_and_later_candles(self):
-        stock = candles([("09:55", 100, 10), ("10:00", 101, 20), ("10:05", 105, 999)])
-        result = ReplayCoachDecisionContext.build(stock, stock, "2026-09-22T10:08:00+05:30", {})
-        self.assertEqual(result["decision_timing"]["last_completed_stock_candle_time"], "2026-09-22T10:00:00+05:30")
-        self.assertEqual(result["stock_direction"]["last_completed_close"], 101.0)
+        stock = candles([("09:45", 90, 10), ("09:50", 95, 20), ("09:55", 999, 999)])
+        stock[-1].update({"high": 2000, "low": 1, "vwap": 999})
+        result = ReplayCoachDecisionContext.build(stock, stock, "2026-09-22T09:56:00+05:30", {})
+        self.assertEqual(result["decision_timing"]["containing_candle_start"], "2026-09-22T09:55:00+05:30")
+        self.assertEqual(result["decision_timing"]["containing_candle_end"], "2026-09-22T10:00:00+05:30")
+        self.assertFalse(result["decision_timing"]["containing_candle_complete_at_entry"])
+        self.assertEqual(result["decision_timing"]["last_completed_stock_candle_time"], "2026-09-22T09:50:00+05:30")
+        self.assertEqual(result["stock_direction"]["last_completed_close"], 95.0)
+        self.assertEqual(result["stock_relative_volume"]["last_completed_volume"], 20.0)
+        self.assertEqual(result["stock_direction"]["vwap"], 94.5)
 
     def test_long_economics_enforces_four_to_one(self):
         result = ReplayCoachDecisionContext._economics({"entry_price": 1832.6, "stop_price": 1825, "target_price": 1835, "position_type": "LONG"})

@@ -186,6 +186,16 @@ class TradeLog(Base):
 
     notes = Column(JSON, nullable=True)
 
+    # Phase 1 position aggregates.  Legacy rows leave these NULL/false and
+    # continue to use the database-generated single-entry P&L fields above.
+    is_phase1_position = Column(Integer, nullable=False, default=0)
+    open_quantity = Column(BigInteger, nullable=True)
+    total_entered_quantity = Column(BigInteger, nullable=True)
+    remaining_avg_entry_price = Column(DECIMAL(18, 6), nullable=True)
+    realized_gross_pnl = Column(DECIMAL(24, 6), nullable=True)
+    total_entry_notional = Column(DECIMAL(24, 6), nullable=True)
+    realized_gross_pnl_pct = Column(DECIMAL(9, 4), nullable=True)
+
     created_at = Column(
         TIMESTAMP,
         nullable=False,
@@ -197,6 +207,31 @@ class TradeLog(Base):
         server_default="CURRENT_TIMESTAMP",
         server_onupdate="CURRENT_TIMESTAMP",
     )
+
+    executions = relationship(
+        "TradeExecution",
+        order_by="TradeExecution.sequence",
+        cascade="all, delete-orphan",
+    )
+
+
+class TradeExecution(Base):
+    __tablename__ = "trade_execution"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    trade_id = Column(BigInteger, ForeignKey("trade_log.id"), nullable=False)
+    sequence = Column(Integer, nullable=False)
+    event_type = Column(Enum("ENTRY", "ADD", "EXIT"), nullable=False)
+    side = Column(Enum(TradeSide), nullable=False)
+    quantity = Column(BigInteger, nullable=False)
+    price = Column(DECIMAL(18, 6), nullable=False)
+    execution_timestamp = Column(DateTime, nullable=False)
+    reason = Column(String(128), nullable=True)
+    note = Column(Text, nullable=True)
+    client_request_id = Column(String(64), nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False, server_default="CURRENT_TIMESTAMP")
+
+    trade = relationship("TradeLog")
 
 
 # --------------------------------------------------

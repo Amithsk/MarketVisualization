@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.deps import get_db
+from app.market_time import to_api_time
 
 router = APIRouter(prefix="/api/trade-plans", tags=["Trade Plans"])
 
@@ -108,6 +109,25 @@ def list_plans(
 
             is_reviewed = review_exists is not None
 
+        position = None
+        executions = []
+        if plan.trade:
+            position = {
+                "open_quantity": plan.trade.open_quantity,
+                "total_entered_quantity": plan.trade.total_entered_quantity,
+                "remaining_avg_entry_price": float(plan.trade.remaining_avg_entry_price) if plan.trade.remaining_avg_entry_price is not None else None,
+                "realized_gross_pnl": float(plan.trade.realized_gross_pnl) if plan.trade.realized_gross_pnl is not None else None,
+                "realized_gross_pnl_pct": float(plan.trade.realized_gross_pnl_pct) if plan.trade.realized_gross_pnl_pct is not None else None,
+                "is_phase1_position": bool(plan.trade.is_phase1_position),
+            }
+            executions = [{
+                "id": item.id, "sequence": item.sequence, "event_type": item.event_type,
+                "side": item.side.value if hasattr(item.side, "value") else item.side,
+                "quantity": item.quantity, "price": float(item.price),
+                "execution_timestamp": to_api_time(item.execution_timestamp), "reason": item.reason,
+                "note": item.note,
+            } for item in plan.trade.executions]
+
         # --------------------------------------------------
         # ENRICHED RESPONSE
         # --------------------------------------------------
@@ -146,6 +166,8 @@ def list_plans(
                 "is_exited": is_exited,
                 "is_reviewed": is_reviewed,
             }
+            ,"position": position,
+            "executions": executions,
         })
 
     return enriched_plans

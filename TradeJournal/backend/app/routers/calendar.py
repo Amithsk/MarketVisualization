@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, cast, Date
+from sqlalchemy import func, cast, Date, case
 
 from app import models
 from app.deps import get_db
@@ -37,10 +37,16 @@ def get_calendar_summary(
 
         func.count(models.TradePlan.id).label("trade_count"),
 
-        func.coalesce(
-            func.sum(models.TradeLog.pnl_amount),
-            0
-        ).label("pnl"),
+        func.coalesce(func.sum(
+            # Phase-1 positions report only their final accumulated result.
+            # Legacy rows retain the deployed generated-column calculation.
+            case(
+                (models.TradeLog.is_phase1_position == 1,
+                 case((models.TradeLog.open_quantity == 0,
+                       models.TradeLog.realized_gross_pnl - func.coalesce(models.TradeLog.fees, 0)), else_=0)),
+                else_=models.TradeLog.pnl_amount,
+            )
+        ), 0).label("pnl"),
     )
 
     # --------------------------------------------------

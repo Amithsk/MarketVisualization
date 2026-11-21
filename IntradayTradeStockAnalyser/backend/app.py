@@ -1,5 +1,6 @@
 #IntradayTradeStockAnalyser/backend/app.py
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 
@@ -13,6 +14,16 @@ from backend.api.live import (router as live_router)
 from fastapi.middleware.cors import (    CORSMiddleware)
 from backend.services.live_nifty_poller import LiveNiftyPoller
 from backend.services.replay_stock_fetch_service import ReplayStockFetchService
+
+
+market_context_logger = logging.getLogger("market_context")
+market_context_logger.setLevel(logging.INFO)
+if not market_context_logger.handlers:
+    market_context_handler = logging.StreamHandler()
+    market_context_handler.setLevel(logging.INFO)
+    market_context_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    market_context_logger.addHandler(market_context_handler)
+market_context_logger.propagate = False
 
 
 @asynccontextmanager

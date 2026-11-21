@@ -1,37 +1,47 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 type ExitPayload = {
   exit_price: number
   exit_timestamp: string
   exit_reason: string
+  quantity?: number
+  client_request_id?: string
 }
 
 type Props = {
-  onSubmit: (payload: ExitPayload) => void
+  onSubmit: (payload: ExitPayload) => Promise<void>
+  openQuantity?: number | null
+  latestExecutionTimestamp?: string | null
 }
 
-export default function TradeExitForm({ onSubmit }: Props) {
+export default function TradeExitForm({ onSubmit, openQuantity, latestExecutionTimestamp }: Props) {
   const [exitPrice, setExitPrice] = useState("")
   const [exitTimestamp, setExitTimestamp] = useState("")
   const [exitReason, setExitReason] = useState("")
+  const [quantity, setQuantity] = useState(openQuantity?.toString() ?? "")
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  useEffect(() => setQuantity(openQuantity?.toString() ?? ""), [openQuantity])
 
   const isValid =
     exitPrice.trim() !== "" &&
     exitTimestamp.trim() !== "" &&
     exitReason.trim() !== ""
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid) return
-
-    onSubmit({
-      exit_price: Number(exitPrice),
-      // datetime-local is the trader's India-market wall time. Keep that
-      // wall time and send its explicit offset instead of converting to UTC.
-      exit_timestamp: `${exitTimestamp}:00+05:30`,
-      exit_reason: exitReason,
-    })
+    setSubmitError(null)
+    setSubmitting(true)
+    try {
+      const withSeconds = exitTimestamp.length === 16 ? `${exitTimestamp}:00` : exitTimestamp
+      await onSubmit({ exit_price: Number(exitPrice), exit_timestamp: `${withSeconds}+05:30`,
+        exit_reason: exitReason, quantity: quantity ? Number(quantity) : undefined,
+        client_request_id: crypto.randomUUID() })
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Exit could not be saved")
+    } finally { setSubmitting(false) }
   }
 
   return (
@@ -41,6 +51,7 @@ export default function TradeExitForm({ onSubmit }: Props) {
       </h3>
 
       {/* Exit price */}
+      {openQuantity !== undefined && <div><label className="block font-medium">Exit Quantity *</label><input type="number" min="1" max={openQuantity ?? undefined} className="w-full rounded border p-2" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>}
       <div>
         <label className="block font-medium">Exit Price *</label>
         <input
@@ -58,11 +69,14 @@ export default function TradeExitForm({ onSubmit }: Props) {
         <label className="block font-medium">Exit Time *</label>
         <input
           type="datetime-local"
+          step="1"
+          min={latestExecutionTimestamp ? latestExecutionTimestamp.slice(0, 19) : undefined}
           className="w-full rounded border p-2"
           value={exitTimestamp}
           onChange={(e) => setExitTimestamp(e.target.value)}
         />
       </div>
+      {submitError && <div role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-red-700">{submitError}</div>}
 
       {/* Exit reason */}
       <div>
@@ -83,7 +97,7 @@ export default function TradeExitForm({ onSubmit }: Props) {
       </div>
 
       <button
-        disabled={!isValid}
+        disabled={!isValid || submitting}
         onClick={handleSubmit}
         className="w-full rounded bg-black py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-40"
       >

@@ -1,7 +1,7 @@
 /*IntradayTradeStockAnalyser/frontend/app/live/page.tsx*/
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import StockSelector from "../../components/selectors/StockSelector";
 import SynchronizedCharts from "../../components/charts/SynchronizedCharts";
@@ -11,6 +11,12 @@ import type {
 } from "../../components/live/LiveTradePlanPanel";
 import useLivePolling from "../../hooks/useLivePolling";
 import { Candle } from "../../types/candle";
+import { fetchLiveTradePlans } from "../../services/liveTradePlanApi";
+import {
+    belongsToLiveTradingSession,
+    getLiveTradingSession,
+    millisecondsUntilLiveTradingSessionBoundary,
+} from "../../lib/liveTradingSession";
 
 const DEFAULT_STOCKS = [
     "NSE:SBIN",
@@ -33,7 +39,40 @@ export default function LivePage() {
     const [tradePlans, setTradePlans] =
         useState<LiveTradePlan[]>([]);
 
-    const { nifty, stock } = useLivePolling(selectedStock);
+    const [tradingSession, setTradingSession] =
+        useState(() => getLiveTradingSession());
+
+    const { nifty, stock, niftyContext, stockContext } = useLivePolling(selectedStock);
+
+    useEffect(() => {
+        const refreshTradingSession = () => {
+            setTradingSession(getLiveTradingSession());
+        };
+        const scheduleBoundaryRefresh = () => window.setTimeout(() => {
+            refreshTradingSession();
+            timer = scheduleBoundaryRefresh();
+        }, millisecondsUntilLiveTradingSessionBoundary() + 25);
+        let timer = scheduleBoundaryRefresh();
+        window.addEventListener("focus", refreshTradingSession);
+        return () => {
+            window.clearTimeout(timer);
+            window.removeEventListener("focus", refreshTradingSession);
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        void fetchLiveTradePlans(selectedStock)
+            .then(({ plans }) => { if (!cancelled) setTradePlans(plans); })
+            .catch(() => { if (!cancelled) setTradePlans([]); });
+        return () => { cancelled = true; };
+    }, [selectedStock, tradingSession.date]);
+
+    const currentSessionPlans = tradingSession.isOpen
+        ? tradePlans.filter((plan) =>
+            belongsToLiveTradingSession(plan, tradingSession.date)
+        )
+        : [];
 
     // -----------------------------------
     // NIFTY candles
@@ -60,6 +99,25 @@ export default function LivePage() {
         close: Number(c.close || c.Close),
         volume: Number(c.volume || c.Volume || 0),
     }));
+
+    // A draft belongs to a particular selected candle.  Retaining just that
+    // identifier lets the panel hydrate the matching local draft after reload.
+    useEffect(() => {
+        try {
+            const time = window.localStorage.getItem(`intraday.live-selected-candle.v1:${selectedStock}`);
+            const candle = stockCandles.find((item) => item.time === time);
+            if (candle) setSelectedStockCandle((current) => current?.time === candle.time ? current : candle);
+        } catch { /* selection restoration is optional */ }
+    }, [selectedStock, stockCandles]);
+
+    const selectStockCandle = (candle: Candle | null) => {
+        setSelectedStockCandle(candle);
+        try {
+            const key = `intraday.live-selected-candle.v1:${selectedStock}`;
+            if (candle) window.localStorage.setItem(key, candle.time);
+            else window.localStorage.removeItem(key);
+        } catch { /* storage is optional */ }
+    };
 
     return (
         <div className="p-6">
@@ -111,17 +169,22 @@ export default function LivePage() {
                 marketEvents={[]}
                 stockName={selectedStock}
                 mode="live"
-                tradePlans={tradePlans}
+                niftyContext={niftyContext}
+                stockContext={stockContext}
+                tradePlans={currentSessionPlans}
                 onStockCandleSelect={
-                    setSelectedStockCandle
+                    selectStockCandle
                 }
             />
 
             <LiveTradePlanPanel
                 selectedCandle={selectedStockCandle}
                 stockName={selectedStock}
-                plans={tradePlans}
+                stockCandles={stockCandles}
+                niftyCandles={niftyCandles}
+                plans={currentSessionPlans}
                 onPlansChange={setTradePlans}
+                isSessionOpen={tradingSession.isOpen}
             />
 
         </div>

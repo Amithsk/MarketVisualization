@@ -25,7 +25,7 @@ import type {
     from "../live/LiveTradePlanPanel";
 
 import {
-    ExecutedTrade,
+    ExecutedTrade, ExecutionEvent,
     MarketEvent
 }
     from "../../types/replay";
@@ -55,8 +55,13 @@ type Props = {
     tradePlans?: LiveTradePlan[];
 
     executedTrade?: ExecutedTrade;
+    executionHistory?: ExecutionEvent[];
 
     mode?: "live" | "replay";
+
+    niftyContext?: any;
+
+    stockContext?: any;
 };
 
 const LIVE_VIEWPORT_DURATION_MS = 2 * 60 * 60 * 1000;
@@ -208,8 +213,13 @@ export default function SynchronizedCharts({
     tradePlans = [],
 
     executedTrade,
+    executionHistory = [],
 
     mode = "replay",
+
+    niftyContext,
+
+    stockContext,
 
 }: Props) {
 
@@ -480,6 +490,8 @@ export default function SynchronizedCharts({
 
                 mode={mode}
 
+                marketContext={niftyContext}
+
                 currentCandleIndex={
                     currentCandleIndex
                 }
@@ -517,7 +529,9 @@ export default function SynchronizedCharts({
                     )
                 }
                 executedTrade={executedTrade}
+                executionHistory={executionHistory}
                 mode={mode}
+                marketContext={stockContext}
                 
                 title={
                     stockName
@@ -550,6 +564,11 @@ export default function SynchronizedCharts({
                 }
 
             />
+
+            {executionHistory.length > 0 && <section className="rounded border border-slate-700 bg-slate-950 p-3 text-xs"><h3 className="font-semibold">Position executions</h3><div className="mt-2 space-y-1">{executionHistory.map(event => <button key={event.sequence} className="block w-full rounded border border-slate-800 p-2 text-left hover:border-indigo-400" onClick={() => {
+                const index = stockCandles.findIndex(candle => createTimestamp(candle.time) <= createTimestamp(event.execution_timestamp) && createTimestamp(candle.time) + FIVE_MINUTE_STEP_MS > createTimestamp(event.execution_timestamp));
+                if (index >= 0) onCandleSelect?.(index);
+            }}>#{event.sequence} {event.event_type} {event.quantity} @ ₹{event.price.toFixed(2)} · {event.execution_timestamp.slice(11,19)} · open {event.open_quantity_before}→{event.open_quantity_after} {event.weighted_average_after !== null ? `· avg ₹${event.weighted_average_after.toFixed(2)}` : ""}</button>)}</div></section>}
 
             {mode === "live" && liveVisibleRange && (
                 <div

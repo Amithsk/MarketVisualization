@@ -22,7 +22,13 @@ async function api<T>(
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(text || "API request failed")
+    try {
+      const body = JSON.parse(text)
+      throw new Error(body.detail || "API request failed")
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new Error(text || "API request failed")
+      throw error
+    }
   }
 
   return res.json()
@@ -63,6 +69,9 @@ export async function executeTradePlan(
   planId: number,
   payload?: {
     entry_timestamp?: string
+    quantity?: number
+    price?: number
+    client_request_id?: string
   }
 ): Promise<{ trade_id: number; status: "EXECUTED"; entry_timestamp: string }> {
   return api<{ trade_id: number; status: "EXECUTED"; entry_timestamp: string }>(
@@ -72,6 +81,10 @@ export async function executeTradePlan(
       body: JSON.stringify(payload ?? {}),
     }
   )
+}
+
+export async function addToPosition(tradeId: number, payload: { quantity: number; price: number; execution_timestamp: string; note: string; client_request_id: string }) {
+  return api(`/trades/${tradeId}/add`, { method: "POST", body: JSON.stringify(payload) })
 }
 
 /* ===============================
@@ -87,6 +100,8 @@ export async function exitTrade(
     exit_price: number
     exit_reason: string
     exit_timestamp: string
+    quantity?: number
+    client_request_id?: string
   }
 ): Promise<{ status: "EXITED"; exit_timestamp: string }> {
   return api<{ status: "EXITED"; exit_timestamp: string }>(
