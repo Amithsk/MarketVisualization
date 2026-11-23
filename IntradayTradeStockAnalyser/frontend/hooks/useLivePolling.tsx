@@ -16,6 +16,32 @@ import {
 
 import { Candle } from "../types/candle";
 
+export type NiftyLiveStatus = {
+    refresh_status: "refreshing" | "updated" | "failed" | "no_data";
+    refresh_started_at: string | null;
+    last_successful_fetch_time: string | null;
+    latest_candle_timestamp: string | null;
+    last_error: string | null;
+};
+
+const EMPTY_NIFTY_STATUS: NiftyLiveStatus = {
+    refresh_status: "no_data",
+    refresh_started_at: null,
+    last_successful_fetch_time: null,
+    latest_candle_timestamp: null,
+    last_error: null,
+};
+
+function toNiftyStatus(response: any): NiftyLiveStatus {
+    return {
+        refresh_status: response?.refresh_status || "no_data",
+        refresh_started_at: response?.refresh_started_at || null,
+        last_successful_fetch_time: response?.last_successful_fetch_time || null,
+        latest_candle_timestamp: response?.latest_candle_timestamp || null,
+        last_error: response?.last_error || response?.message || null,
+    };
+}
+
 
 function nextFiveMinuteBoundaryDelay() {
 
@@ -54,6 +80,8 @@ export default function useLivePolling(
         useState<Candle[]>([]);
     const [niftyContext, setNiftyContext] = useState<any>(null);
     const [stockContext, setStockContext] = useState<any>(null);
+    const [niftyStatus, setNiftyStatus] =
+        useState<NiftyLiveStatus>(EMPTY_NIFTY_STATUS);
     const timerRef =
         useRef<number | null>(null);
     const niftyRetryTimerRef =
@@ -91,6 +119,10 @@ export default function useLivePolling(
                 const nRes =
                     await fetchNiftyCandles();
 
+                if (!cancelled) {
+                    setNiftyStatus(toNiftyStatus(nRes));
+                }
+
                 if (
                     !cancelled &&
                     nRes?.candles
@@ -118,6 +150,15 @@ export default function useLivePolling(
                         "Nifty load error",
                         e
                     );
+                    setNiftyStatus((current) => ({
+                        ...current,
+                        refresh_status: current.last_successful_fetch_time
+                            ? "failed"
+                            : "no_data",
+                        last_error: e instanceof Error
+                            ? e.message
+                            : "NIFTY request failed",
+                    }));
                 }
             }
 
@@ -227,6 +268,9 @@ export default function useLivePolling(
 
                     try {
                         const refreshed = await fetchNiftyCandles();
+                        if (!cancelled) {
+                            setNiftyStatus(toNiftyStatus(refreshed));
+                        }
                         if (!cancelled && refreshed?.candles) {
                             setNifty(refreshed.candles.map((c: any) => ({
                                 ...c,
@@ -237,6 +281,15 @@ export default function useLivePolling(
                     } catch (e) {
                         if (!cancelled) {
                             console.error("Nifty refresh retry error", e);
+                            setNiftyStatus((current) => ({
+                                ...current,
+                                refresh_status: current.last_successful_fetch_time
+                                    ? "failed"
+                                    : "no_data",
+                                last_error: e instanceof Error
+                                    ? e.message
+                                    : "NIFTY request failed",
+                            }));
                         }
                     }
                 },
@@ -335,5 +388,6 @@ export default function useLivePolling(
         stock,
         niftyContext,
         stockContext,
+        niftyStatus,
     };
 }

@@ -24,6 +24,10 @@ async def api_nifty_candles():
         ),
         "trade_date": result.get("trade_date"),
         "last_error": result.get("last_error"),
+        "refresh_status": result.get("refresh_status"),
+        "refresh_started_at": result.get("refresh_started_at"),
+        "last_successful_fetch_time": result.get("last_successful_fetch_time"),
+        "latest_candle_timestamp": result.get("latest_candle_timestamp"),
     })
 
 

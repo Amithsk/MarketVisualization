@@ -31,6 +31,9 @@ class LiveNiftyPoller:
         "contract": None,
         "next_refresh_time": None,
         "last_error": None,
+        "refresh_status": "no_data",
+        "refresh_started_at": None,
+        "last_successful_fetch_time": None,
     }
 
     @classmethod
@@ -84,11 +87,20 @@ class LiveNiftyPoller:
                 "message": "Live NIFTY data temporarily unavailable",
                 "trade_date": current_trade_date,
                 "last_error": state.get("last_error"),
+                "refresh_status": state.get("refresh_status"),
+                "refresh_started_at": state.get("refresh_started_at"),
+                "last_successful_fetch_time": state.get("last_successful_fetch_time"),
+                "latest_candle_timestamp": state.get("latest_candle_timestamp"),
             }
 
         return {
             **state["payload"],
             "next_refresh_time": state.get("next_refresh_time"),
+            "refresh_status": state.get("refresh_status"),
+            "refresh_started_at": state.get("refresh_started_at"),
+            "last_successful_fetch_time": state.get("last_successful_fetch_time"),
+            "latest_candle_timestamp": state.get("latest_candle_timestamp"),
+            "last_error": state.get("last_error"),
         }
 
     @classmethod
@@ -220,10 +232,19 @@ class LiveNiftyPoller:
                 return
 
             trade_date = cls._current_trade_date()
+            refresh_started_at = cls._to_indian_time().isoformat()
+
+            if cls._state_lock:
+                async with cls._state_lock:
+                    cls._state["refresh_status"] = "refreshing"
+                    cls._state["refresh_started_at"] = refresh_started_at
+            else:
+                cls._state["refresh_status"] = "refreshing"
+                cls._state["refresh_started_at"] = refresh_started_at
 
             print(
                 "LIVE_NIFTY_POLLER refresh started "
-                f"trade_date={trade_date}"
+                f"trade_date={trade_date} refresh_started_at={refresh_started_at}"
             )
 
             result = await asyncio.to_thread(
@@ -280,6 +301,9 @@ class LiveNiftyPoller:
                         "contract": payload.get("contract"),
                         "next_refresh_time": cls._state.get("next_refresh_time"),
                         "last_error": None,
+                        "refresh_status": "updated",
+                        "refresh_started_at": refresh_started_at,
+                        "last_successful_fetch_time": refresh_time,
                     }
             else:
                 cache_before = cls._state["latest_candle_timestamp"]
@@ -312,8 +336,10 @@ class LiveNiftyPoller:
         if cls._state_lock:
             async with cls._state_lock:
                 cls._state["last_error"] = message
+                cls._state["refresh_status"] = "failed"
         else:
             cls._state["last_error"] = message
+            cls._state["refresh_status"] = "failed"
 
     @classmethod
     async def _clear_stale_session(cls):
@@ -336,6 +362,9 @@ class LiveNiftyPoller:
                         "contract": None,
                         "next_refresh_time": None,
                         "last_error": None,
+                        "refresh_status": "no_data",
+                        "refresh_started_at": None,
+                        "last_successful_fetch_time": None,
                     }
 
     @classmethod

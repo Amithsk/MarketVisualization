@@ -23,6 +23,9 @@ import type {
     LiveTradePlan,
 }
     from "../live/LiveTradePlanPanel";
+import type {
+    NiftyLiveStatus,
+} from "../../hooks/useLivePolling";
 
 import {
     ExecutedTrade, ExecutionEvent,
@@ -62,6 +65,8 @@ type Props = {
     niftyContext?: any;
 
     stockContext?: any;
+
+    niftyStatus?: NiftyLiveStatus;
 };
 
 const LIVE_VIEWPORT_DURATION_MS = 2 * 60 * 60 * 1000;
@@ -220,6 +225,8 @@ export default function SynchronizedCharts({
     niftyContext,
 
     stockContext,
+
+    niftyStatus,
 
 }: Props) {
 
@@ -488,6 +495,10 @@ export default function SynchronizedCharts({
 
                 title="NIFTY 50"
 
+                headerAccessory={
+                    niftyStatus && <NiftyStatusIndicator status={niftyStatus} />
+                }
+
                 mode={mode}
 
                 marketContext={niftyContext}
@@ -673,6 +684,53 @@ export default function SynchronizedCharts({
                 </div>
             )}
 
+        </div>
+    );
+}
+
+function formatIstTimestamp(value: string | null): string {
+    if (!value) return "—";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+
+    return new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    }).format(date) + " IST";
+}
+
+function NiftyStatusIndicator({ status }: { status: NiftyLiveStatus }) {
+    const labels = {
+        refreshing: "Refreshing",
+        updated: "Updated",
+        failed: "Failed",
+        no_data: "No Data",
+    };
+    const statusClass = status.refresh_status === "failed"
+        ? "text-amber-300"
+        : status.refresh_status === "refreshing"
+            ? "text-cyan-300"
+            : status.refresh_status === "updated"
+                ? "text-emerald-300"
+                : "text-gray-400";
+
+    return (
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs font-normal text-gray-400">
+            <span className={statusClass}>
+                NIFTY: {labels[status.refresh_status] || "No Data"}
+            </span>
+            <span>Fetched: {formatIstTimestamp(status.last_successful_fetch_time)}</span>
+            <span>Candle: {formatIstTimestamp(status.latest_candle_timestamp)}</span>
+            {status.refresh_status === "refreshing" && status.last_successful_fetch_time && (
+                <span className="text-cyan-300">Awaiting update</span>
+            )}
+            {status.last_error && status.refresh_status === "failed" && (
+                <span className="text-amber-300">Warning: {status.last_error}</span>
+            )}
         </div>
     );
 }

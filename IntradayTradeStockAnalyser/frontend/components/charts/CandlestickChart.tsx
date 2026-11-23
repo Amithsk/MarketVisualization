@@ -10,7 +10,7 @@ import {
     HistogramSeries,
     Coordinate,
 } from "lightweight-charts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Candle } from "../../types/candle";
 import { ExecutedTrade, MarketEvent } from "../../types/replay";
@@ -37,6 +37,7 @@ type Props = {
 
     mode?: "live" | "replay";
     marketContext?: MarketContext | null;
+    headerAccessory?: ReactNode;
 };
 
 type MarketContext = {
@@ -349,6 +350,7 @@ export default function CandlestickChart({
     executionHistory = [],
     mode = "replay",
     marketContext,
+    headerAccessory,
 }: Props) {
     const chartContainerRef = useRef<HTMLDivElement | null>(null);
     const marketEvents = providedMarketEvents ?? EMPTY_MARKET_EVENTS;
@@ -1231,7 +1233,10 @@ export default function CandlestickChart({
 
     return (
         <div className="relative w-full h-full">
-            <div className="text-sm font-semibold mb-2 text-gray-300">{title}</div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-gray-300">
+                <span>{title}</span>
+                {headerAccessory}
+            </div>
             {summaryData && (
                 <div className="w-full overflow-x-auto">
                     <div

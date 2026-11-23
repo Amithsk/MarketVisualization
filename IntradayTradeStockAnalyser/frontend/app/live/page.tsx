@@ -42,7 +42,13 @@ export default function LivePage() {
     const [tradingSession, setTradingSession] =
         useState(() => getLiveTradingSession());
 
-    const { nifty, stock, niftyContext, stockContext } = useLivePolling(selectedStock);
+    const {
+        nifty,
+        stock,
+        niftyContext,
+        stockContext,
+        niftyStatus,
+    } = useLivePolling(selectedStock);
 
     useEffect(() => {
         const refreshTradingSession = () => {
@@ -171,6 +177,7 @@ export default function LivePage() {
                 mode="live"
                 niftyContext={niftyContext}
                 stockContext={stockContext}
+                niftyStatus={niftyStatus}
                 tradePlans={currentSessionPlans}
                 onStockCandleSelect={
                     selectStockCandle

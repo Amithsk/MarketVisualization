@@ -33,7 +33,24 @@ echo Running Intraday Backend on 8003 ^&^
 uvicorn backend.app:app --reload --host 127.0.0.1 --port 8003
 
 REM -------------------------------
-REM 4. JOURNAL FRONTEND (3001)
+REM 4. NIFTY ANALYSER BACKEND (8000)
+REM -------------------------------
+start "NIFTY Analyser Backend (8000)" cmd /k ^
+cd /d D:\MarketVisualization\IntradayTradeNiftyAnalyser ^&^
+call ..\visualenv\Scripts\activate ^&^
+echo Running NIFTY Analyser Backend on 8000 ^&^
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+
+REM -------------------------------
+REM 5. NIFTY ANALYSER FRONTEND (3000)
+REM -------------------------------
+start "NIFTY Analyser Frontend (3000)" cmd /k ^
+cd /d D:\MarketVisualization\IntradayTradeNiftyAnalyser\frontend ^&^
+echo Starting NIFTY Analyser Frontend on 3000... ^&^
+npm run dev -- --port 3000
+
+REM -------------------------------
+REM 6. JOURNAL FRONTEND (3001)
 REM -------------------------------
 start "Journal Frontend (3001)" cmd /k ^
 cd /d D:\MarketVisualization\TradeJournal\frontend ^&^

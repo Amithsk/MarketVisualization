@@ -50,10 +50,16 @@ export default function TradeDayClient({
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-      <header>
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">
           Trade Day — {tradeDate}
         </h1>
+        <a
+          href="/stock-review"
+          className="rounded-md border border-sky-500 bg-sky-950 px-4 py-2 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-900"
+        >
+          Stock Review
+        </a>
       </header>
 
       {/* STEP 1 */}

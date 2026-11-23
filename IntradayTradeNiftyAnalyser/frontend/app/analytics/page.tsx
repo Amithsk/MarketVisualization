@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import { useAnalytics } from "@/hooks/useAnalytics";
 
@@ -55,6 +56,10 @@ export default function AnalyticsPage() {
 
     return (
         <div style={{ padding: "20px" }}>
+
+            <div className="mb-4 flex justify-end">
+                <Link className="text-sky-400 hover:text-sky-300" href="/">Stock Review</Link>
+            </div>
 
             <TradeDateSelector
             value={tradeDate}

@@ -18,6 +18,9 @@ from backend.app.api.analytics.performance import (
 from backend.app.api.analytics.learning import (
     router as analytics_learning_router,
 )
+from backend.app.api.analytics.stock_review import (
+    router as analytics_stock_review_router,
+)
 
 app = FastAPI(
     title="NIFTY Analytics API",
@@ -38,4 +41,8 @@ app.include_router(
 
 app.include_router(
     analytics_learning_router
+)
+
+app.include_router(
+    analytics_stock_review_router
 )

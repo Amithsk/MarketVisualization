@@ -1,7 +1,13 @@
 export async function fetchNiftyCandles() {
     const res = await fetch('/api/v1/live/nifty-candles');
-    if (!res.ok) throw new Error(`Nifty fetch failed: ${res.status}`);
-    return res.json();
+    const payload = await res.json();
+
+    // A 503 before the first completed fetch still carries poller state.
+    if (!res.ok && !payload?.refresh_status) {
+        throw new Error(`Nifty fetch failed: ${res.status}`);
+    }
+
+    return payload;
 }
 
 export async function fetchSymbolCandles(symbol: string) {
