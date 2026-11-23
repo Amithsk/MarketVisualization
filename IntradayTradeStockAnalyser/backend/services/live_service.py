@@ -13,6 +13,14 @@ from backend.services.market_context_engine import calculate_market_context
 BASE_URL = os.getenv("ZERODHA_MARKET_DATA_BASE_URL", "http://127.0.0.1:8001")
 INDIAN_TIME_ZONE = ZoneInfo("Asia/Kolkata")
 CANDLE_INTERVAL = timedelta(minutes=5)
+NIFTY_CONNECT_TIMEOUT_SECONDS = 5.0
+NIFTY_READ_TIMEOUT_SECONDS = 30.0
+NIFTY_HTTP_TIMEOUT = httpx.Timeout(
+    connect=NIFTY_CONNECT_TIMEOUT_SECONDS,
+    read=NIFTY_READ_TIMEOUT_SECONDS,
+    write=NIFTY_READ_TIMEOUT_SECONDS,
+    pool=NIFTY_READ_TIMEOUT_SECONDS,
+)
 
 
 class LiveService:
@@ -81,7 +89,13 @@ class LiveService:
             print(f"base_url={BASE_URL}")
             print(f"url={url}")
             print("method=GET")
-            print("timeout=10.0")
+            print(
+                "nifty_http_timeout "
+                f"connect={NIFTY_HTTP_TIMEOUT.connect} "
+                f"read={NIFTY_HTTP_TIMEOUT.read} "
+                f"write={NIFTY_HTTP_TIMEOUT.write} "
+                f"pool={NIFTY_HTTP_TIMEOUT.pool}"
+            )
             print("proxy env:", {
                 "HTTP_PROXY": os.getenv("HTTP_PROXY"),
                 "http_proxy": os.getenv("http_proxy"),
@@ -105,7 +119,15 @@ class LiveService:
             except Exception as sock_e:
                 print("TCP connect failed:", repr(sock_e))
 
-            r = httpx.get(url,    headers={        "User-Agent": "curl/7.88.1",        "Connection": "close",        "Accept": "*/*",    },    timeout=15.0,)
+            r = httpx.get(
+                url,
+                headers={
+                    "User-Agent": "curl/7.88.1",
+                    "Connection": "close",
+                    "Accept": "*/*",
+                },
+                timeout=NIFTY_HTTP_TIMEOUT,
+            )
             r.raise_for_status()
             payload = r.json()
 
