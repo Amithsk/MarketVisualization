@@ -31,7 +31,7 @@ class LiveNiftyPoller:
         "contract": None,
         "next_refresh_time": None,
         "last_error": None,
-        "refresh_status": "no_data",
+        "refresh_status": "waiting_for_data",
         "refresh_started_at": None,
         "last_successful_fetch_time": None,
     }
@@ -301,7 +301,7 @@ class LiveNiftyPoller:
                         "contract": payload.get("contract"),
                         "next_refresh_time": cls._state.get("next_refresh_time"),
                         "last_error": None,
-                        "refresh_status": "updated",
+                        "refresh_status": "ready",
                         "refresh_started_at": refresh_started_at,
                         "last_successful_fetch_time": refresh_time,
                     }
@@ -362,7 +362,7 @@ class LiveNiftyPoller:
                         "contract": None,
                         "next_refresh_time": None,
                         "last_error": None,
-                        "refresh_status": "no_data",
+                        "refresh_status": "waiting_for_data",
                         "refresh_started_at": None,
                         "last_successful_fetch_time": None,
                     }

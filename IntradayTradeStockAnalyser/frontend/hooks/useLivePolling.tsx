@@ -17,7 +17,7 @@ import {
 import { Candle } from "../types/candle";
 
 export type NiftyLiveStatus = {
-    refresh_status: "refreshing" | "updated" | "failed" | "no_data";
+    refresh_status: "refreshing" | "ready" | "failed" | "waiting_for_data";
     refresh_started_at: string | null;
     last_successful_fetch_time: string | null;
     latest_candle_timestamp: string | null;
@@ -25,7 +25,7 @@ export type NiftyLiveStatus = {
 };
 
 const EMPTY_NIFTY_STATUS: NiftyLiveStatus = {
-    refresh_status: "no_data",
+    refresh_status: "waiting_for_data",
     refresh_started_at: null,
     last_successful_fetch_time: null,
     latest_candle_timestamp: null,
@@ -34,7 +34,7 @@ const EMPTY_NIFTY_STATUS: NiftyLiveStatus = {
 
 function toNiftyStatus(response: any): NiftyLiveStatus {
     return {
-        refresh_status: response?.refresh_status || "no_data",
+        refresh_status: response?.refresh_status || "waiting_for_data",
         refresh_started_at: response?.refresh_started_at || null,
         last_successful_fetch_time: response?.last_successful_fetch_time || null,
         latest_candle_timestamp: response?.latest_candle_timestamp || null,
@@ -154,7 +154,7 @@ export default function useLivePolling(
                         ...current,
                         refresh_status: current.last_successful_fetch_time
                             ? "failed"
-                            : "no_data",
+                            : "waiting_for_data",
                         last_error: e instanceof Error
                             ? e.message
                             : "NIFTY request failed",
@@ -285,7 +285,7 @@ export default function useLivePolling(
                                 ...current,
                                 refresh_status: current.last_successful_fetch_time
                                     ? "failed"
-                                    : "no_data",
+                                    : "waiting_for_data",
                                 last_error: e instanceof Error
                                     ? e.message
                                     : "NIFTY request failed",

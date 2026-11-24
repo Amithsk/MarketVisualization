@@ -706,25 +706,25 @@ function formatIstTimestamp(value: string | null): string {
 function NiftyStatusIndicator({ status }: { status: NiftyLiveStatus }) {
     const labels = {
         refreshing: "Refreshing",
-        updated: "Updated",
-        failed: "Failed",
-        no_data: "No Data",
+        ready: "Ready",
+        failed: "Refresh failed",
+        waiting_for_data: "Waiting for data",
     };
     const statusClass = status.refresh_status === "failed"
         ? "text-amber-300"
         : status.refresh_status === "refreshing"
             ? "text-cyan-300"
-            : status.refresh_status === "updated"
+            : status.refresh_status === "ready"
                 ? "text-emerald-300"
                 : "text-gray-400";
 
     return (
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs font-normal text-gray-400">
             <span className={statusClass}>
-                NIFTY: {labels[status.refresh_status] || "No Data"}
+                NIFTY: {labels[status.refresh_status] || "Waiting for data"}
             </span>
             <span>Fetched: {formatIstTimestamp(status.last_successful_fetch_time)}</span>
-            <span>Candle: {formatIstTimestamp(status.latest_candle_timestamp)}</span>
+            <span>Latest candle: {formatIstTimestamp(status.latest_candle_timestamp)}</span>
             {status.refresh_status === "refreshing" && status.last_successful_fetch_time && (
                 <span className="text-cyan-300">Awaiting update</span>
             )}
