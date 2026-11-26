@@ -4,7 +4,7 @@ import {
 
     useEffect,
 
-    useState
+    useState, useRef
 
 } from "react";
 
@@ -17,6 +17,7 @@ import {
 } from "../services/tradeApi";
 
 export function useTradeSelection() {
+    const requestRef = useRef(0);
 
     // -----------------------------------
     // Trade dates
@@ -94,6 +95,7 @@ export function useTradeSelection() {
         tradeDate: string
     ) => {
 
+        const request = ++requestRef.current;
         try {
 
             setSelectedDate(tradeDate);
@@ -111,12 +113,14 @@ export function useTradeSelection() {
                     tradeDate
                 );
 
+            if (request !== requestRef.current) return;
             setStocks(
                 fetchedStocks
             );
 
         } catch (err: any) {
 
+            if (request !== requestRef.current) return;
             console.error(err);
 
             setError(
@@ -126,7 +130,7 @@ export function useTradeSelection() {
 
         } finally {
 
-            setLoading(false);
+            if (request === requestRef.current) setLoading(false);
         }
     };
 

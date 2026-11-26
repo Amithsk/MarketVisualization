@@ -1,0 +1,20 @@
+.root { position: relative; min-width: 0; }
+.label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: #334155; }
+.field { width: 100%; min-height: 42px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: white; color: #0f172a; border: 1px solid #94a3b8; border-radius: 7px; padding: 8px 12px; text-align: left; }
+.popover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 100; width: min(340px, calc(100vw - 24px)); padding: 16px; background: #fff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 32px #0f172a30; }
+.modes { display: flex; padding: 3px; background: #f1f5f9; border-radius: 7px; }
+.modes button { flex: 1; padding: 7px; border-radius: 5px; color: #475569; }
+.modes button[aria-pressed="true"] { background: white; color: #075985; font-weight: 700; box-shadow: 0 1px 4px #0f172a24; }
+.month { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px; }
+.month button { width: 36px; height: 36px; font-size: 24px; border-radius: 5px; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; }
+.weekday { padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 700; }
+.day { height: 38px; min-width: 0; border-radius: 5px; font-size: 14px; font-weight: 600; color: #0f172a; }
+.day:hover { background: #e0f2fe; }
+.missing { color: #94a3b8; font-weight: 400; }
+.otherMonth { opacity: .65; }
+.selected { background: #dbeafe; color: #075985; opacity: 1; }
+.selected.missing { color: #64748b; background: #e8eff7; text-decoration: line-through; }
+.legend { margin: 10px 0 0; color: #64748b; font-size: 12px; }
+.root button:focus-visible { outline: 3px solid #0284c7; outline-offset: 2px; position: relative; z-index: 1; }
+@media (max-width: 640px) { .popover { left: 0; right: auto; } }

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 import {
     ReplayData
@@ -20,6 +20,7 @@ type ReplayParams = {
 };
 
 export function useReplayData() {
+    const requestRef = useRef(0);
 
     const [replayData, setReplayData] =
         useState<ReplayData | null>(null);
@@ -39,6 +40,7 @@ export function useReplayData() {
         stock
     }: ReplayParams) => {
 
+        const request = ++requestRef.current;
         try {
 
             setLoading(true);
@@ -51,6 +53,7 @@ export function useReplayData() {
                     stock
                 );
 
+            if (request !== requestRef.current) return null;
             setReplayData(
                 replayPayload
             );
@@ -59,6 +62,7 @@ export function useReplayData() {
 
         } catch (err: any) {
 
+            if (request !== requestRef.current) return null;
             setError(
 
                 err.message ||
@@ -69,7 +73,7 @@ export function useReplayData() {
 
         } finally {
 
-            setLoading(false);
+            if (request === requestRef.current) setLoading(false);
         }
     };
 
@@ -81,6 +85,7 @@ export function useReplayData() {
 
         error,
 
-        fetchReplayData
+        fetchReplayData,
+        invalidate: () => { requestRef.current++; setReplayData(null); setError(null); setLoading(false); }
     };
 }

@@ -143,7 +143,7 @@ export default function ReplayPage() {
 
         error: replayError,
 
-        fetchReplayData
+        fetchReplayData, invalidate
 
     } = useReplayData();
     // -----------------------------------
@@ -208,6 +208,7 @@ export default function ReplayPage() {
     ] = useState<number>(0);
 
     useEffect(() => {
+        invalidate();
         coachAbortRef.current?.abort();
         activeCoachKeyRef.current = null;
         completedCoachKeyRef.current = null;
@@ -397,11 +398,11 @@ export default function ReplayPage() {
                                 }
 
                                 onSelectDate={
-                                    selectTradeDate
+                                    (date) => { invalidate(); selectionRef.current = { date, stock: "" }; selectTradeDate(date); }
                                 }
 
                                 loading={
-                                    tradeLoading
+                                    false
                                 }
 
                             />
@@ -421,7 +422,7 @@ export default function ReplayPage() {
                                 }
 
                                 onSelectStock={
-                                    setSelectedStock
+                                    (stock) => { invalidate(); selectionRef.current = { date: selectedDate, stock }; setSelectedStock(stock); }
                                 }
 
                                 disabled={

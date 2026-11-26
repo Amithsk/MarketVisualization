@@ -1,118 +1,19 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 
-type Props = {
-
-    tradeDates: string[];
-
-    selectedDate: string;
-
-    onSelectDate: (
-        tradeDate: string
-    ) => void;
-
-    loading?: boolean;
-};
-
-export default function TradeDateSelector({
-
-    tradeDates,
-
-    selectedDate,
-
-    onSelectDate,
-
-    loading = false
-
-}: Props) {
-
-    return (
-
-        <div
-            className="
-                flex
-                flex-col
-                gap-2
-            "
-        >
-
-            {/* ---------------------------- */}
-            {/* LABEL */}
-            {/* ---------------------------- */}
-
-            <label
-                className="
-                    text-sm
-                    text-gray-400
-                    font-medium
-                "
-            >
-
-                Trade Date
-
-            </label>
-
-            {/* ---------------------------- */}
-            {/* SELECT */}
-            {/* ---------------------------- */}
-
-            <select
-
-                value={selectedDate}
-
-                onChange={(event) =>
-
-                    onSelectDate(
-                        event.target.value
-                    )
-                }
-
-                disabled={loading}
-
-                className="
-                    bg-gray-900
-                    border
-                    border-gray-700
-                    rounded-md
-                    px-3
-                    py-2
-                    text-sm
-                    text-white
-                    min-w-[220px]
-                "
-            >
-
-                {/* Placeholder */}
-
-                <option value="">
-
-                    Select Trade Date
-
-                </option>
-
-                {/* Trade Dates */}
-
-                {
-
-                    tradeDates.map(
-                        (tradeDate) => (
-
-                            <option
-
-                                key={tradeDate}
-
-                                value={tradeDate}
-
-                            >
-
-                                {tradeDate}
-
-                            </option>
-                        )
-                    )
-                }
-
-            </select>
-
-        </div>
-    );
+export const addDays = (s: string, n: number) => { const d = new Date(`${s}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+export const monday = (s: string) => addDays(s, -((new Date(`${s}T00:00:00Z`).getUTCDay() + 6) % 7));
+export const shortDate = (s: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${s}T00:00:00Z`));
+type Props = { tradeDates: string[]; selectedDate: string; onSelectDate: (date: string) => void; loading?: boolean; week?: boolean; label?: string };
+export default function TradeDateSelector({ tradeDates, selectedDate, onSelectDate, loading = false, week = false, label = "Trade Date" }: Props) {
+ const [open, setOpen] = useState(false); const [cursor, setCursor] = useState(""); const root = useRef<HTMLDivElement>(null); const field = useRef<HTMLButtonElement>(null); const grid = useRef<HTMLDivElement>(null);
+ const available = new Set(tradeDates); const selectedWeek = selectedDate ? monday(selectedDate) : "";
+ const close = () => { setOpen(false); field.current?.focus(); };
+ useEffect(() => { if (!open) return; const outside = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) close(); }; const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); close(); } }; document.addEventListener("pointerdown", outside); document.addEventListener("keydown", key); return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", key); }; }, [open]);
+ useEffect(() => { if (open) grid.current?.querySelector<HTMLButtonElement>(`[data-date="${cursor}"]`)?.focus(); }, [open, cursor]);
+ const start = cursor ? `${cursor.slice(0, 7)}-01` : ""; const first = start ? monday(start) : ""; const dates = first ? Array.from({length: 42}, (_, i) => addDays(first, i)) : [];
+ const selectable = (s: string) => week ? Array.from({length: 5}, (_, i) => addDays(monday(s), i)).some(d => available.has(d)) : available.has(s);
+ const monthMove = (n: number) => { const d = new Date(`${cursor.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); setCursor(d.toISOString().slice(0, 10)); };
+ const text = selectedDate ? week ? `${selectedWeek.slice(0, 7) === addDays(selectedWeek, 4).slice(0, 7) ? String(Number(selectedWeek.slice(8))) : shortDate(selectedWeek)}–${shortDate(addDays(selectedWeek, 4))}` : shortDate(selectedDate) : "Select date";
+ return <div ref={root} style={{position:"relative", minWidth: 220}}><div className="text-sm font-medium text-gray-400 mb-2">{label}</div><button ref={field} type="button" aria-haspopup="dialog" aria-expanded={open} disabled={loading || !tradeDates.length} onClick={() => { if (open) close(); else { setCursor(selectedDate || [...tradeDates].sort().at(-1) || ""); setOpen(true); } }} className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-left text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">{text} <span aria-hidden="true">▾</span></button>{open && <div role="dialog" aria-label="Choose date" style={{position:"fixed", zIndex:1000, width:"min(320px, calc(100vw - 16px))", left: Math.max(8, Math.min(root.current?.getBoundingClientRect().left ?? 8, window.innerWidth - Math.min(320, window.innerWidth - 16) - 8)), top: Math.max(8, Math.min((root.current?.getBoundingClientRect().bottom ?? 0) + 4, window.innerHeight - 370)), maxHeight:"calc(100vh - 16px)", overflow:"auto"}} className="rounded-lg border border-slate-600 bg-slate-900 p-3 text-white shadow-xl"><div className="flex items-center justify-between mb-2"><button type="button" aria-label="Previous month" onClick={() => monthMove(-1)} className="px-3 py-1 focus-visible:outline focus-visible:outline-sky-400">‹</button><strong>{new Intl.DateTimeFormat("en-GB", {month:"long", year:"numeric", timeZone:"UTC"}).format(new Date(`${start}T00:00:00Z`))}</strong><button type="button" aria-label="Next month" onClick={() => monthMove(1)} className="px-3 py-1 focus-visible:outline focus-visible:outline-sky-400">›</button></div><div className="grid grid-cols-7 text-center text-xs text-slate-400">{["Mo","Tu","We","Th","Fr","Sa","Su"].map(x => <span key={x}>{x}</span>)}</div><div ref={grid} className="grid grid-cols-7" onKeyDown={e => { const delta: Record<string,number> = {ArrowLeft:-1, ArrowRight:1, ArrowUp:-7, ArrowDown:7}; if (delta[e.key]) { e.preventDefault(); setCursor(addDays(cursor, delta[e.key])); } else if (e.key === "PageUp" || e.key === "PageDown") { e.preventDefault(); monthMove(e.key === "PageUp" ? -1 : 1); } }} >{dates.map(d => { const enabled = selectable(d); const selected = week ? selectedWeek === monday(d) && new Date(`${d}T00:00:00Z`).getUTCDay() !== 0 && new Date(`${d}T00:00:00Z`).getUTCDay() !== 6 : d === selectedDate; return <button key={d} data-date={d} type="button" tabIndex={d === cursor ? 0 : -1} aria-label={`${shortDate(d)}${enabled ? ", available" : ", unavailable"}`} aria-disabled={!enabled} aria-pressed={selected} onClick={() => { if (enabled) { onSelectDate(d); close(); } }} className={`h-9 rounded text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 ${selected ? "bg-blue-600 text-white" : enabled ? "text-white hover:bg-slate-700" : "text-slate-600"} ${d.slice(0,7) !== start.slice(0,7) ? "opacity-50" : ""}`}>{Number(d.slice(8))}</button>; })}</div><p className="mt-2 text-xs text-slate-400">Available dates are bright; unavailable dates are dimmed.</p></div>}</div>;
 }
