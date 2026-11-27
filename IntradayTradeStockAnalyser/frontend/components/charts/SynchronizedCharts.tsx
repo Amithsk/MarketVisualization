@@ -704,33 +704,42 @@ function formatIstTimestamp(value: string | null): string {
 }
 
 function NiftyStatusIndicator({ status }: { status: NiftyLiveStatus }) {
+    const display = status.display_status ?? "waiting_for_first_candle";
+    const latest = formatIstTimestamp(status.latest_candle_timestamp).replace(" IST", "").slice(0, 5);
     const labels = {
-        refreshing: "Refreshing",
-        ready: "Ready",
-        failed: "Refresh failed",
-        waiting_for_data: "Waiting for data",
+        ready: `Ready | ${latest}`,
+        updating: "Updating...",
+        delayed: `Delayed | ${latest}`,
+        fetch_failed: "Fetch failed",
+        market_closed: "Market closed",
+        waiting_for_first_candle: "Waiting for first candle",
     };
-    const statusClass = status.refresh_status === "failed"
-        ? "text-amber-300"
-        : status.refresh_status === "refreshing"
-            ? "text-cyan-300"
-            : status.refresh_status === "ready"
-                ? "text-emerald-300"
+    const statusClass = display === "ready"
+        ? "text-emerald-300"
+        : display === "updating"
+            ? "text-amber-300"
+            : display === "delayed" || display === "fetch_failed"
+                ? "text-red-300"
                 : "text-gray-400";
+    const diagnostic = [
+        "NIFTY Data Status",
+        `Status: ${labels[display]}`,
+        `Last fetched: ${formatIstTimestamp(status.last_successful_fetch_time)}`,
+        `Latest available candle: ${formatIstTimestamp(status.latest_candle_timestamp)}`,
+        `Expected completed candle: ${formatIstTimestamp(status.expected_candle_timestamp ?? null)}`,
+        `Current time: ${formatIstTimestamp(status.current_time ?? null)}`,
+        status.candle_delay_minutes === null || status.candle_delay_minutes === undefined
+            ? null
+            : `Candle delay: ${status.candle_delay_minutes} minutes`,
+        status.last_error ? `Latest fetch error: ${status.last_error}` : null,
+    ].filter(Boolean).join("\n");
 
     return (
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs font-normal text-gray-400">
-            <span className={statusClass}>
-                NIFTY: {labels[status.refresh_status] || "Waiting for data"}
+        <div className="group relative flex items-center justify-end text-xs font-medium" title={diagnostic} tabIndex={0} aria-label={diagnostic} aria-describedby="nifty-status-diagnostics">
+            <span className={statusClass}>NIFTY: {labels[display]}</span>
+            <span id="nifty-status-diagnostics" role="tooltip" className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-72 whitespace-pre-line rounded border border-gray-700 bg-gray-950 p-2 text-left text-xs font-normal text-gray-200 shadow-lg group-hover:block group-focus:block">
+                {diagnostic}
             </span>
-            <span>Fetched: {formatIstTimestamp(status.last_successful_fetch_time)}</span>
-            <span>Latest candle: {formatIstTimestamp(status.latest_candle_timestamp)}</span>
-            {status.refresh_status === "refreshing" && status.last_successful_fetch_time && (
-                <span className="text-cyan-300">Awaiting update</span>
-            )}
-            {status.last_error && status.refresh_status === "failed" && (
-                <span className="text-amber-300">Warning: {status.last_error}</span>
-            )}
         </div>
     );
 }

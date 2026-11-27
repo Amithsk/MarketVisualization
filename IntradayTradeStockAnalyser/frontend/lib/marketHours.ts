@@ -1,6 +1,6 @@
 const INDIAN_TIME_ZONE = "Asia/Kolkata";
-const MARKET_OPEN_MINUTES = 9 * 60 + 15;
-const MARKET_CLOSE_MINUTES = 15 * 60 + 15;
+export const MARKET_OPEN_MINUTES = 9 * 60 + 15;
+export const MARKET_CLOSE_MINUTES = 15 * 60 + 15;
 
 function getIndianTimeParts(date: Date) {
     const parts = new Intl.DateTimeFormat("en-GB", {

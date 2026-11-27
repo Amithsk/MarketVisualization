@@ -11,6 +11,8 @@ import {
 } from "../services/liveApi";
 import {
     isIndianMarketOpen,
+    MARKET_CLOSE_MINUTES,
+    MARKET_OPEN_MINUTES,
     millisecondsUntilIndianMarketOpen,
 } from "../lib/marketHours";
 
@@ -22,7 +24,16 @@ export type NiftyLiveStatus = {
     last_successful_fetch_time: string | null;
     latest_candle_timestamp: string | null;
     last_error: string | null;
+    display_status?: "ready" | "updating" | "delayed" | "fetch_failed" | "market_closed" | "waiting_for_first_candle";
+    expected_candle_timestamp?: string | null;
+    current_time?: string;
+    candle_delay_minutes?: number | null;
 };
+
+// The existing stale-cache retry waits 20 seconds when the poller does not
+// provide a next refresh time.  Use that same normal refresh window for UI
+// freshness rather than changing the polling cadence.
+export const NIFTY_FRESHNESS_GRACE_MS = 20_000;
 
 const EMPTY_NIFTY_STATUS: NiftyLiveStatus = {
     refresh_status: "waiting_for_data",
@@ -39,6 +50,54 @@ function toNiftyStatus(response: any): NiftyLiveStatus {
         last_successful_fetch_time: response?.last_successful_fetch_time || null,
         latest_candle_timestamp: response?.latest_candle_timestamp || null,
         last_error: response?.last_error || response?.message || null,
+    };
+}
+
+function indianDateParts(date: Date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Kolkata", year: "numeric", month: "numeric",
+        day: "numeric", hour: "numeric", minute: "numeric", second: "numeric",
+        hourCycle: "h23",
+    }).formatToParts(date);
+    const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+    return { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute"), second: value("second") };
+}
+
+function expectedCompletedCandle(now: Date): number | null {
+    const ist = indianDateParts(now);
+    const minutes = ist.hour * 60 + ist.minute;
+    if (minutes < MARKET_OPEN_MINUTES + 5 || minutes > MARKET_CLOSE_MINUTES) return null;
+
+    const expectedMinutes = Math.floor((minutes - 5) / 5) * 5;
+    return Date.UTC(ist.year, ist.month - 1, ist.day, 0, expectedMinutes) - 5.5 * 60 * 60 * 1000;
+}
+
+export function getNiftyFreshnessStatus(status: NiftyLiveStatus, now = new Date()): NiftyLiveStatus {
+    if (!isIndianMarketOpen(now)) {
+        return { ...status, display_status: "market_closed", current_time: now.toISOString(), expected_candle_timestamp: null, candle_delay_minutes: null };
+    }
+
+    const expected = expectedCompletedCandle(now);
+    if (expected === null) {
+        return { ...status, display_status: "waiting_for_first_candle", current_time: now.toISOString(), expected_candle_timestamp: null, candle_delay_minutes: null };
+    }
+
+    const latest = status.latest_candle_timestamp ? new Date(status.latest_candle_timestamp).getTime() : Number.NaN;
+    const current = latest === expected;
+    const delay = Number.isFinite(latest) ? Math.max(0, Math.round((expected - latest) / 60_000)) : null;
+    if (current) {
+        return { ...status, display_status: "ready", current_time: now.toISOString(), expected_candle_timestamp: new Date(expected).toISOString(), candle_delay_minutes: 0 };
+    }
+    if (status.refresh_status === "failed") {
+        return { ...status, display_status: "fetch_failed", current_time: now.toISOString(), expected_candle_timestamp: new Date(expected).toISOString(), candle_delay_minutes: delay };
+    }
+    const expectedAvailableAt = expected + 5 * 60_000;
+    return {
+        ...status,
+        display_status: now.getTime() < expectedAvailableAt + NIFTY_FRESHNESS_GRACE_MS ? "updating" : "delayed",
+        current_time: now.toISOString(),
+        expected_candle_timestamp: new Date(expected).toISOString(),
+        candle_delay_minutes: delay,
     };
 }
 
@@ -82,6 +141,7 @@ export default function useLivePolling(
     const [stockContext, setStockContext] = useState<any>(null);
     const [niftyStatus, setNiftyStatus] =
         useState<NiftyLiveStatus>(EMPTY_NIFTY_STATUS);
+    const [freshnessClock, setFreshnessClock] = useState(() => Date.now());
     const timerRef =
         useRef<number | null>(null);
     const niftyRetryTimerRef =
@@ -152,9 +212,7 @@ export default function useLivePolling(
                     );
                     setNiftyStatus((current) => ({
                         ...current,
-                        refresh_status: current.last_successful_fetch_time
-                            ? "failed"
-                            : "waiting_for_data",
+                        refresh_status: "failed",
                         last_error: e instanceof Error
                             ? e.message
                             : "NIFTY request failed",
@@ -283,9 +341,7 @@ export default function useLivePolling(
                             console.error("Nifty refresh retry error", e);
                             setNiftyStatus((current) => ({
                                 ...current,
-                                refresh_status: current.last_successful_fetch_time
-                                    ? "failed"
-                                    : "waiting_for_data",
+                                refresh_status: "failed",
                                 last_error: e instanceof Error
                                     ? e.message
                                     : "NIFTY request failed",
@@ -382,12 +438,33 @@ export default function useLivePolling(
 
     }, [selectedSymbol]);
 
+    // Freshness changes at a candle boundary even when the chart data has not
+    // changed. This timer performs no network work.
+    useEffect(() => {
+        let timer: number | null = null;
+        const reassess = () => {
+            setFreshnessClock(Date.now());
+            const now = new Date();
+            const delay = 5 * 60_000 - (now.getTime() % (5 * 60_000));
+            timer = window.setTimeout(reassess, Math.max(1000, delay));
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState === "visible") setFreshnessClock(Date.now());
+        };
+        reassess();
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => {
+            if (timer !== null) window.clearTimeout(timer);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
+        };
+    }, []);
+
 
     return {
         nifty,
         stock,
         niftyContext,
         stockContext,
-        niftyStatus,
+        niftyStatus: getNiftyFreshnessStatus(niftyStatus, new Date(freshnessClock)),
     };
 }
